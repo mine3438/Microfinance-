@@ -618,3 +618,93 @@ Approve §1–§12 (or mark specific sections for change), and answer §13 —
 at minimum 13.1, 13.2, and 13.3, which gate the lending core.
 
 On approval I begin at Stage 0 and implement one stage at a time.
+
+---
+
+## 16. Amendments — BOT Template (supersedes §13.7 and §14)
+
+The official BOT template arrived after §1–§15 were written. See
+`02-BOT-REPORTING-SPEC.md` for the full analysis. §1–§12 stand
+unchanged; the amendments below extend them.
+
+### 16.1 Decisions recorded
+
+| Decision | Value |
+|---|---|
+| MSP2-01 / MSP2-02 production | **Option 1** — structured quarterly financial-statement entry, with all loan-derived lines auto-populated and locked. No general ledger in v1; ledger seam retained so entered figures become opening balances later |
+| Monthly → annual rate conversion | **Configurable reference data, simple convention (`m × 12 × 100`) as default.** To be verified against a previously accepted filing or a BOT contact before first submission. The convention is a config value, not a constant in code, so correcting it is a data change |
+| MSP2-08 Agent Banking | **In scope.** The template shows a single balance column per bank, not the agent transaction table previously assumed. §13.7 is closed |
+
+### 16.2 Architecture changes
+
+1. **`provisioning` domain service** — BOT's classification bands and
+   provision rates as *versioned reference data with effective dates*
+   (BOT can revise them), dual schedules for standard vs. housing
+   microfinance, net-of-collateral computation, NPL ratio. Classification
+   becomes **loan-type dependent**, not a single function.
+2. **`branches` is mandatory**, not optional — MSP2-10 reports branch and
+   employee counts per district. Staff carry a branch assignment; branches
+   carry a district.
+3. **Geography as seeded reference tables** — 31 regions, 193 districts,
+   Mainland/Zanzibar, council-type suffixes preserved. Client and branch
+   location become FKs, replacing free-text `district`/`region`.
+4. **`financial_statement_lines`** — quarterly, Sno-keyed, per form,
+   distinguishing auto-derived (locked) from entered (editable) lines.
+5. **`bank_accounts`** — institution type (bank / MSP / MNO / foreign
+   bank), seeded institution lists, TZS **and foreign-currency-equivalent**
+   columns, quarter-end snapshots, plus a separate agent-banking balance
+   for MSP2-08. Foreign-currency holdings need a rate and rate date
+   (§11.6 of the BOT spec).
+6. **Complaints extended** — monetary value, one of six nature
+   categories, resolution route (institution vs. other party), referral
+   destination, and quarterly roll-forward derivation.
+7. **Compulsory savings** surfaced to MSP2-01, MSP2-03 (as a provision
+   deduction) and MSP2-10. Its source of truth must be unambiguous
+   (§11.7 of the BOT spec).
+8. **Rate reporting** — annual-percent conversion per 16.1, min/max per
+   loan type, split by amortisation method. `interest_method` becomes a
+   first-class reporting dimension.
+9. **Cross-form validation engine** — all 18 rules from
+   `bot-taxonomies.json` run as pre-submission checks and **block export
+   on failure**. Together with the freshness gate (§10.3), the system
+   refuses to file a report it can tell is wrong.
+10. **Sno-addressed cell mapping** — the exporter writes by
+    (form, Sno, column), never hardcoded row index. BOT's own validation
+    rules are expressed in Sno terms, and a template revision then
+    becomes a data change rather than a code change.
+
+### 16.3 Testing gain
+
+Every formula in every form is now reproducible as a fixture. The
+compliance module can be verified against BOT's actual arithmetic before
+a real filing, which retires most of R10 — not by guessing better, but by
+having the answer key.
+
+### 16.4 Revised implementation sequence (supersedes §14)
+
+| # | Stage | Depends on | Blocked by |
+|---|---|---|---|
+| 0 | Monorepo, TS strict, lint + import boundaries, CI, migrations, Docker Postgres/Redis | — | — |
+| 1 | `packages/money` — Money/Rate/Percentage, golden vectors, driver numeric-parser assertion | 0 | — |
+| 2 | Core schema + RLS + **isolation suite green before any UI** | 0 | — |
+| 3 | Seed reference data: geography, sectors, loan types, banks/MNOs, provisioning schedules, BOT line items | 2 | — |
+| 4 | identity: auth, permissions, invitations, **branches**, session security | 1,2 | — |
+| 5 | Audit (both layers), domain-event seam, boot health check | 4 | — |
+| 6 | client context: clients, KYC, guarantors, documents | 4,5 | — |
+| 7 | lending core: products, interest engines, schedules, **preview endpoints** | 1,6 | — |
+| 8 | lending workflow: applications, approval, disbursement | 7 | §13.3 |
+| 9 | repayment: allocation, reversals, receipts | 7 | §13.2 |
+| 10 | **provisioning + classification** (dual schedules) + scheduled job + freshness gating | 9 | §13.1 (penalties only) |
+| 11 | finops: expenses/income mapped to BOT lines, bank accounts, agent banking | 6 | — |
+| 12 | **financial statements**: quarterly entry, locked derived lines | 10,11 | — |
+| 13 | compliance: all 10 forms, validation engine, XLSX + PDF, archive | 9,12 | — |
+| 14 | support (complaints, roll-forward), notifications | 5 | — |
+| 15 | savings incl. compulsory savings | 6 | §13.4 |
+| 16 | shares | 6 | §13.5 |
+| 17 | groups + group lending | 7 | §13.6 |
+| 18 | Dashboard, analytics, search/filter, exports | 9,13 | — |
+| 19 | Backup/restore, settings, hardening, load test | all | — |
+
+**Stages 0–7 are unblocked** by the outstanding §13 business rules and
+can proceed immediately. Stages 1, 2, 7, and 10 are the ones that must be
+right — they are where the money and the regulatory numbers live.
