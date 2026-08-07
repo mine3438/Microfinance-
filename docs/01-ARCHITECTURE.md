@@ -689,10 +689,10 @@ having the answer key.
 | 2 | Core schema + RLS + **isolation suite green before any UI** | 0 | — |
 | 3 | Seed reference data: geography, sectors, loan types, banks/MNOs, provisioning schedules, BOT line items | 2 | — |
 | 4 | identity: auth, permissions, invitations, **branches**, session security | 1,2 | — |
-| 5 | Audit (both layers), domain-event seam, boot health check | 4 | — |
+| 5 | Audit: generic trigger on every business table, tamper-proof log | 4 | — |
 | 6 | client context: clients, KYC, guarantors, documents | 4,5 | — |
 | 7 | lending core: products, interest engines, schedules, **preview endpoints** | 1,6 | — |
-| 8 | lending workflow: applications, approval, disbursement | 7 | §13.3 |
+| 8 | lending workflow: applications, approval, disbursement, **domain-event seam** | 7 | §13.3 |
 | 9 | repayment: allocation, reversals, receipts | 7 | §13.2 |
 | 10 | **provisioning + classification** (dual schedules) + scheduled job + freshness gating | 9 | §13.1 (penalties only) |
 | 11 | finops: expenses/income mapped to BOT lines, bank accounts, agent banking | 6 | — |
@@ -704,6 +704,15 @@ having the answer key.
 | 17 | groups + group lending | 7 | §13.6 |
 | 18 | Dashboard, analytics, search/filter, exports | 9,13 | — |
 | 19 | Backup/restore, settings, hardening, load test | all | — |
+
+**Amendment (stage 5).** The domain-event seam moves from stage 5 to stage 8.
+Creating the table before any financial event exists would leave it empty in
+every deployment — the exact fault the analysis records as R8 for `audit_logs`
+and App Flow §4 for `bot_reports`, both of which were schema for capabilities
+that were designed and never built. The seam lands with the first events it
+carries. Audit itself ships in stage 5 fully wired, so it is populated from the
+moment it exists. The boot health check listed here shipped early, in stage 2,
+as `Database.verifyReadiness()`.
 
 **Stages 0–7 are unblocked** by the outstanding §13 business rules and
 can proceed immediately. Stages 1, 2, 7, and 10 are the ones that must be

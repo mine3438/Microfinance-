@@ -11,11 +11,11 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–4 of 19 complete: repository foundation, tooling,
+Early construction. Stages 0–5 of 19 complete: repository foundation, tooling,
 CI, migration infrastructure, the exact-decimal money layer, the tenancy core
-with its cross-tenant isolation suite, the seeded BOT reference data, and the
-identity schema with password, token and permission primitives. No HTTP surface
-or application features yet.
+with its cross-tenant isolation suite, the seeded BOT reference data, the
+identity schema with password, token and permission primitives, and audit
+logging. No HTTP surface or application features yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -118,6 +118,13 @@ Two more rules in the same spirit:
   all rows — and the application layer refuses the operation before it reaches
   the database, because an empty result is indistinguishable from an
   institution that has no data.
+- **Every change is audited, by the database.** One generic trigger is
+  attached to every business table, and a test reads the catalogue to confirm
+  none was missed — so a write path added later is audited whether or not
+  anyone remembers. Entries are append-only: the application holds SELECT and
+  nothing else, so an entry cannot be amended, removed, or forged. Password and
+  token hashes are stripped before they are written, because an audit trail
+  holding secrets is a second credential store with longer retention.
 - **Authorisation is permissions, not role names.** Five seeded roles are
   named bundles of 29 permissions. A loan officer holds `loan.create` and not
   `loan.approve`, and the domain refuses an approval by the user who made the

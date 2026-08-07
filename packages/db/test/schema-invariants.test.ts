@@ -107,26 +107,117 @@ describe('every tenant table enforces row-level security', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('scopes every policy through current_institution_id()', async () => {
+  it('scopes every policy reachable by the application through current_institution_id()', async () => {
     // A policy that never consults tenant resolution is not a tenant policy,
     // whatever it is named.
+    //
+    // Scoped to policies that apply to `mfi_app`, because that is what the
+    // invariant is actually about: the application role must not be able to
+    // escape its tenant. Internal policies granted to another role — the audit
+    // writer, for instance — are governed by the fact that `mfi_app` holds no
+    // privilege there at all, which is a stronger guarantee than a predicate.
     const result = await pool.query<{
       table_name: string;
       policy_name: string;
+      roles: string[];
       qualifier: string | null;
       with_check: string | null;
     }>(
-      `SELECT tablename AS table_name, policyname AS policy_name, qual AS qualifier, with_check
+      `SELECT tablename AS table_name, policyname AS policy_name, roles,
+              qual AS qualifier, with_check
          FROM pg_policies
         WHERE schemaname = 'public'`,
     );
 
-    const offenders = result.rows
+    const appReachable = result.rows.filter(
+      (row) => row.roles.includes('mfi_app') || row.roles.includes('public'),
+    );
+    expect(appReachable.length).toBeGreaterThan(0);
+
+    const offenders = appReachable
       .filter((row) => {
         const expression = `${row.qualifier ?? ''} ${row.with_check ?? ''}`;
         return !expression.includes('current_institution_id');
       })
       .map((row) => `${row.table_name}.${row.policy_name}`);
+
+    expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * Tables deliberately not audited, each with the reason.
+ *
+ * The list being explicit is the mechanism: adding a table here is a reviewed
+ * decision, whereas forgetting to attach a trigger is silent. The previous
+ * system's audit table was empty in every deployment precisely because nothing
+ * made the omission visible.
+ */
+const UNAUDITED_TABLES: ReadonlyMap<string, string> = new Map([
+  [
+    'schema_migrations',
+    'Migration registry. Its own contents are the change history of the schema.',
+  ],
+  ['audit_logs', 'Auditing the audit log is circular.'],
+  [
+    'refresh_tokens',
+    'Rotated on every request. Auditing session churn would bury genuine business ' +
+      'changes, and who logged in is a security concern served by the login record.',
+  ],
+  [
+    'user_tokens',
+    'Verification and reset tokens, issued and consumed mechanically. No business meaning.',
+  ],
+  [
+    'code_sequences',
+    'Implementation detail of code allocation. The audit entry for the loan says ' +
+      'everything the counter increment would.',
+  ],
+]);
+
+describe('every business table is audited', () => {
+  const auditedTables = async (): Promise<Set<string>> => {
+    const result = await pool.query<{ table_name: string }>(
+      `SELECT DISTINCT c.relname AS table_name
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_proc p ON p.oid = t.tgfoid
+        WHERE p.proname = 'audit_row_change' AND NOT t.tgisinternal`,
+    );
+    return new Set(result.rows.map((row) => row.table_name));
+  };
+
+  it('attaches the audit trigger to every table not explicitly excluded', async () => {
+    // This is what keeps the audit trail honest as the schema grows: a table
+    // added in a later stage without a trigger fails here, on the commit that
+    // adds it, rather than being discovered missing during an inspection.
+    const audited = await auditedTables();
+    const offenders = (await listTables())
+      .map((table) => table.table_name)
+      .filter((name) => !UNAUDITED_TABLES.has(name) && !audited.has(name));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('audits something, so the check cannot pass vacuously', async () => {
+    expect((await auditedTables()).size).toBeGreaterThan(0);
+  });
+
+  it('fires on insert, update and delete alike', async () => {
+    // A trigger attached for INSERT only would satisfy the check above while
+    // recording none of the changes that matter most.
+    const result = await pool.query<{ table_name: string; events: number }>(
+      `SELECT c.relname AS table_name, t.tgtype AS events
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_proc p ON p.oid = t.tgfoid
+        WHERE p.proname = 'audit_row_change' AND NOT t.tgisinternal`,
+    );
+
+    // tgtype bits: 4 = INSERT, 8 = DELETE, 16 = UPDATE.
+    const offenders = result.rows
+      .filter((row) => (row.events & 4) === 0 || (row.events & 8) === 0 || (row.events & 16) === 0)
+      .map((row) => row.table_name);
 
     expect(offenders).toEqual([]);
   });
