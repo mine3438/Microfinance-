@@ -15,7 +15,12 @@
  *   is undetectable afterwards.
  */
 
-export { Database, DEFAULT_APPLICATION_ROLE, TENANT_SETTING } from './database.js';
+export {
+  ACTING_USER_SETTING,
+  Database,
+  DEFAULT_APPLICATION_ROLE,
+  TENANT_SETTING,
+} from './database.js';
 export type { DatabaseOptions, TransactionClient, TransactionWork } from './database.js';
 
 export { assertExactNumericsAreSafe, TYPE_OIDS } from './driver-safety.js';

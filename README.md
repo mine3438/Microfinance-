@@ -11,10 +11,11 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–3 of 19 complete: repository foundation, tooling,
+Early construction. Stages 0–4 of 19 complete: repository foundation, tooling,
 CI, migration infrastructure, the exact-decimal money layer, the tenancy core
-with its cross-tenant isolation suite, and the seeded BOT reference data. No
-application features yet.
+with its cross-tenant isolation suite, the seeded BOT reference data, and the
+identity schema with password, token and permission primitives. No HTTP surface
+or application features yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -67,6 +68,7 @@ pnpm verify               # format, lint, typecheck, build, test
 apps/          API and web applications
 packages/
   money/       exact-decimal Money, Rate, Percentage value objects
+  identity/    password hashing, session tokens, the permission model
   db/          Postgres access, tenant-scoped transactions, driver safety
   migrator/    forward-only, checksum-verified SQL migration runner
 db/
@@ -116,6 +118,11 @@ Two more rules in the same spirit:
   all rows — and the application layer refuses the operation before it reaches
   the database, because an empty result is indistinguishable from an
   institution that has no data.
+- **Authorisation is permissions, not role names.** Five seeded roles are
+  named bundles of 29 permissions. A loan officer holds `loan.create` and not
+  `loan.approve`, and the domain refuses an approval by the user who made the
+  application — segregation of duties enforced where it cannot be bypassed,
+  rather than in an interface that is not the only way in.
 - **BOT reference data is generated, never transcribed.** The 22 sectors, 193
   districts, provisioning bands and 103 financial-statement line items are
   extracted from BOT's own template and emitted as a migration by a committed

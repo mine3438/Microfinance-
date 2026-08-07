@@ -19,6 +19,16 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export interface TenantContext {
   /** Institution the work belongs to. */
   readonly institutionId: string;
+
+  /**
+   * The user acting, when there is one.
+   *
+   * Absent for work with no human actor — a scheduled classification run, a
+   * migration. Present for anything a person initiated, where it feeds
+   * `current_user_id()` for permission predicates and, from the audit stage
+   * onward, records who made a change.
+   */
+  readonly userId?: string;
 }
 
 /**
@@ -54,6 +64,11 @@ export function assertValidTenantContext(context: TenantContext | undefined): Te
     throw new MissingTenantContextError(
       `Tenant context institutionId "${institutionId}" is not a UUID.`,
     );
+  }
+
+  const { userId } = context;
+  if (userId !== undefined && !UUID_PATTERN.test(userId)) {
+    throw new MissingTenantContextError(`Tenant context userId "${userId}" is not a UUID.`);
   }
 
   return context;

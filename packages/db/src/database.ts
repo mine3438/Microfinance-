@@ -7,6 +7,9 @@ import { assertValidTenantContext, type TenantContext } from './tenant-context.j
 /** Session setting the tenancy policies read. Mirrors `current_institution_id()` in SQL. */
 export const TENANT_SETTING = 'app.institution_id';
 
+/** Session setting identifying the acting user. Mirrors `current_user_id()` in SQL. */
+export const ACTING_USER_SETTING = 'app.user_id';
+
 /** Default least-privilege role, created by migration `0001_foundation.sql`. */
 export const DEFAULT_APPLICATION_ROLE = 'mfi_app';
 
@@ -100,7 +103,7 @@ export class Database {
     context: TenantContext,
     work: TransactionWork<T>,
   ): Promise<T> {
-    const { institutionId } = assertValidTenantContext(context);
+    const { institutionId, userId } = assertValidTenantContext(context);
 
     return this.runInTransaction(async (client) => {
       if (this.applicationRole !== null) {
@@ -110,6 +113,9 @@ export class Database {
         await client.query(`SET LOCAL ROLE ${this.applicationRole}`);
       }
       await client.query('SELECT set_config($1, $2, true)', [TENANT_SETTING, institutionId]);
+      // Empty string rather than NULL when there is no acting user: set_config
+      // rejects NULL, and current_user_id() maps '' back to NULL.
+      await client.query('SELECT set_config($1, $2, true)', [ACTING_USER_SETTING, userId ?? '']);
       return work(client);
     });
   }

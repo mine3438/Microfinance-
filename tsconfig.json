@@ -5,6 +5,9 @@
       "path": "./packages/money/tsconfig.build.json"
     },
     {
+      "path": "./packages/identity/tsconfig.build.json"
+    },
+    {
       "path": "./packages/db/tsconfig.build.json"
     },
     {

@@ -1,9 +1,9 @@
 {
-  "name": "@mfi/db",
+  "name": "@mfi/identity",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Postgres access with tenant-scoped transactions and driver-safety guarantees",
+  "description": "Password hashing, session token handling, and the permission model",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,19 +17,12 @@
   ],
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
-    "pretest": "pnpm --filter \"@mfi/db^...\" build",
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@mfi/money": "workspace:*",
-    "pg": "^8.13.1"
-  },
-  "devDependencies": {
-    "@mfi/identity": "workspace:*",
-    "@mfi/migrator": "workspace:*",
-    "@types/pg": "^8.11.10"
+    "@node-rs/argon2": "^2.0.2"
   }
 }
