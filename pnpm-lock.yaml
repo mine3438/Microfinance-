@@ -36,6 +36,22 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.1)(tsx@4.23.9))
 
+  packages/db:
+    dependencies:
+      '@mfi/money':
+        specifier: workspace:*
+        version: link:../money
+      pg:
+        specifier: ^8.13.1
+        version: 8.22.0
+    devDependencies:
+      '@mfi/migrator':
+        specifier: workspace:*
+        version: link:../migrator
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.4
+
   packages/migrator:
     dependencies:
       pg:

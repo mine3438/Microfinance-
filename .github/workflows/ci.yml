@@ -80,5 +80,16 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Apply migrations
+        # Proves the migration set applies cleanly to an empty database, and
+        # that no applied migration has been edited since. A drifted checksum
+        # fails here rather than on a production deploy.
+        run: pnpm db:migrate
+
+      - name: Verify migrations
+        run: pnpm db:verify
+
       - name: Test
+        # Includes the cross-tenant isolation suite and the schema invariants
+        # that fail when a new table is added without row-level security.
         run: pnpm test

@@ -11,9 +11,9 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–1 of 19 complete: repository foundation, tooling,
-CI, database migration infrastructure, and the exact-decimal money layer. No
-application features yet.
+Early construction. Stages 0–2 of 19 complete: repository foundation, tooling,
+CI, migration infrastructure, the exact-decimal money layer, and the tenancy
+core with its cross-tenant isolation suite. No application features yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -66,6 +66,7 @@ pnpm verify               # format, lint, typecheck, build, test
 apps/          API and web applications
 packages/
   money/       exact-decimal Money, Rate, Percentage value objects
+  db/          Postgres access, tenant-scoped transactions, driver safety
   migrator/    forward-only, checksum-verified SQL migration runner
 db/
   migrations/  versioned SQL, immutable once applied
@@ -93,9 +94,20 @@ Two more rules in the same spirit:
   loudly instead of silently diverging the database from the repository.
 - **Money is never a float.** Amounts are exact decimals end to end —
   `NUMERIC(15,2)` at rest, strings on the wire, `Money` in code. Constructing
-  an amount from a JavaScript number throws, and a test asserts the Postgres
-  driver still returns `NUMERIC` as a string, since a driver reconfigured to
-  parse it with `parseFloat` would silently turn every balance into a double.
+  an amount from a JavaScript number throws, and opening a database connection
+  asserts the driver still returns `NUMERIC` as a string, since one
+  `setTypeParser(1700, parseFloat)` anywhere in the process would silently turn
+  every balance into a double.
+- **No table without tenant isolation.** Every tenant-scoped table carries a
+  `NOT NULL institution_id`, has row-level security enabled *and* forced, and
+  is reachable only through policies that consult `current_institution_id()`.
+  A schema-invariant suite reads the live catalogue on every commit, so a table
+  added without those properties fails CI on the commit that adds it rather
+  than in an incident months later.
+- **Tenancy fails closed.** Forgetting the tenant context yields no rows, never
+  all rows — and the application layer refuses the operation before it reaches
+  the database, because an empty result is indistinguishable from an
+  institution that has no data.
 
 ## Licence
 
