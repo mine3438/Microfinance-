@@ -1,0 +1,84 @@
+name: CI
+
+# Every push and pull request. The analysis (00-PROJECT-ANALYSIS.md, R14)
+# identifies the project's historical failure mode as "hit a bug, declare the
+# codebase broken, regenerate everything." CI is the structural answer: "is it
+# broken?" becomes a question with an automatic answer rather than a judgement
+# made while frustrated.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Migration and repository tests run against a real Postgres. The behaviour
+  # under test is the database's — transaction rollback, advisory locks, RLS —
+  # and a mocked driver would assert the mock instead of the guarantee.
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mfi_test
+  REDIS_URL: redis://localhost:6379
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Pinned to 16 to match the target deployment. NUMERIC semantics and RLS
+        # behaviour are what the financial and tenancy suites assert against.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mfi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        # Includes the architectural boundary rules: a domain layer that imports
+        # a framework or a database driver fails here, not in review.
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
