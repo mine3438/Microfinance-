@@ -1,0 +1,28 @@
+{
+  "name": "@mfi/money",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Exact-decimal monetary and rate value objects. The only place arithmetic on money is permitted.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0"
+  }
+}

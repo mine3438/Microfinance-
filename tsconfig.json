@@ -1,4 +1,11 @@
 {
   "files": [],
-  "references": [{ "path": "./packages/migrator/tsconfig.build.json" }]
+  "references": [
+    {
+      "path": "./packages/money/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/migrator/tsconfig.build.json"
+    }
+  ]
 }

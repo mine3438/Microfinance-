@@ -11,8 +11,9 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stage 0 of 19 — repository foundation, tooling, CI, and
-database migration infrastructure. No application features yet.
+Early construction. Stages 0–1 of 19 complete: repository foundation, tooling,
+CI, database migration infrastructure, and the exact-decimal money layer. No
+application features yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -64,6 +65,7 @@ pnpm verify               # format, lint, typecheck, build, test
 ```
 apps/          API and web applications
 packages/
+  money/       exact-decimal Money, Rate, Percentage value objects
   migrator/    forward-only, checksum-verified SQL migration runner
 db/
   migrations/  versioned SQL, immutable once applied
@@ -89,6 +91,11 @@ Two more rules in the same spirit:
 - **Applied migrations are immutable.** Checksums are recorded on apply and
   verified on every run, including in CI, so editing schema history fails
   loudly instead of silently diverging the database from the repository.
+- **Money is never a float.** Amounts are exact decimals end to end —
+  `NUMERIC(15,2)` at rest, strings on the wire, `Money` in code. Constructing
+  an amount from a JavaScript number throws, and a test asserts the Postgres
+  driver still returns `NUMERIC` as a string, since a driver reconfigured to
+  parse it with `parseFloat` would silently turn every balance into a double.
 
 ## Licence
 
