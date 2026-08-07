@@ -11,9 +11,10 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–2 of 19 complete: repository foundation, tooling,
-CI, migration infrastructure, the exact-decimal money layer, and the tenancy
-core with its cross-tenant isolation suite. No application features yet.
+Early construction. Stages 0–3 of 19 complete: repository foundation, tooling,
+CI, migration infrastructure, the exact-decimal money layer, the tenancy core
+with its cross-tenant isolation suite, and the seeded BOT reference data. No
+application features yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -70,9 +71,16 @@ packages/
   migrator/    forward-only, checksum-verified SQL migration runner
 db/
   migrations/  versioned SQL, immutable once applied
-  seeds/       reference data
-docs/          analysis, architecture, BOT specification
+scripts/       build and data-generation tooling
+docs/          analysis, architecture, BOT specification, extracted reference data
 ```
+
+Two Postgres schemas, and the split is structural rather than stylistic:
+`public` holds institution data and every table in it must enforce row-level
+security; `reference` holds BOT's own taxonomies — sectors, districts,
+provisioning rates, form line items — which belong to no institution and are
+granted read-only. "Is this tenant data?" is answered by where a table lives,
+not by a list someone has to keep up to date.
 
 Packages appear as their stage builds them, rather than as empty shells.
 
@@ -108,6 +116,11 @@ Two more rules in the same spirit:
   all rows — and the application layer refuses the operation before it reaches
   the database, because an empty result is indistinguishable from an
   institution that has no data.
+- **BOT reference data is generated, never transcribed.** The 22 sectors, 193
+  districts, provisioning bands and 103 financial-statement line items are
+  extracted from BOT's own template and emitted as a migration by a committed
+  script. Twenty-two sectors typed by hand would contain errors, and each one
+  would surface as a wrong regulatory filing rather than as a crash.
 
 ## Licence
 

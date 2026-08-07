@@ -186,4 +186,18 @@ export default defineConfig([
       '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
+
+  // ── Build and data-generation scripts ─────────────────────────────────────
+  // Plain Node ESM, outside any package tsconfig, so the Node globals they use
+  // have to be declared rather than inferred from types.
+  {
+    files: ['scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
 ]);
