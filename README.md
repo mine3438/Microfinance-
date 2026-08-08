@@ -11,11 +11,11 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–5 of 19 complete: repository foundation, tooling,
+Early construction. Stages 0–6 of 19 complete: repository foundation, tooling,
 CI, migration infrastructure, the exact-decimal money layer, the tenancy core
 with its cross-tenant isolation suite, the seeded BOT reference data, the
-identity schema with password, token and permission primitives, and audit
-logging. No HTTP surface or application features yet.
+identity schema with password, token and permission primitives, audit logging,
+and the client context. No HTTP surface yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -68,6 +68,7 @@ pnpm verify               # format, lint, typecheck, build, test
 apps/          API and web applications
 packages/
   money/       exact-decimal Money, Rate, Percentage value objects
+  domain/      business rules and value objects; no framework, no I/O
   identity/    password hashing, session tokens, the permission model
   db/          Postgres access, tenant-scoped transactions, driver safety
   migrator/    forward-only, checksum-verified SQL migration runner

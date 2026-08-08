@@ -8,6 +8,9 @@
       "path": "./packages/identity/tsconfig.build.json"
     },
     {
+      "path": "./packages/domain/tsconfig.build.json"
+    },
+    {
       "path": "./packages/db/tsconfig.build.json"
     },
     {

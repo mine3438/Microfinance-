@@ -45,6 +45,9 @@ importers:
         specifier: ^8.13.1
         version: 8.22.0
     devDependencies:
+      '@mfi/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@mfi/identity':
         specifier: workspace:*
         version: link:../identity
@@ -54,6 +57,12 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.4
+
+  packages/domain:
+    dependencies:
+      '@mfi/money':
+        specifier: workspace:*
+        version: link:../money
 
   packages/identity:
     dependencies:

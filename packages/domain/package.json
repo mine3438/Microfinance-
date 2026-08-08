@@ -1,9 +1,9 @@
 {
-  "name": "@mfi/db",
+  "name": "@mfi/domain",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Postgres access with tenant-scoped transactions and driver-safety guarantees",
+  "description": "Business rules and value objects. Pure TypeScript: no framework, no I/O.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,20 +17,12 @@
   ],
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
-    "pretest": "pnpm --filter \"@mfi/db^...\" build",
     "clean": "rm -rf dist *.tsbuildinfo",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@mfi/money": "workspace:*",
-    "pg": "^8.13.1"
-  },
-  "devDependencies": {
-    "@mfi/domain": "workspace:*",
-    "@mfi/identity": "workspace:*",
-    "@mfi/migrator": "workspace:*",
-    "@types/pg": "^8.11.10"
+    "@mfi/money": "workspace:*"
   }
 }

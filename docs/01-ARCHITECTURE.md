@@ -690,7 +690,7 @@ having the answer key.
 | 3 | Seed reference data: geography, sectors, loan types, banks/MNOs, provisioning schedules, BOT line items | 2 | — |
 | 4 | identity: auth, permissions, invitations, **branches**, session security | 1,2 | — |
 | 5 | Audit: generic trigger on every business table, tamper-proof log | 4 | — |
-| 6 | client context: clients, KYC, guarantors, documents | 4,5 | — |
+| 6 | client context: clients, guarantors (documents → API stage) | 4,5 | — |
 | 7 | lending core: products, interest engines, schedules, **preview endpoints** | 1,6 | — |
 | 8 | lending workflow: applications, approval, disbursement, **domain-event seam** | 7 | §13.3 |
 | 9 | repayment: allocation, reversals, receipts | 7 | §13.2 |
