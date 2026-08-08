@@ -60,6 +60,9 @@ importers:
 
   packages/domain:
     dependencies:
+      '@mfi/identity':
+        specifier: workspace:*
+        version: link:../identity
       '@mfi/money':
         specifier: workspace:*
         version: link:../money

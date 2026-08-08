@@ -160,6 +160,12 @@ const UNAUDITED_TABLES: ReadonlyMap<string, string> = new Map([
   ],
   ['audit_logs', 'Auditing the audit log is circular.'],
   [
+    'domain_events',
+    'Append-only event log with the same shape as audit_logs: written solely by a ' +
+      'SECURITY DEFINER trigger, read-only to the application, never amended. A change ' +
+      'log over an immutable log records nothing that the log does not already say.',
+  ],
+  [
     'refresh_tokens',
     'Rotated on every request. Auditing session churn would bury genuine business ' +
       'changes, and who logged in is a security concern served by the login record.',

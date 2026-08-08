@@ -25,6 +25,26 @@ export { PhoneNumber } from './client/phone-number.js';
 
 export { addMonthsFromAnchor, monthlyDueDates } from './lending/due-dates.js';
 
+export { assessApproval } from './lending/approval.js';
+export type {
+  ApprovalAssessment,
+  ApprovalAuthority,
+  ApprovalRefusal,
+  ApprovalRequest,
+} from './lending/approval.js';
+
+export {
+  LOAN_STATUSES,
+  LOAN_TRANSITIONS,
+  TERMINAL_LOAN_STATUSES,
+  assertTransition,
+  canTransition,
+  isDisbursed,
+  isLoanStatus,
+  isOutstanding,
+} from './lending/loan-status.js';
+export type { LoanStatus } from './lending/loan-status.js';
+
 export {
   INTEREST_METHODS,
   MAXIMUM_TERM_MONTHS,

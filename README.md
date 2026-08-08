@@ -11,12 +11,12 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–7 of 19 complete: repository foundation, tooling,
+Early construction. Stages 0–8 of 19 complete: repository foundation, tooling,
 CI, migration infrastructure, the exact-decimal money layer, the tenancy core
 with its cross-tenant isolation suite, the seeded BOT reference data, the
 identity schema with password, token and permission primitives, audit logging,
-the client context, and the lending core with both interest engines. No HTTP
-surface yet.
+the client context, the lending core with both interest engines, and the
+approval workflow. No HTTP surface yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -120,6 +120,11 @@ Two more rules in the same spirit:
   all rows — and the application layer refuses the operation before it reaches
   the database, because an empty result is indistinguishable from an
   institution that has no data.
+- **Money cannot be advanced on an application nobody sanctioned.** The status
+  machine is enforced by a database trigger as well as in the domain, and the
+  approver may not be the person who submitted — including an administrator
+  holding every permission. A control the interface enforces is not a control,
+  because the interface is not the only way in.
 - **One schedule engine, not two.** The system it replaces computed a payment
   breakdown twice — once server-side to write the schedule, once in the browser
   to preview it — and its own technical document warned that if they drifted,

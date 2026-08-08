@@ -7,5 +7,12 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts", "dist"],
-  "references": [{ "path": "../money/tsconfig.build.json" }]
+  "references": [
+    {
+      "path": "../money/tsconfig.build.json"
+    },
+    {
+      "path": "../identity/tsconfig.build.json"
+    }
+  ]
 }
