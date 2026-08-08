@@ -11,12 +11,12 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–8 of 19 complete: repository foundation, tooling,
+Early construction. Stages 0–9 of 19 complete: repository foundation, tooling,
 CI, migration infrastructure, the exact-decimal money layer, the tenancy core
 with its cross-tenant isolation suite, the seeded BOT reference data, the
 identity schema with password, token and permission primitives, audit logging,
-the client context, the lending core with both interest engines, and the
-approval workflow. No HTTP surface yet.
+the client context, the lending core with both interest engines, the approval
+workflow, and payment allocation with reversals. No HTTP surface yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -120,6 +120,13 @@ Two more rules in the same spirit:
   all rows — and the application layer refuses the operation before it reaches
   the database, because an empty result is indistinguishable from an
   institution that has no data.
+- **A payment is never edited.** Recorded payments are append-only: the
+  application holds INSERT and SELECT and nothing else. Correcting a mis-keyed
+  payment means recording a linked reversal that negates it exactly, so the
+  mistake and its correction both stay visible. The system this replaces made
+  payments immutable and never built the correction, so fixing one meant
+  editing the database by hand — which destroys the property the immutability
+  was protecting.
 - **Money cannot be advanced on an application nobody sanctioned.** The status
   machine is enforced by a database trigger as well as in the domain, and the
   approver may not be the person who submitted — including an administrator

@@ -11,6 +11,20 @@
 export { DomainError, DomainValidationError } from './errors.js';
 
 export {
+  ALLOCATION_BUCKETS,
+  DOCUMENTED_ALLOCATION_ORDER,
+  allocatePayment,
+  amountApplied,
+  balanceAfter,
+} from './repayment/allocation.js';
+export type {
+  AllocationBucket,
+  AllocationRequest,
+  OutstandingAmounts,
+  PaymentAllocation,
+} from './repayment/allocation.js';
+
+export {
   AGE_BAND_LABELS,
   AGE_BAND_THRESHOLD_YEARS,
   ageBandAt,
