@@ -46,6 +46,41 @@ const FRAMEWORK_AND_IO = [
   },
 ];
 
+/** Never reachable from the API layer, however the request arrived. */
+const API_FORBIDDEN = [
+  {
+    group: ['decimal.js'],
+    message:
+      'Money arithmetic belongs in @mfi/money and the rules that use it in @mfi/domain. ' +
+      'An amount computed in a controller is a second implementation of a calculation that ' +
+      'must have exactly one (analysis R2).',
+  },
+  {
+    group: ['@node-rs/argon2', 'argon2', 'bcrypt', 'bcryptjs'],
+    message:
+      'Password hashing belongs in @mfi/identity, which fixes the argon2id parameters in one ' +
+      'place. Hashing here would let a second, weaker cost setting exist.',
+  },
+];
+
+/** Constructing these belongs to the composition root alone. */
+const INFRASTRUCTURE_CONSTRUCTION = [
+  {
+    group: ['ioredis'],
+    allowTypeImports: true,
+    message:
+      'Construct the Redis client in composition.ts and pass it in. A module that builds its ' +
+      'own connection cannot be given a different one by a test.',
+  },
+  {
+    group: ['pg'],
+    allowTypeImports: true,
+    message:
+      'Use the Database from @mfi/db, which enforces the tenant transaction boundary. A pool ' +
+      'built here would bypass it.',
+  },
+];
+
 export default defineConfig([
   {
     ignores: [
@@ -151,6 +186,44 @@ export default defineConfig([
     files: ['packages/contracts/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', { patterns: FRAMEWORK_AND_IO }],
+    },
+  },
+
+  // ── Layer: api ────────────────────────────────────────────────────────────
+  // The interface layer. It may reach for a framework and a driver — that is
+  // what it is for — but the direction of dependency still only points inward,
+  // and the one thing it must not become is a second place business rules live.
+  //
+  // The typescript-eslint variant throughout, for `allowTypeImports`: these
+  // rules are about *constructing* things, and a type-only import constructs
+  // nothing. A module that names `Redis` to type a parameter it is handed is
+  // obeying the rule, not breaking it.
+  {
+    files: ['apps/api/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: API_FORBIDDEN }],
+    },
+  },
+
+  // ── Composition root ──────────────────────────────────────────────────────
+  // The one file permitted to construct concrete infrastructure. Everything
+  // else receives what it needs as an argument, which is what makes a wiring
+  // mistake a type error at the line that would have supplied it rather than a
+  // runtime failure when a module loads (01-ARCHITECTURE.md §17.1).
+  //
+  // The pattern list is composed rather than replaced. ESLint overrides a rule's
+  // options wholesale, so a block that listed only the extra patterns would
+  // silently switch the ones above back off for every file it matched.
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: ['apps/api/src/composition.ts', 'apps/api/src/main.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [...API_FORBIDDEN, ...INFRASTRUCTURE_CONSTRUCTION] },
+      ],
     },
   },
 

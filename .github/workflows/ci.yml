@@ -19,6 +19,10 @@ env:
   # under test is the database's — transaction rollback, advisory locks, RLS —
   # and a mocked driver would assert the mock instead of the guarantee.
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mfi_test
+  # The API suite starts a real server with the real plugin stack, including the
+  # Redis-backed rate limiter. Its limits are a security control, so the suite
+  # exercises the shipped configuration rather than a loosened one.
+  REDIS_URL: redis://localhost:6379
   REDIS_URL: redis://localhost:6379
 
 jobs:
@@ -96,6 +100,7 @@ jobs:
         run: pnpm db:verify
 
       - name: Test
-        # Includes the cross-tenant isolation suite and the schema invariants
-        # that fail when a new table is added without row-level security.
+        # Includes the cross-tenant isolation suite, the schema invariants that
+        # fail when a new table is added without row-level security, and the
+        # HTTP suites that drive a real server against a real database.
         run: pnpm test

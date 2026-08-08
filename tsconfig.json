@@ -18,6 +18,9 @@
     },
     {
       "path": "./packages/migrator/tsconfig.build.json"
+    },
+    {
+      "path": "./apps/api/tsconfig.build.json"
     }
   ]
 }

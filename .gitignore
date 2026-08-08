@@ -25,3 +25,7 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Redis snapshot, written into the working directory when redis-server is
+# started here for the test suites.
+dump.rdb

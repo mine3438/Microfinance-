@@ -11,13 +11,17 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–10 of 19 complete: repository foundation, tooling,
-CI, migration infrastructure, the exact-decimal money layer, the tenancy core
-with its cross-tenant isolation suite, the seeded BOT reference data, the
-identity schema with password, token and permission primitives, audit logging,
-the client context, the lending core with both interest engines, the approval
-workflow, payment allocation with reversals, and overdue classification with
-provisioning and a freshness gate on reporting. No HTTP surface yet.
+Early construction. Stages 0–10 of 19 complete, plus the API foundation:
+repository foundation, tooling, CI, migration infrastructure, the exact-decimal
+money layer, the tenancy core with its cross-tenant isolation suite, the seeded
+BOT reference data, the identity schema with password, token and permission
+primitives, audit logging, the client context, the lending core with both
+interest engines, the approval workflow, payment allocation with reversals, and
+overdue classification with provisioning and a freshness gate on reporting.
+
+The HTTP surface has started: a Fastify API with the shared wire contract,
+authentication, refresh-token rotation with reuse detection, and the security
+controls around them. Resource routes for clients, loans and payments are next.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -67,7 +71,8 @@ pnpm verify               # format, build, lint, typecheck, test
 ## Layout
 
 ```
-apps/          API and web applications
+apps/
+  api/         Fastify HTTP interface: routes, guards, use cases
 packages/
   contracts/   zod request and response schemas, shared by API and web
   money/       exact-decimal Money, Rate, Percentage value objects
@@ -165,6 +170,27 @@ Two more rules in the same spirit:
   housing loan 40 days overdue has no classification BOT has given. It is left
   unclassified and counted, and its presence blocks filing — rather than being
   rounded into "Current", which would understate provisions on a signed return.
+- **The wire contract is one definition, not two.** Every request and response
+  is a zod schema in `packages/contracts`; the API validates against it and the
+  web client imports the same object, so a shape change is a compile error on
+  both sides rather than a runtime surprise on one. Objects are strict — an
+  unrecognised key is rejected, not stripped — because on a request that moves
+  money, silence is the wrong answer to a typo.
+- **Nothing is constructed except at the composition root.** There is no
+  container and no runtime resolution: `composition.ts` builds every dependency
+  and passes it inward as an argument, so a wiring mistake is a type error at
+  the line that would have supplied it rather than an exception when a module
+  loads. A lint rule keeps it that way, and was verified to fire.
+- **An error discloses nothing by default.** One handler turns a thrown value
+  into a response; anything not deliberately classified becomes a 500 with a
+  fixed message and a correlation ID, while the real cause goes to the log. The
+  system this replaces surfaced raw Postgres errors to the browser, which
+  described the schema to an attacker and told the user nothing actionable.
+- **A cache outage does not stop the institution.** The rate limiter continues
+  unlimited when Redis is unreachable — its plugin default is to fail the
+  request, which would return 500 for every call because a cache is down. Login
+  alone fails closed, because there the limit *is* the control rather than a
+  protection around one.
 - **BOT reference data is generated, never transcribed.** The 22 sectors, 193
   districts, provisioning bands and 103 financial-statement line items are
   extracted from BOT's own template and emitted as a migration by a committed
