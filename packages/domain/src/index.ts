@@ -22,3 +22,18 @@ export { GENDERS, isGender, parseGender } from './client/gender.js';
 export type { Gender } from './client/gender.js';
 
 export { PhoneNumber } from './client/phone-number.js';
+
+export { addMonthsFromAnchor, monthlyDueDates } from './lending/due-dates.js';
+
+export {
+  INTEREST_METHODS,
+  MAXIMUM_TERM_MONTHS,
+  generateSchedule,
+  isInterestMethod,
+} from './lending/schedule.js';
+export type {
+  InterestMethod,
+  RepaymentSchedule,
+  ScheduleInstalment,
+  ScheduleRequest,
+} from './lending/schedule.js';

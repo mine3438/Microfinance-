@@ -11,11 +11,12 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–6 of 19 complete: repository foundation, tooling,
+Early construction. Stages 0–7 of 19 complete: repository foundation, tooling,
 CI, migration infrastructure, the exact-decimal money layer, the tenancy core
 with its cross-tenant isolation suite, the seeded BOT reference data, the
 identity schema with password, token and permission primitives, audit logging,
-and the client context. No HTTP surface yet.
+the client context, and the lending core with both interest engines. No HTTP
+surface yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -119,6 +120,12 @@ Two more rules in the same spirit:
   all rows — and the application layer refuses the operation before it reaches
   the database, because an empty result is indistinguishable from an
   institution that has no data.
+- **One schedule engine, not two.** The system it replaces computed a payment
+  breakdown twice — once server-side to write the schedule, once in the browser
+  to preview it — and its own technical document warned that if they drifted,
+  the preview would lie about what was actually recorded. Here the preview
+  endpoint and the write path call the same function; there is no second
+  implementation to drift from.
 - **Every change is audited, by the database.** One generic trigger is
   attached to every business table, and a test reads the catalogue to confirm
   none was missed — so a write path added later is audited whether or not
