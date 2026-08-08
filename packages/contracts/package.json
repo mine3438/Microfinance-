@@ -1,9 +1,9 @@
 {
-  "name": "@mfi/identity",
+  "name": "@mfi/contracts",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Password hashing, session token handling, and the permission model",
+  "description": "Wire schemas shared by the API and the web client. One definition per request and response, validated on the server and imported by the browser.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -23,7 +23,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@mfi/contracts": "workspace:*",
-    "@node-rs/argon2": "^2.0.2"
+    "zod": "^4.4.3"
   }
 }

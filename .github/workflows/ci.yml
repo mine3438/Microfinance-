@@ -69,6 +69,15 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      - name: Build
+        # Ahead of lint, and that order is load-bearing rather than incidental.
+        # The lint rules that matter here are type-aware, and a package's types
+        # only become resolvable to its dependents once its declarations are
+        # emitted. Linting a fresh checkout first makes every cross-package
+        # symbol `any`, which does not fail the build — it silently disables
+        # the rules, so the step passes while checking almost nothing.
+        run: pnpm build
+
       - name: Lint
         # Includes the architectural boundary rules: a domain layer that imports
         # a framework or a database driver fails here, not in review.
@@ -76,9 +85,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
-
-      - name: Build
-        run: pnpm build
 
       - name: Apply migrations
         # Proves the migration set applies cleanly to an empty database, and

@@ -48,14 +48,14 @@ pnpm install
 cp .env.example .env      # then fill it in; .env is never committed
 pnpm services:up          # Docker Compose, or native services if no daemon
 pnpm db:migrate
-pnpm verify               # format, lint, typecheck, build, test
+pnpm verify               # format, build, lint, typecheck, test
 ```
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `pnpm verify` | The full gate CI runs: format, lint, typecheck, build, test |
+| `pnpm verify` | The full gate CI runs: format, build, lint, typecheck, test |
 | `pnpm lint` | ESLint, including the architectural boundary rules |
 | `pnpm typecheck` | TypeScript across every package, tests included |
 | `pnpm test` | All test suites |
@@ -69,6 +69,7 @@ pnpm verify               # format, lint, typecheck, build, test
 ```
 apps/          API and web applications
 packages/
+  contracts/   zod request and response schemas, shared by API and web
   money/       exact-decimal Money, Rate, Percentage value objects
   domain/      business rules and value objects; no framework, no I/O
   identity/    password hashing, session tokens, the permission model

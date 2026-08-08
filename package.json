@@ -24,7 +24,7 @@
     "db:verify": "mfi-migrate verify",
     "services:up": "./scripts/services.sh up",
     "services:down": "./scripts/services.sh down",
-    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test"
+    "verify": "pnpm format:check && pnpm build && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

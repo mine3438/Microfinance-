@@ -717,3 +717,76 @@ as `Database.verifyReadiness()`.
 **Stages 0–7 are unblocked** by the outstanding §13 business rules and
 can proceed immediately. Stages 1, 2, 7, and 10 are the ones that must be
 right — they are where the money and the regulatory numbers live.
+
+---
+
+## 17. Amendments — API Stage (supersedes §2 and §5 on the HTTP framework)
+
+### 17.1 Fastify replaces NestJS
+
+§2 recorded NestJS as the API framework and §5 laid out its module tree. That
+choice was made before the packages existed. Ten stages in, its cost is
+measurable rather than hypothetical, so it is revised here with the reasoning
+on the record.
+
+NestJS resolves dependencies at runtime by reading the `design:paramtypes`
+metadata TypeScript emits under `emitDecoratorMetadata`. That has three
+consequences for this repository specifically:
+
+1. **It is incompatible with `verbatimModuleSyntax`.** Under that flag a
+   `import type` is erased exactly as written, so a constructor parameter typed
+   by a type-only import has no metadata for the container to read and
+   injection fails — at runtime, on the request path, not at compile time.
+2. **`apps/api` would need its own relaxed `tsconfig`.** Turning
+   `verbatimModuleSyntax` off and `experimentalDecorators` on makes the layer
+   that handles every request the least strictly typed layer in the codebase.
+3. **Wiring errors move from compile time to runtime.** A missing provider is a
+   resolution exception when the module loads, not a type error where the
+   mistake is.
+
+Fastify with an explicit composition root avoids all three. There are no
+decorators, so nothing is emitted and nothing is reflected; `apps/api` keeps
+every compiler setting the other packages have held since stage 0. Dependencies
+are constructed in one file and passed as arguments, which means the
+inward-only rule of §4 is checked by the type system at the point of wiring —
+the same property the ESLint boundary rules give the package graph, extended to
+the object graph.
+
+**What is given up:** guards, interceptors, exception filters and validation
+pipes are conventions in NestJS and code here — roughly four hundred lines,
+written and tested rather than inherited. That is the honest cost. It buys a
+request path where a wiring mistake cannot reach production, on a system where
+the request path moves money.
+
+**What is unchanged:** every architectural rule in §4, §9 and §10. Layering,
+the tenant guard, the transaction boundary, permission checks, audit and the
+security controls of §10.5 are requirements on the API, not on the framework
+underneath it. Fastify's plugin surface covers §10.5 directly — `@fastify/helmet`
+for transport headers, `@fastify/rate-limit` backed by Redis for the tiers,
+`@fastify/cookie` for the refresh cookie, `@fastify/multipart` for uploads.
+
+### 17.2 Authentication needs a narrow RLS exemption
+
+Every authenticated request carries its institution in the access token, so the
+tenant setting is established before any query runs. Four operations have no
+institution yet, because identifying one is the operation: **login**, **refresh**,
+**invitation acceptance**, and **password reset**.
+
+The application role is subject to row-level security, so an unscoped lookup
+returns nothing — correctly, and uselessly. The alternative of asking the client
+which institution it is logging into was rejected: it puts tenancy in the hands
+of the caller, and an enumerable institution identifier on an unauthenticated
+endpoint is a disclosure with no compensating benefit.
+
+Instead a dedicated `auth` schema holds `SECURITY DEFINER` lookup functions
+owned by a role with no table privileges beyond the columns each function
+returns. The pattern matches `mfi_classifier` from stage 10: the exemption is
+one named function with a fixed result shape, not a role that can read the
+table. `users_email_unique` is global across institutions, so an email
+identifies at most one user and no ambiguity arises.
+
+Each function returns the minimum the operation needs and nothing decorative —
+a login lookup returns the hash to verify against, the status to check, and the
+institution to scope the rest of the request to. What it deliberately does not
+do is reveal whether the email existed: that judgement belongs to the use case,
+which answers identically either way.

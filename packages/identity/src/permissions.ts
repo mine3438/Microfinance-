@@ -1,74 +1,37 @@
+import {
+  PERMISSIONS,
+  ROLES,
+  isPermission,
+  isRoleCode,
+  type Permission,
+  type RoleCode,
+  type RoleScope,
+} from '@mfi/contracts';
+
 /**
- * The permission catalogue, mirroring what migration `0005_identity.sql` seeds.
+ * The permission catalogue, re-exported from `@mfi/contracts`.
  *
- * Held as a typed constant so a permission check is a compile-time error when
- * misspelled, rather than a silent `false` at runtime — a denied permission
- * that should have been granted looks exactly like correct authorisation, and
- * a granted one that should have been denied is a security hole.
+ * The catalogue itself moved there when the API stage landed, because these
+ * codes travel on the wire — in the access token and the session response — and
+ * the web client needs them to decide which routes to render. A browser bundle
+ * cannot import this package, which loads a native argon2 binding, so the list
+ * had to live somewhere both sides can reach.
  *
- * The database is the authority; this is a typed view of it. A test in
- * `@mfi/db` reads the seeded catalogue and fails if the two ever diverge, so
- * this cannot quietly drift out of date.
+ * Re-exported rather than relocated-and-forgotten so that every existing
+ * consumer of `@mfi/identity` keeps working, and so that permission *checks*
+ * stay here beside the authentication primitives they are used with. The
+ * database remains the authority over both: a test in `@mfi/db` reads the
+ * seeded catalogue and fails if this list ever diverges from it.
  */
-export const PERMISSIONS = [
-  'client.read',
-  'client.create',
-  'client.update',
-  'client.deactivate',
-  'branch.read',
-  'branch.manage',
-  'user.read',
-  'user.invite',
-  'user.manage',
-  'loan.read',
-  'loan.create',
-  'loan.approve',
-  'loan.disburse',
-  'loan.write_off',
-  'payment.read',
-  'payment.create',
-  'payment.reverse',
-  'savings.read',
-  'savings.manage',
-  'share.read',
-  'share.manage',
-  'expense.read',
-  'expense.manage',
-  'complaint.read',
-  'complaint.manage',
-  'report.read',
-  'report.generate',
-  'settings.manage',
-  'audit.read',
-] as const;
-
-/** One of the permissions the application recognises. */
-export type Permission = (typeof PERMISSIONS)[number];
-
-/** Roles seeded by migration `0005_identity.sql`. */
-export const ROLES = [
-  'institution_admin',
-  'branch_manager',
-  'loan_officer',
-  'accountant',
-  'auditor',
-] as const;
-
-/** One of the seeded roles. */
-export type RoleCode = (typeof ROLES)[number];
-
-/** Whether a role's authority covers a whole institution or a single branch. */
-export type RoleScope = 'institution' | 'branch';
-
-/** Narrow an arbitrary string to a known permission. */
-export function isPermission(value: string): value is Permission {
-  return (PERMISSIONS as readonly string[]).includes(value);
-}
-
-/** Narrow an arbitrary string to a known role. */
-export function isRoleCode(value: string): value is RoleCode {
-  return (ROLES as readonly string[]).includes(value);
-}
+export {
+  PERMISSIONS,
+  ROLES,
+  isPermission,
+  isRoleCode,
+  type Permission,
+  type RoleCode,
+  type RoleScope,
+};
 
 /**
  * A principal's resolved authority for one request.
