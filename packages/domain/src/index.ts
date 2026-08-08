@@ -37,6 +37,32 @@ export type { Gender } from './client/gender.js';
 
 export { PhoneNumber } from './client/phone-number.js';
 
+export {
+  NON_PERFORMING_CLASSIFICATIONS,
+  OVERDUE_CLASSIFICATIONS,
+  classifyByDaysOverdue,
+  grossProvision,
+  isOverdueClassification,
+  netProvision,
+  nonPerformingRatio,
+} from './portfolio/classification.js';
+export type {
+  ClassificationResult,
+  OverdueClassification,
+  PortfolioByClassification,
+  ProvisioningBand,
+} from './portfolio/classification.js';
+
+export {
+  MAXIMUM_CLASSIFICATION_AGE_HOURS,
+  assessReportingReadiness,
+} from './portfolio/freshness.js';
+export type {
+  ReadinessProblem,
+  ReadinessRequest,
+  ReportingReadiness,
+} from './portfolio/freshness.js';
+
 export { addMonthsFromAnchor, monthlyDueDates } from './lending/due-dates.js';
 
 export { assessApproval } from './lending/approval.js';

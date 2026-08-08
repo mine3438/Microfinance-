@@ -11,12 +11,13 @@ and the quarterly filing becomes an export rather than a re-derivation.
 
 ## Status
 
-Early construction. Stages 0–9 of 19 complete: repository foundation, tooling,
+Early construction. Stages 0–10 of 19 complete: repository foundation, tooling,
 CI, migration infrastructure, the exact-decimal money layer, the tenancy core
 with its cross-tenant isolation suite, the seeded BOT reference data, the
 identity schema with password, token and permission primitives, audit logging,
 the client context, the lending core with both interest engines, the approval
-workflow, and payment allocation with reversals. No HTTP surface yet.
+workflow, payment allocation with reversals, and overdue classification with
+provisioning and a freshness gate on reporting. No HTTP surface yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -150,6 +151,19 @@ Two more rules in the same spirit:
   `loan.approve`, and the domain refuses an approval by the user who made the
   application — segregation of duties enforced where it cannot be bypassed,
   rather than in an interface that is not the only way in.
+- **Stale figures cannot be filed.** Overdue classification is recomputed by a
+  job that stamps a health record, and reporting refuses to generate when that
+  record is missing or older than a day. The system this replaces scheduled the
+  same job with a `pg_cron` line left commented out, so a loan forty days past
+  due kept reporting "Current" — to the dashboard and to the Bank of Tanzania.
+  Nothing crashed and no screen was empty; the numbers simply were not true.
+  A compliance product that quietly files wrong figures is worse than one that
+  refuses to file.
+- **An unclassifiable loan is reported, not absorbed.** BOT's housing
+  microfinance schedule begins at 91 days and defines nothing below it, so a
+  housing loan 40 days overdue has no classification BOT has given. It is left
+  unclassified and counted, and its presence blocks filing — rather than being
+  rounded into "Current", which would understate provisions on a signed return.
 - **BOT reference data is generated, never transcribed.** The 22 sectors, 193
   districts, provisioning bands and 103 financial-statement line items are
   extracted from BOT's own template and emitted as a migration by a committed

@@ -175,6 +175,12 @@ const UNAUDITED_TABLES: ReadonlyMap<string, string> = new Map([
     'Verification and reset tokens, issued and consumed mechanically. No business meaning.',
   ],
   [
+    'system_health',
+    'Derived-state record, written solely by the classification job. The changes it ' +
+      'summarises — each loan gaining or losing a classification — are themselves audited on ' +
+      'the loans table, so auditing this as well would log the same event twice.',
+  ],
+  [
     'code_sequences',
     'Implementation detail of code allocation. The audit entry for the loan says ' +
       'everything the counter increment would.',
