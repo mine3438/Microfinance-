@@ -25,7 +25,10 @@ find_pg_bin() {
     return 0
   fi
   local candidate
-  candidate=$(find /usr/lib/postgresql -maxdepth 2 -name pg_ctl -type f 2>/dev/null | sort -V | tail -1)
+  # Depth 3: Debian and Ubuntu install to /usr/lib/postgresql/<major>/bin/pg_ctl,
+  # so a two-level search finds nothing and the script reports PostgreSQL as
+  # missing on a machine that has it. `sort -V` then picks the highest major.
+  candidate=$(find /usr/lib/postgresql -maxdepth 3 -name pg_ctl -type f 2>/dev/null | sort -V | tail -1)
   if [[ -n "${candidate}" ]]; then
     dirname "${candidate}"
     return 0

@@ -330,6 +330,74 @@ describe('the application role holds no more privilege than it needs', () => {
   });
 });
 
+describe('no SECURITY DEFINER function is executable by PUBLIC', () => {
+  /**
+   * The escalation path this closes.
+   *
+   * A `SECURITY DEFINER` function runs with its owner's authority, and these
+   * are owned by the roles that can see past row-level security — the audit
+   * writer, the classifier, the authentication role. Postgres grants EXECUTE to
+   * PUBLIC on every new function by default, so a migration that adds one and
+   * says nothing about privileges has handed that authority to every role in
+   * the cluster, including any added later for an unrelated purpose.
+   *
+   * Nothing about that is visible in the migration; the grant is the absence of
+   * a line rather than the presence of one. So it is checked here instead,
+   * where a new function without its revoke fails on the commit that adds it.
+   */
+  const securityDefinerFunctions = async (): Promise<
+    { qualified_name: string; public_can_execute: boolean }[]
+  > => {
+    const result = await pool.query<{ qualified_name: string; public_can_execute: boolean }>(
+      `SELECT n.nspname || '.' || p.proname AS qualified_name,
+              has_function_privilege('public', p.oid, 'EXECUTE') AS public_can_execute
+         FROM pg_proc p
+         JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE p.prosecdef
+          AND n.nspname IN ('public', 'reference', 'auth')
+        ORDER BY 1`,
+    );
+    return result.rows;
+  };
+
+  it('finds SECURITY DEFINER functions to check, so the suite cannot pass vacuously', async () => {
+    expect((await securityDefinerFunctions()).length).toBeGreaterThan(0);
+  });
+
+  it('has EXECUTE revoked from PUBLIC on every one of them', async () => {
+    const offenders = (await securityDefinerFunctions())
+      .filter((row) => row.public_can_execute)
+      .map((row) => row.qualified_name);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('still grants the application the ones it actually calls', async () => {
+    // The revoke is only correct if the explicit grants replaced it. Without
+    // this, a migration could satisfy the rule above by revoking from everyone
+    // and breaking the application instead.
+    const required = [
+      'allocate_entity_code(uuid, text, text, integer)',
+      'user_permissions(uuid)',
+      'auth.find_login_identity(text)',
+      'auth.find_refresh_token(text)',
+    ];
+
+    const offenders: string[] = [];
+    for (const signature of required) {
+      const result = await pool.query<{ has_execute: boolean }>(
+        `SELECT has_function_privilege('mfi_app', $1, 'EXECUTE') AS has_execute`,
+        [signature],
+      );
+      if (result.rows[0]?.has_execute !== true) {
+        offenders.push(signature);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe('timestamp columns are maintained by the database', () => {
   it('attaches the updated_at trigger to every table that has the column', async () => {
     // An updated_at the application sets is not evidence of when a row changed;
