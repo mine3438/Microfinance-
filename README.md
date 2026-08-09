@@ -21,8 +21,12 @@ overdue classification with provisioning and a freshness gate on reporting.
 
 The HTTP surface is in place: a Fastify API with the shared wire contract,
 authentication with refresh-token rotation, and resource routes for clients,
-loans and payments — including the preview endpoints that keep repayment
-arithmetic out of the browser. No web client yet.
+loans and payments. A React client sits on top of it — sign in, register a
+borrower, apply for a loan with the schedule shown as the terms are typed,
+approve, disburse, and record repayments.
+
+What a Tier II MSP needs beyond that — the ten MSP2 returns, savings, shares,
+groups, expenses and the dashboard — is stages 11 to 19 and not yet built.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -53,8 +57,23 @@ pnpm install
 cp .env.example .env      # then fill it in; .env is never committed
 pnpm services:up          # Docker Compose, or native services if no daemon
 pnpm db:migrate
+pnpm seed:dev             # development data — invented, and refuses to run in production
 pnpm verify               # format, build, lint, typecheck, test
 ```
+
+Then run the API and the web client in two terminals:
+
+```bash
+pnpm --filter @mfi/api dev     # http://127.0.0.1:3000
+pnpm --filter @mfi/web dev     # http://localhost:5173
+```
+
+`pnpm seed:dev` prints the accounts it created. **Approval limits are seeded
+only by that script, never by a migration** — the figures belong to the
+institution, the documentation does not state them, and an absent limit means
+no authority rather than unlimited. A fresh production database therefore
+approves nothing until someone configures it, which is the correct direction to
+fail in.
 
 ## Commands
 
@@ -68,12 +87,14 @@ pnpm verify               # format, build, lint, typecheck, test
 | `pnpm db:status` | List applied and pending migrations |
 | `pnpm db:verify` | Fail if the repository and database disagree |
 | `pnpm services:up` / `services:down` | Start or stop Postgres and Redis |
+| `pnpm seed:dev` | Development data: staff, products, borrowers, approval limits |
 
 ## Layout
 
 ```
 apps/
   api/         Fastify HTTP interface: routes, guards, use cases
+  web/         React client: renders state, computes no money
 packages/
   contracts/   zod request and response schemas, shared by API and web
   money/       exact-decimal Money, Rate, Percentage value objects
@@ -200,6 +221,12 @@ Two more rules in the same spirit:
   test compares a preview against the rows read back from the database
   afterwards, because comparing two in-memory results of one function proves
   only that the function is deterministic.
+- **The browser never computes money.** `@mfi/money` is not a dependency of the
+  web client and a lint rule keeps it that way, so there is nothing there to
+  calculate a repayment with. Every figure on a screen came from a response —
+  the schedule from a preview endpoint, the allocation from another. The
+  previous build calculated both in the browser and again on the server, and
+  warned in its own technical document that the two would drift.
 - **BOT reference data is generated, never transcribed.** The 22 sectors, 193
   districts, provisioning bands and 103 financial-statement line items are
   extracted from BOT's own template and emitted as a migration by a committed

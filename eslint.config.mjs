@@ -227,6 +227,56 @@ export default defineConfig([
     },
   },
 
+  // ── Layer: web ────────────────────────────────────────────────────────────
+  // The presentation layer. It renders what the server decided and collects
+  // what a user typed. The rule worth enforcing here is the one the analysis
+  // records as R1 and R2: the previous build calculated repayment figures in
+  // the browser *and* on the server, and its own technical document warned the
+  // two would drift.
+  //
+  // So the arithmetic libraries are unreachable from this package. A component
+  // that wants a total asks an endpoint for it.
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@mfi/money', 'decimal.js', 'big.js', 'bignumber.js'],
+              message:
+                'The web client must not compute money. Repayment figures come from the ' +
+                'preview endpoints, which run the same code the write path runs (analysis R2).',
+            },
+            {
+              group: ['@mfi/domain', '@mfi/db', '@mfi/identity', '@mfi/migrator'],
+              message:
+                'Server-side packages are not reachable from the browser. Share types through ' +
+                '@mfi/contracts.',
+            },
+            {
+              group: ['pg', 'pg-*', 'ioredis', 'fastify'],
+              message: 'Server infrastructure is not reachable from the browser.',
+            },
+          ],
+        },
+      ],
+      // React escapes by default; this is the one way to opt out of it, and
+      // there is no content in this app that needs to.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'JSXAttribute[name.name="dangerouslySetInnerHTML"]',
+          message:
+            'dangerouslySetInnerHTML disables the escaping that makes React XSS-safe by ' +
+            'default. Nothing this app renders requires it.',
+        },
+      ],
+    },
+  },
+
   // ── Tests ─────────────────────────────────────────────────────────────────
   // Integration tests legitimately reach for drivers and the filesystem; that is
   // the point of them. Boundary rules do not apply, correctness rules still do.
