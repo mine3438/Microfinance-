@@ -8,6 +8,7 @@ import { AccessTokenService } from './auth/access-token.js';
 import { type Environment } from './config/environment.js';
 import { buildServer } from './http/server.js';
 import { PostgresSessionRepository } from './modules/auth/session-repository.js';
+import { PostgresClientRepository } from './modules/clients/client-repository.js';
 
 /**
  * The composition root.
@@ -48,8 +49,16 @@ export async function composeApplication(environment: Environment): Promise<Appl
   });
 
   const sessions = new PostgresSessionRepository(database);
+  const clients = new PostgresClientRepository(database);
 
-  const server = await buildServer({ environment, database, redis, sessions, tokens });
+  const server = await buildServer({
+    environment,
+    database,
+    redis,
+    sessions,
+    clients,
+    tokens,
+  });
 
   // ioredis emits `error` on every failed connection attempt. An unhandled
   // 'error' event on an EventEmitter terminates the process, so this listener

@@ -63,6 +63,23 @@ export {
 } from './pagination.js';
 
 export {
+  CLIENT_STATUSES,
+  GENDERS,
+  clientListQuerySchema,
+  clientSchema,
+  createClientRequestSchema,
+  dateOfBirthSchema,
+  phoneInputSchema,
+  updateClientRequestSchema,
+  type Client,
+  type ClientListQuery,
+  type ClientStatus,
+  type CreateClientRequest,
+  type Gender,
+  type UpdateClientRequest,
+} from './clients.js';
+
+export {
   MAXIMUM_PASSWORD_LENGTH,
   MINIMUM_PASSWORD_LENGTH,
   acknowledgementSchema,

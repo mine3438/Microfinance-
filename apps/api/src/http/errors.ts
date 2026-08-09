@@ -145,7 +145,71 @@ export function classify(error: unknown): ApiError {
     return new ApiError('internal_error', INTERNAL_MESSAGE, undefined, { cause: error });
   }
 
+  const constraint = classifyIntegrityViolation(error);
+  if (constraint !== null) {
+    return constraint;
+  }
+
   return new ApiError('internal_error', INTERNAL_MESSAGE, undefined, { cause: error });
+}
+
+/**
+ * Postgres integrity violations, which are the caller's fault and not ours.
+ *
+ * The schema is the last line of defence and it is meant to be: `NUMERIC(15,2)`,
+ * `CHECK (date_of_birth < CURRENT_DATE)`, foreign keys into BOT's taxonomies.
+ * Those constraints exist because a rule enforced only in application code is a
+ * rule that a script, an import or a future endpoint can walk around.
+ *
+ * But a constraint firing on bad *input* is a 400, not a 500. Left unmapped, a
+ * borrower registered with a mistyped birth year gets "something went wrong on
+ * our side" — which is untrue, unactionable, and lands in the logs beside real
+ * faults where it hides them.
+ *
+ * This is a safety net beneath validation, not a replacement for it. Where a
+ * field can be checked before the query it is, because only then can the error
+ * name the field. Here the constraint name is deliberately **not** disclosed:
+ * it names tables and columns, which is the schema disclosure §10.5 rules out.
+ * It goes to the log with the correlation ID instead.
+ */
+function classifyIntegrityViolation(error: unknown): ApiError | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return null;
+  }
+
+  const code = (error as { code?: unknown }).code;
+  if (typeof code !== 'string') {
+    return null;
+  }
+
+  switch (code) {
+    case '23505': // unique_violation
+      return new ApiError(
+        'conflict',
+        'That record already exists. Check whether it has been entered before.',
+        undefined,
+        { cause: error },
+      );
+    case '23503': // foreign_key_violation
+    case '23514': // check_violation
+    case '22P02': // invalid_text_representation
+    case '22001': // string_data_right_truncation
+    case '22003': // numeric_value_out_of_range
+    case '22007': // invalid_datetime_format
+    case '22008': // datetime_field_overflow
+      return new ApiError(
+        'validation_failed',
+        'One of the values supplied is not acceptable. Check the entries and try again.',
+        undefined,
+        { cause: error },
+      );
+    case '23502': // not_null_violation
+      return new ApiError('validation_failed', 'A required value is missing.', undefined, {
+        cause: error,
+      });
+    default:
+      return null;
+  }
 }
 
 /** Build the response body. The only place an error becomes JSON. */

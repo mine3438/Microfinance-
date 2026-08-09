@@ -9,6 +9,8 @@ import { type Redis } from 'ioredis';
 import { type AccessTokenService } from '../auth/access-token.js';
 import { type Environment } from '../config/environment.js';
 import { type SessionRepository } from '../modules/auth/session-repository.js';
+import { type ClientRepository } from '../modules/clients/client-repository.js';
+import { registerClientRoutes } from '../modules/clients/routes.js';
 import { registerAuthRoutes } from '../modules/auth/routes.js';
 import { registerHealthRoutes } from '../modules/health/routes.js';
 import { registerCorrelationId } from './correlation.js';
@@ -30,6 +32,7 @@ export interface ServerDependencies {
   readonly database: Database;
   readonly redis: Redis;
   readonly sessions: SessionRepository;
+  readonly clients: ClientRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -47,7 +50,7 @@ export interface ServerDependencies {
  * headers, then CORS, then the rate limiter, then routes.
  */
 export async function buildServer(dependencies: ServerDependencies): Promise<FastifyInstance> {
-  const { environment, database, redis, sessions, tokens } = dependencies;
+  const { environment, database, redis, sessions, clients, tokens } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
 
   const app = Fastify({
@@ -194,6 +197,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     cookieSecure: environment.COOKIE_SECURE,
     now,
   });
+  registerClientRoutes(app, { clients, tokens });
 
   return app;
 }

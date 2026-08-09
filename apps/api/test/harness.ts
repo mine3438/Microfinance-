@@ -10,6 +10,7 @@ import { AccessTokenService } from '../src/auth/access-token.js';
 import { loadEnvironment, type Environment } from '../src/config/environment.js';
 import { buildServer } from '../src/http/server.js';
 import { PostgresSessionRepository } from '../src/modules/auth/session-repository.js';
+import { PostgresClientRepository } from '../src/modules/clients/client-repository.js';
 import { testDatabaseUrl, testRedisUrl } from './global-setup.js';
 
 /**
@@ -103,6 +104,7 @@ export async function startHarness(
     database,
     redis,
     sessions: new PostgresSessionRepository(database),
+    clients: new PostgresClientRepository(database),
     tokens,
   });
   await server.ready();
