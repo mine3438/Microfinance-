@@ -97,3 +97,63 @@ export type {
   ScheduleInstalment,
   ScheduleRequest,
 } from './lending/schedule.js';
+
+export {
+  QUARTERS,
+  formatPeriod,
+  isQuarter,
+  periodContaining,
+  periodContains,
+  reportingPeriod,
+} from './reporting/period.js';
+export type { Quarter, ReportingPeriod } from './reporting/period.js';
+
+export { compileMsp2_03 } from './reporting/msp2-03.js';
+export type {
+  ClassifiedExposure,
+  Msp2_03,
+  Msp2_03Request,
+  Msp2_03Row,
+  SectorCollateral,
+  SectorWriteOff,
+} from './reporting/msp2-03.js';
+
+export { amortisationMethodFor, compileMsp2_04 } from './reporting/msp2-04.js';
+export type {
+  AmortisationMethod,
+  Msp2_04,
+  Msp2_04Request,
+  Msp2_04Row,
+  RateBand,
+  RateExposure,
+} from './reporting/msp2-04.js';
+
+export { compileMsp2_09 } from './reporting/msp2-09.js';
+export type {
+  Disbursement,
+  GenderSplit,
+  Msp2_09,
+  Msp2_09Request,
+  Msp2_09Row,
+} from './reporting/msp2-09.js';
+
+export { compileMsp2_10 } from './reporting/msp2-10.js';
+export type {
+  DemographicCell,
+  DemographicKey,
+  DistrictInHierarchy,
+  DistrictPresence,
+  GeographicExposure,
+  Msp2_10,
+  Msp2_10RegionSubtotal,
+  Msp2_10Request,
+  Msp2_10Row,
+} from './reporting/msp2-10.js';
+
+export { validatePortfolioForms } from './reporting/validation.js';
+export type {
+  PortfolioForms,
+  ValidationFinding,
+  ValidationResult,
+  ValidationSeverity,
+} from './reporting/validation.js';

@@ -63,6 +63,33 @@ export class Percentage {
   }
 
   /**
+   * Add two percentages.
+   *
+   * Exists for the weighted averages on BOT's MSP2-04, which accumulate a rate
+   * across a portfolio. Unrounded: rounding belongs at the point a figure is
+   * reported, not part-way through a sum where the error compounds.
+   */
+  public plus(other: Percentage): Percentage {
+    return new Percentage(this.value.plus(other.value));
+  }
+
+  public minus(other: Percentage): Percentage {
+    return new Percentage(this.value.minus(other.value));
+  }
+
+  /**
+   * Scale by a dimensionless factor.
+   *
+   * For weighting — a rate times a share of a portfolio. The factor is a
+   * `Dec` rather than a number, so a caller cannot pass a float and lose
+   * precision on the way in.
+   */
+  public times(factor: Dec | string): Percentage {
+    assertNotFloat(factor, 'Percentage.times');
+    return new Percentage(this.value.times(toDecimal(factor, 'Percentage.times')));
+  }
+
+  /**
    * Round to `decimalPlaces` for reporting.
    *
    * BOT's MSP2-04 reports rates to a fixed number of places; this is where that
