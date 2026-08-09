@@ -9,6 +9,7 @@ import { type Environment } from './config/environment.js';
 import { buildServer } from './http/server.js';
 import { PostgresSessionRepository } from './modules/auth/session-repository.js';
 import { PostgresClientRepository } from './modules/clients/client-repository.js';
+import { PostgresLoanRepository } from './modules/loans/loan-repository.js';
 
 /**
  * The composition root.
@@ -50,6 +51,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
 
   const sessions = new PostgresSessionRepository(database);
   const clients = new PostgresClientRepository(database);
+  const loans = new PostgresLoanRepository(database);
 
   const server = await buildServer({
     environment,
@@ -57,6 +59,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     redis,
     sessions,
     clients,
+    loans,
     tokens,
   });
 

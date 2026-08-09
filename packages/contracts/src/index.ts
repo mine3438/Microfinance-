@@ -80,6 +80,37 @@ export {
 } from './clients.js';
 
 export {
+  INTEREST_METHODS,
+  LOAN_STATUSES,
+  MAXIMUM_TERM_MONTHS,
+  createLoanRequestSchema,
+  decideLoanRequestSchema,
+  disburseLoanRequestSchema,
+  loanListQuerySchema,
+  loanProductSchema,
+  loanSchema,
+  loanTermsSchema,
+  loanWithScheduleSchema,
+  previewScheduleRequestSchema,
+  repaymentScheduleSchema,
+  scheduleInstalmentSchema,
+  submitLoanRequestSchema,
+  termMonthsSchema,
+  type CreateLoanRequest,
+  type DecideLoanRequest,
+  type DisburseLoanRequest,
+  type InterestMethod,
+  type Loan,
+  type LoanListQuery,
+  type LoanProduct,
+  type LoanStatus,
+  type LoanWithSchedule,
+  type PreviewScheduleRequest,
+  type RepaymentSchedule,
+  type ScheduleInstalment,
+} from './loans.js';
+
+export {
   MAXIMUM_PASSWORD_LENGTH,
   MINIMUM_PASSWORD_LENGTH,
   acknowledgementSchema,

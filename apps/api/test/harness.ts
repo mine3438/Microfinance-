@@ -11,6 +11,7 @@ import { loadEnvironment, type Environment } from '../src/config/environment.js'
 import { buildServer } from '../src/http/server.js';
 import { PostgresSessionRepository } from '../src/modules/auth/session-repository.js';
 import { PostgresClientRepository } from '../src/modules/clients/client-repository.js';
+import { PostgresLoanRepository } from '../src/modules/loans/loan-repository.js';
 import { testDatabaseUrl, testRedisUrl } from './global-setup.js';
 
 /**
@@ -105,6 +106,7 @@ export async function startHarness(
     redis,
     sessions: new PostgresSessionRepository(database),
     clients: new PostgresClientRepository(database),
+    loans: new PostgresLoanRepository(database),
     tokens,
   });
   await server.ready();
