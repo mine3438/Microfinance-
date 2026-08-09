@@ -790,3 +790,30 @@ a login lookup returns the hash to verify against, the status to check, and the
 institution to scope the rest of the request to. What it deliberately does not
 do is reveal whether the email existed: that judgement belongs to the use case,
 which answers identically either way.
+
+### 17.3 New open question — §13.9 reopening a completed loan
+
+Surfaced while building the payment routes, and not answerable from the
+supplied documentation.
+
+A loan reaches `completed` when a payment brings its balance to zero.
+`completed` is terminal: nothing follows it in the domain's transition table or
+in the `enforce_loan_transition` trigger, both from stage 8.
+
+Reversing the payment that settled a loan therefore has no defined outcome. It
+is not a hypothetical — a settlement cheque that does not clear, or a payment
+keyed against the wrong loan and noticed the next morning, produces exactly this
+case. Three things would need answering together:
+
+1. May a completed loan return to `active`, and who may do it?
+2. What happens if the loan was already reported as closed on a filed MSP2
+   return — is the correction restated in the current quarter, or does the
+   filing stand?
+3. Does reopening restore the original schedule, or does the loan need a new
+   one from the date it reopened?
+
+Until those are answered, `reversePayment` refuses with a message naming the
+situation. The two alternatives were both worse: inventing a `completed →
+active` transition would contradict a rule already written and tested, and
+letting the database trigger reject it produces an error that explains nothing
+to the person holding the bounced cheque.

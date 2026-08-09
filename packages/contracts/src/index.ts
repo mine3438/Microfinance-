@@ -111,6 +111,23 @@ export {
 } from './loans.js';
 
 export {
+  allocationPreviewSchema,
+  paymentAllocationSchema,
+  paymentListQuerySchema,
+  paymentSchema,
+  previewAllocationRequestSchema,
+  recordPaymentRequestSchema,
+  reversePaymentRequestSchema,
+  type AllocationPreview,
+  type Payment,
+  type PaymentAllocation,
+  type PaymentListQuery,
+  type PreviewAllocationRequest,
+  type RecordPaymentRequest,
+  type ReversePaymentRequest,
+} from './payments.js';
+
+export {
   MAXIMUM_PASSWORD_LENGTH,
   MINIMUM_PASSWORD_LENGTH,
   acknowledgementSchema,

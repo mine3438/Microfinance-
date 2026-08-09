@@ -13,6 +13,8 @@ import { type ClientRepository } from '../modules/clients/client-repository.js';
 import { registerClientRoutes } from '../modules/clients/routes.js';
 import { type LoanRepository } from '../modules/loans/loan-repository.js';
 import { registerLoanRoutes } from '../modules/loans/routes.js';
+import { type PaymentRepository } from '../modules/payments/payment-repository.js';
+import { registerPaymentRoutes } from '../modules/payments/routes.js';
 import { registerAuthRoutes } from '../modules/auth/routes.js';
 import { registerHealthRoutes } from '../modules/health/routes.js';
 import { registerCorrelationId } from './correlation.js';
@@ -36,6 +38,7 @@ export interface ServerDependencies {
   readonly sessions: SessionRepository;
   readonly clients: ClientRepository;
   readonly loans: LoanRepository;
+  readonly payments: PaymentRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -53,7 +56,7 @@ export interface ServerDependencies {
  * headers, then CORS, then the rate limiter, then routes.
  */
 export async function buildServer(dependencies: ServerDependencies): Promise<FastifyInstance> {
-  const { environment, database, redis, sessions, clients, loans, tokens } = dependencies;
+  const { environment, database, redis, sessions, clients, loans, payments, tokens } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
 
   const app = Fastify({
@@ -202,6 +205,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   });
   registerClientRoutes(app, { clients, tokens });
   registerLoanRoutes(app, { loans, tokens });
+  registerPaymentRoutes(app, { payments, tokens });
 
   return app;
 }

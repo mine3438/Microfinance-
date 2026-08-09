@@ -19,9 +19,10 @@ primitives, audit logging, the client context, the lending core with both
 interest engines, the approval workflow, payment allocation with reversals, and
 overdue classification with provisioning and a freshness gate on reporting.
 
-The HTTP surface has started: a Fastify API with the shared wire contract,
-authentication, refresh-token rotation with reuse detection, and the security
-controls around them. Resource routes for clients, loans and payments are next.
+The HTTP surface is in place: a Fastify API with the shared wire contract,
+authentication with refresh-token rotation, and resource routes for clients,
+loans and payments — including the preview endpoints that keep repayment
+arithmetic out of the browser. No web client yet.
 
 See [`docs/01-ARCHITECTURE.md`](docs/01-ARCHITECTURE.md) §16.4 for the full
 stage plan.
@@ -191,6 +192,14 @@ Two more rules in the same spirit:
   request, which would return 500 for every call because a cache is down. Login
   alone fails closed, because there the limit *is* the control rather than a
   protection around one.
+- **The preview and the record are one calculation.** A schedule preview and a
+  disbursement call the same generator; a payment preview and a recorded
+  payment call the same allocator. The system this replaces computed both
+  twice — server-side to write, in the browser to preview — and warned in its
+  own technical document that the preview would lie if the two drifted. The
+  test compares a preview against the rows read back from the database
+  afterwards, because comparing two in-memory results of one function proves
+  only that the function is deterministic.
 - **BOT reference data is generated, never transcribed.** The 22 sectors, 193
   districts, provisioning bands and 103 financial-statement line items are
   extracted from BOT's own template and emitted as a migration by a committed
