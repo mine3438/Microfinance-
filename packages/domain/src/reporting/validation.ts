@@ -95,6 +95,7 @@ const NET_INCOME_AFTER_TAX_SNO = 42;
 export function validatePortfolioForms(forms: PortfolioForms): ValidationResult {
   const findings: ValidationFinding[] = [
     ...checkBalanceSheetBalances(forms.msp2_01),
+    ...checkBalanceSheetCompleteness(forms.msp2_01),
     ...checkNetIncomeAgreesWithBalanceSheet(forms.msp2_01, forms.msp2_02),
     ...checkGrossLoansAgree(forms.msp2_01, forms.msp2_04),
     ...checkLiquidAssetsRestateBalanceSheet(forms.msp2_01, forms.msp2_05),
@@ -353,6 +354,38 @@ function checkBalanceSheetBalances(form: Msp2_01): ValidationFinding[] {
           ? ''
           : ` ${String(outstanding)} line(s) have not been filled in yet, which is the first ` +
             'thing to check.'),
+    },
+  ];
+}
+
+/**
+ * Lines nobody has filled in.
+ *
+ * Not one of BOT's rules, and it exists because rule 1 has a blind spot: an
+ * entirely empty balance sheet balances, at zero against zero. A dormant
+ * institution genuinely files zeros, and one that has simply not started filling
+ * the form in files the same document — the two are indistinguishable to every
+ * arithmetic check BOT publishes.
+ *
+ * Whether a figure was ever entered is the only thing that separates them, so
+ * that is what this reports. A warning rather than a block: a line may be
+ * legitimately nil and never touched, and refusing to file on that basis would
+ * be wrong.
+ */
+function checkBalanceSheetCompleteness(form: Msp2_01): ValidationFinding[] {
+  if (form.missingEntries.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      ruleId: null,
+      formCode: 'MSP2-01',
+      severity: 'warning',
+      message:
+        `${String(form.missingEntries.length)} balance sheet line(s) have never been filled in ` +
+        'and are reported as nil. A sheet of zeros balances trivially, so BOT’s arithmetic ' +
+        'checks cannot tell an institution with nothing to report from one that has not started.',
     },
   ];
 }

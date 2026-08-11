@@ -12,6 +12,7 @@ import { PostgresClientRepository } from './modules/clients/client-repository.js
 import { PostgresLoanRepository } from './modules/loans/loan-repository.js';
 import { PostgresFinanceRepository } from './modules/finance/finance-repository.js';
 import { PostgresPaymentRepository } from './modules/payments/payment-repository.js';
+import { PostgresFilingRepository } from './modules/filings/filing-repository.js';
 import { PostgresReportRepository } from './modules/reporting/report-repository.js';
 import { PostgresStatementRepository } from './modules/statements/statement-repository.js';
 
@@ -60,6 +61,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const reports = new PostgresReportRepository(database);
   const finance = new PostgresFinanceRepository(database);
   const statements = new PostgresStatementRepository(database);
+  const filings = new PostgresFilingRepository(database);
 
   const server = await buildServer({
     environment,
@@ -72,6 +74,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     reports,
     finance,
     statements,
+    filings,
     tokens,
   });
 

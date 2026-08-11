@@ -157,6 +157,28 @@ describe('validatePortfolioForms', () => {
     expect(result.submittable).toBe(true);
   });
 
+  it('warns that a sheet of zeros balances trivially', () => {
+    // Rule 1's blind spot: an untouched balance sheet passes every arithmetic
+    // check BOT publishes, because nothing against nothing is equal. Whether a
+    // figure was ever entered is the only thing that separates a dormant
+    // institution from one that has not started.
+    const forms = consistentForms();
+    const empty: PortfolioForms = {
+      ...forms,
+      msp2_01: compileMsp2_01({
+        lines: MSP2_01_LINES,
+        entered: new Map(),
+        derived: derivedBalanceSheetFigures(forms),
+      }),
+    };
+
+    const warning = validatePortfolioForms(empty).findings.find((finding) =>
+      finding.message.includes('never been filled in'),
+    );
+
+    expect(warning?.severity).toBe('warning');
+  });
+
   it('blocks a balance sheet that does not balance', () => {
     // Rule 1, and the one check on MSP2-01 that can genuinely fail: its two
     // sides are assembled from different figures.

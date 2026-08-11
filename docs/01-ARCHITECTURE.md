@@ -1246,3 +1246,62 @@ discovered at submission.
 
 A draft is cleared when the form or the quarter changes. Carrying it across
 would offer to write last quarter's figures into this one.
+
+---
+
+## 21. Amendments — Compliance Stage
+
+### 21.1 A filing is a record, not a query that can be re-run
+
+`filed_returns` stores the whole compiled return as JSONB. Recompiling a past
+quarter later produces a different document — the loan book has moved, a
+mis-keyed payment has been reversed — and an institution asked to explain a
+filed figure needs the document it sent, not this system's current opinion of
+that quarter.
+
+The document is immutable, enforced by a trigger rather than by convention:
+only the submission reference may be added afterwards. There is no `DELETE`
+policy and no privilege to grant one, because a filing that can be removed is
+not a record of what was filed.
+
+The system being replaced retained nothing at all — reports were generated in
+the browser and never kept (R10, App Flow §4).
+
+### 21.2 The filing refuses what BOT would reject
+
+`POST /reports/msp2/:year/:quarter/filing` compiles first, so both gates apply:
+the freshness gate inside the compilation, and then BOT's own validation rules.
+A return with a blocking finding is one BOT's EDI validator will reject, and
+filing it spends an institution's submission window to learn something this
+system already knew. The refusal lists every blocking finding, keyed by the form
+it concerns.
+
+### 21.3 The cell map is not here yet, on purpose
+
+§16.2 item 10 calls for a Sno-addressed cell map so the exporter writes by
+`(form, Sno, column)`. It has exactly one consumer — the exporter that writes
+BOT's workbook — and that is not built. A table nothing reads is the fault the
+analysis records twice: `audit_logs` and `bot_reports` were both schema for
+capabilities that were designed and never built. The map lands with the code
+that reads it, as the domain-event seam did in stage 8.
+
+The extraction is settled: for MSP2-01, MSP2-02 and MSP2-05, Sno *n* sits on row
+13 + *n*, with amounts in column C and MSP2-02's year-to-date in column D. That
+pattern will be seeded as data rather than encoded as arithmetic, because BOT
+can insert a line and the fix should be a migration.
+
+### 21.4 Rule 1 has a blind spot, and now something covers it
+
+An entirely empty balance sheet **balances** — zero against zero — so every
+arithmetic check BOT publishes passes on a form nobody has filled in. A dormant
+institution genuinely files zeros; one that has not started filing produces the
+same document, and no BOT rule can tell them apart.
+
+Whether a figure was ever *entered* is the only thing that separates them, which
+is what `missingEntries` records. The validator now warns when any entered line
+has never been filled in, saying that a sheet of zeros balances trivially.
+
+A warning and not a block: a line may be legitimately nil and never touched, and
+refusing to file on that basis would be wrong. This is not one of BOT's rules —
+it is the gap between what their rules can see and what an institution needs to
+know before submitting.

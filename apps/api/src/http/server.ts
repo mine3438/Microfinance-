@@ -18,6 +18,8 @@ import { type FinanceRepository } from '../modules/finance/finance-repository.js
 import { registerFinanceRoutes } from '../modules/finance/routes.js';
 import { registerPaymentRoutes } from '../modules/payments/routes.js';
 import { type ReportRepository } from '../modules/reporting/report-repository.js';
+import { type FilingRepository } from '../modules/filings/filing-repository.js';
+import { registerFilingRoutes } from '../modules/filings/routes.js';
 import { registerReportRoutes } from '../modules/reporting/routes.js';
 import { type StatementRepository } from '../modules/statements/statement-repository.js';
 import { registerStatementRoutes } from '../modules/statements/routes.js';
@@ -48,6 +50,7 @@ export interface ServerDependencies {
   readonly reports: ReportRepository;
   readonly finance: FinanceRepository;
   readonly statements: StatementRepository;
+  readonly filings: FilingRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -76,6 +79,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     reports,
     finance,
     statements,
+    filings,
     tokens,
   } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
@@ -230,6 +234,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerFinanceRoutes(app, { finance, tokens });
   registerStatementRoutes(app, { statements, reports, tokens });
   registerReportRoutes(app, { reports, tokens, now });
+  registerFilingRoutes(app, { filings, reports, tokens, now });
 
   return app;
 }

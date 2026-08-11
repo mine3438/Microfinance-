@@ -225,6 +225,17 @@ export {
 } from './reporting.js';
 
 export {
+  filedReturnDetailSchema,
+  filedReturnSchema,
+  fileReturnRequestSchema,
+  recordSubmissionReferenceRequestSchema,
+  type FileReturnRequest,
+  type FiledReturn,
+  type FiledReturnDetail,
+  type RecordSubmissionReferenceRequest,
+} from './filings.js';
+
+export {
   MAXIMUM_PASSWORD_LENGTH,
   MINIMUM_PASSWORD_LENGTH,
   acknowledgementSchema,
