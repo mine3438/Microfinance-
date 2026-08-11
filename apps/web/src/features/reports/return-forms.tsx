@@ -1,13 +1,21 @@
 import {
   type CompiledReturn,
+  type Msp2_02,
   type Msp2_03,
   type Msp2_04,
+  type Msp2_07,
+  type Msp2_08,
   type Msp2_09,
   type Msp2_10,
 } from '@mfi/contracts';
 import { useState, type ReactNode } from 'react';
 
-import { formatMoney, formatPercentage, formatStatus } from '../../shared/lib/format.js';
+import {
+  formatDate,
+  formatMoney,
+  formatPercentage,
+  formatStatus,
+} from '../../shared/lib/format.js';
 import { Panel } from '../../shared/ui/panel.js';
 
 /**
@@ -30,6 +38,194 @@ function Rate({ value }: { value: string | null }): ReactNode {
   // Distinguished from zero on purpose: a loan type with no straight-line
   // lending has no lowest rate, and printing 0% would say it lends at nothing.
   return value === null ? <span className="muted">—</span> : <>{formatPercentage(value)}</>;
+}
+
+/** How BOT labels each section of MSP2-07. */
+const SECTION_LABELS: Record<Msp2_07['sections'][number]['kind'], string> = {
+  bank_tanzania: 'Banks in Tanzania',
+  microfinance_service_provider: 'Microfinance service providers',
+  mno: 'Mobile network operators',
+  bank_abroad: 'Banks abroad',
+};
+
+export function Msp2_02Table({ form }: { form: Msp2_02 }): ReactNode {
+  return (
+    <Panel title="MSP2-02 — Statement of income and expense">
+      <p className="hint-block">
+        Year to date covers {formatDate(form.yearToDateFrom)} to {formatDate(form.yearToDateTo)}.
+        Whether BOT reads that year as the calendar year or the institution&rsquo;s own is
+        unconfirmed (§11.8), so the window used is stated rather than assumed.
+      </p>
+
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Sno</th>
+              <th scope="col">Line</th>
+              <th scope="col" className="numeric">
+                Quarter
+              </th>
+              <th scope="col" className="numeric">
+                Year to date
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {form.rows.map((row) => (
+              <tr key={row.sno} className={row.isComputed ? 'row--computed' : ''}>
+                <td className="numeric">{row.sno}</td>
+                <td>{row.label}</td>
+                <td className="numeric">{formatMoney(row.quarterAmount)}</td>
+                <td className="numeric">{formatMoney(row.yearToDateAmount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
+export function Msp2_07Table({ form }: { form: Msp2_07 }): ReactNode {
+  return (
+    <Panel title="MSP2-07 — Deposits and borrowings">
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col" rowSpan={2}>
+                Counterparty
+              </th>
+              <th scope="col" colSpan={3}>
+                Deposits
+              </th>
+              <th scope="col" colSpan={3}>
+                Borrowings
+              </th>
+            </tr>
+            <tr>
+              <th scope="col" className="numeric">
+                TZS
+              </th>
+              <th scope="col" className="numeric">
+                Foreign (TZS eq.)
+              </th>
+              <th scope="col" className="numeric">
+                Total
+              </th>
+              <th scope="col" className="numeric">
+                TZS
+              </th>
+              <th scope="col" className="numeric">
+                Foreign (TZS eq.)
+              </th>
+              <th scope="col" className="numeric">
+                Total
+              </th>
+            </tr>
+          </thead>
+          {form.sections.map((section) => (
+            <tbody key={section.kind}>
+              <tr className="row--section">
+                <th scope="rowgroup" colSpan={7}>
+                  {SECTION_LABELS[section.kind]}
+                </th>
+              </tr>
+              {section.rows.length === 0 && (
+                <tr className="row--muted">
+                  <td colSpan={7}>Nothing held in this section.</td>
+                </tr>
+              )}
+              {section.rows.map((row) => (
+                <tr key={row.counterparty}>
+                  <td>{row.counterparty}</td>
+                  <td className="numeric">{formatMoney(row.depositTzs)}</td>
+                  <td className="numeric">{formatMoney(row.depositForeignTzsEquivalent)}</td>
+                  <td className="numeric">{formatMoney(row.depositTotal)}</td>
+                  <td className="numeric">{formatMoney(row.borrowingTzs)}</td>
+                  <td className="numeric">{formatMoney(row.borrowingForeignTzsEquivalent)}</td>
+                  <td className="numeric">{formatMoney(row.borrowingTotal)}</td>
+                </tr>
+              ))}
+              <tr>
+                <th scope="row">Subtotal</th>
+                <td className="numeric">{formatMoney(section.subtotal.depositTzs)}</td>
+                <td className="numeric">
+                  {formatMoney(section.subtotal.depositForeignTzsEquivalent)}
+                </td>
+                <td className="numeric">{formatMoney(section.subtotal.depositTotal)}</td>
+                <td className="numeric">{formatMoney(section.subtotal.borrowingTzs)}</td>
+                <td className="numeric">
+                  {formatMoney(section.subtotal.borrowingForeignTzsEquivalent)}
+                </td>
+                <td className="numeric">{formatMoney(section.subtotal.borrowingTotal)}</td>
+              </tr>
+            </tbody>
+          ))}
+          <tfoot>
+            <tr>
+              <th scope="row">Total</th>
+              <td className="numeric">{formatMoney(form.total.depositTzs)}</td>
+              <td className="numeric">{formatMoney(form.total.depositForeignTzsEquivalent)}</td>
+              <td className="numeric">{formatMoney(form.total.depositTotal)}</td>
+              <td className="numeric">{formatMoney(form.total.borrowingTzs)}</td>
+              <td className="numeric">{formatMoney(form.total.borrowingForeignTzsEquivalent)}</td>
+              <td className="numeric">{formatMoney(form.total.borrowingTotal)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * MSP2-08, shown for the banks actually used.
+ *
+ * BOT prints all 52 institutions on its agent-banking list. An institution
+ * typically works with two or three, and 49 rows of zero help nobody checking a
+ * return — the total, which is what rule 15 ties to MSP2-01, is printed
+ * regardless.
+ */
+export function Msp2_08Table({ form }: { form: Msp2_08 }): ReactNode {
+  const used = form.rows.filter((row) => row.balance !== '0.00');
+
+  return (
+    <Panel title="MSP2-08 — Agent banking balances">
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Bank</th>
+              <th scope="col" className="numeric">
+                Balance
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {used.length === 0 && (
+              <tr className="row--muted">
+                <td colSpan={2}>No agent-banking balance recorded for this quarter.</td>
+              </tr>
+            )}
+            {used.map((row) => (
+              <tr key={row.institutionCode}>
+                <td>{formatStatus(row.institutionCode)}</td>
+                <td className="numeric">{formatMoney(row.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Total</th>
+              <td className="numeric">{formatMoney(form.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Panel>
+  );
 }
 
 export function Msp2_03Table({ form }: { form: Msp2_03 }): ReactNode {
@@ -405,8 +601,11 @@ export function Msp2_10Table({ form }: { form: Msp2_10 }): ReactNode {
 export function ReturnForms({ compiled }: { compiled: CompiledReturn }): ReactNode {
   return (
     <>
+      <Msp2_02Table form={compiled.msp2_02} />
       <Msp2_03Table form={compiled.msp2_03} />
       <Msp2_04Table form={compiled.msp2_04} />
+      <Msp2_07Table form={compiled.msp2_07} />
+      <Msp2_08Table form={compiled.msp2_08} />
       <Msp2_09Table form={compiled.msp2_09} />
       <Msp2_10Table form={compiled.msp2_10} />
     </>

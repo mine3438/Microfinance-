@@ -33,6 +33,79 @@ function compiledReturn(overrides: Partial<CompiledReturn> = {}): CompiledReturn
 
   return {
     period: { year: 2026, quarter: 1, startDate: '2026-01-01', endDate: '2026-03-31' },
+    msp2_02: {
+      rows: [
+        {
+          sno: 2,
+          label: 'a. Interest - Loans to Clients',
+          isComputed: false,
+          quarterAmount: '1500000.00',
+          yearToDateAmount: '1500000.00',
+        },
+        {
+          sno: 1,
+          label: '1. INTEREST INCOME',
+          isComputed: true,
+          quarterAmount: '1500000.00',
+          yearToDateAmount: '1500000.00',
+        },
+      ],
+      yearToDateFrom: '2026-01-01',
+      yearToDateTo: '2026-03-31',
+    },
+    msp2_07: {
+      sections: [
+        {
+          kind: 'bank_tanzania',
+          rows: [
+            {
+              counterparty: 'CRDB BANK PLC',
+              depositTzs: '4000000.00',
+              depositForeignTzsEquivalent: '0.00',
+              depositTotal: '4000000.00',
+              borrowingTzs: '0.00',
+              borrowingForeignTzsEquivalent: '0.00',
+              borrowingTotal: '0.00',
+            },
+          ],
+          subtotal: {
+            depositTzs: '4000000.00',
+            depositForeignTzsEquivalent: '0.00',
+            depositTotal: '4000000.00',
+            borrowingTzs: '0.00',
+            borrowingForeignTzsEquivalent: '0.00',
+            borrowingTotal: '0.00',
+          },
+        },
+        {
+          kind: 'microfinance_service_provider',
+          rows: [],
+          subtotal: {
+            depositTzs: '0.00',
+            depositForeignTzsEquivalent: '0.00',
+            depositTotal: '0.00',
+            borrowingTzs: '0.00',
+            borrowingForeignTzsEquivalent: '0.00',
+            borrowingTotal: '0.00',
+          },
+        },
+      ],
+      total: {
+        depositTzs: '4000000.00',
+        depositForeignTzsEquivalent: '0.00',
+        depositTotal: '4000000.00',
+        borrowingTzs: '0.00',
+        borrowingForeignTzsEquivalent: '0.00',
+        borrowingTotal: '0.00',
+      },
+    },
+    msp2_08: {
+      rows: [
+        { institutionCode: 'crdb_bank_plc', balance: '250000.00' },
+        { institutionCode: 'nbc_limited', balance: '0.00' },
+      ],
+      total: '250000.00',
+    },
     msp2_03: {
       rows: [
         {
@@ -230,6 +303,35 @@ describe('ReportsPage', () => {
     // last digit, which a double would not.
     const cells = await screen.findAllByText('1,234,567.89');
     expect(cells.length).toBeGreaterThan(0);
+  });
+
+  it('shows MSP2-02 as two columns and marks the lines BOT derives', async () => {
+    quarterlyReturn.mockResolvedValue(compiledReturn());
+    renderPage();
+
+    expect(await screen.findByText('1. INTEREST INCOME')).toBeInTheDocument();
+    // The window the year-to-date column covers is stated, because §11.8 does
+    // not settle whether that year is the calendar year or the institution's.
+    expect(screen.getByText(/Year to date covers 1 Jan 2026/)).toBeInTheDocument();
+  });
+
+  it('shows every MSP2-07 section, including one holding nothing', async () => {
+    quarterlyReturn.mockResolvedValue(compiledReturn());
+    renderPage();
+
+    expect(await screen.findByText('Banks in Tanzania')).toBeInTheDocument();
+    expect(screen.getByText('Microfinance service providers')).toBeInTheDocument();
+    expect(screen.getByText('Nothing held in this section.')).toBeInTheDocument();
+  });
+
+  it('lists only the banks with an agent-banking balance, and the full total', async () => {
+    quarterlyReturn.mockResolvedValue(compiledReturn());
+    renderPage();
+
+    // BOT prints all 52 institutions; 49 rows of zero help nobody checking a
+    // return, and the total is what rule 15 ties to MSP2-01.
+    const totals = await screen.findAllByText('250,000.00');
+    expect(totals).toHaveLength(2);
   });
 
   it('keeps a sector with no lending on the form', async () => {

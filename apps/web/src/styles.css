@@ -585,3 +585,16 @@ code,
   color: var(--ink-muted);
   font-size: 0.93rem;
 }
+
+/* A line BOT derives rather than one an institution records against. */
+.row--computed td {
+  font-weight: 600;
+  background: var(--canvas);
+}
+
+.row--section th {
+  background: var(--canvas);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

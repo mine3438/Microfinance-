@@ -1034,3 +1034,49 @@ entries are the source, and stage 12's statement dataset auto-populates MSP2-02
 from them and locks it, in the same way Option 1 locks the loan-derived lines.
 MSP2-01's 61 lines, most of which no operational system can derive, remain
 entered.
+
+### 19.8 The finance API, and one naming debt
+
+`/finance/entries` (list, create, amend, delete), `/finance/bank-accounts`,
+`/finance/bank-accounts/:id/balances`, and two reference endpoints that serve
+BOT's own data — the MSP2-02 line taxonomy and the published institution lists.
+A client builds its category picker from the first and its bank picker from the
+second rather than embedding a copy, because a second list is a list that can
+disagree with BOT's.
+
+Every rule the schema enforces is checked in the use case first, against the
+same taxonomy, so the refusal can name the field: a foreign-key violation says
+only that a key did not match, while "that is a total BOT computes from the
+lines beneath it" says what to do instead. The constraint stays underneath as
+the floor.
+
+Recording a balance is a `PUT`, not a `POST`. There is exactly one figure per
+account per quarter and restating it as bank statements arrive is expected; a
+`POST` would suggest a second could exist beside the first, which is what the
+unique key forbids.
+
+**The naming debt.** These routes are guarded on `expense.read` and
+`expense.manage`. §9.2 describes the accountant as "finops, reports", and bank
+balances are finops — but the permission's name is narrower than what it now
+covers. Splitting it would create an authority no seeded role distinguishes, so
+this is recorded rather than papered over with a second permission that always
+travels with the first.
+
+### 19.9 MSP2-02's year-to-date window is a request parameter
+
+`fiscalYearStartMonth`, 1–12, defaulting to January — the same treatment §16.1
+gave the rate convention, and for the same reason: §11.8 does not say whether
+BOT reads the calendar year or the institution's own. The window actually used
+comes back on the compiled form as `yearToDateFrom`, so a reader of a return
+can see which answer produced it.
+
+### 19.10 Seven forms compiled, three still waiting on the balance sheet
+
+The compiled return now carries MSP2-02, -03, -04, -07, -08, -09 and -10.
+MSP2-01, -05 and -06 remain unavailable and are named as such.
+
+Compiling MSP2-07 and MSP2-08 made **no** validation rule checkable: every
+cross-check BOT publishes for them (9–15) ties a total to a balance-sheet line.
+They are reported alongside rules 1, 2, 4 and 16 as checks that could not be
+performed. Producing a form is not the same as being able to verify it, and the
+validator says which of the two happened.

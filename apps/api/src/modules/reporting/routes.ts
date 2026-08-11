@@ -73,6 +73,9 @@ export function registerReportRoutes(app: FastifyInstance, options: ReportRouteO
           ...(query.data.annualisation === undefined
             ? {}
             : { annualisation: query.data.annualisation }),
+          ...(query.data.fiscalYearStartMonth === undefined
+            ? {}
+            : { fiscalYearStartMonth: query.data.fiscalYearStartMonth }),
         },
         reports,
         now,

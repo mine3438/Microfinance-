@@ -366,6 +366,10 @@ describe('GET /reports/msp2/:year/:quarter', () => {
     expect(compiled.msp2_09.rows).toHaveLength(22);
     expect(compiled.msp2_10.districts).toHaveLength(193);
     expect(compiled.msp2_10.regions).toHaveLength(31);
+    // MSP2-02 prints all forty-two lines whether or not anything was recorded
+    // against them, and MSP2-07 prints all four of its sections.
+    expect(compiled.msp2_02.rows).toHaveLength(42);
+    expect(compiled.msp2_07.sections).toHaveLength(4);
 
     // Sectors in BOT's own serial order, not alphabetical. Sorting by code
     // would file every figure one row out.
@@ -492,13 +496,12 @@ describe('GET /reports/msp2/:year/:quarter', () => {
     // A screen showing four forms and saying nothing about the other six reads
     // as a complete submission, and the institution finds out otherwise at the
     // filing desk.
+    // Three, since stage 11 supplied MSP2-02, MSP2-07 and MSP2-08. The three
+    // that remain all wait on the balance sheet.
     expect(compiled.unavailableForms.map((form) => form.code)).toEqual([
       'MSP2-01',
-      'MSP2-02',
       'MSP2-05',
       'MSP2-06',
-      'MSP2-07',
-      'MSP2-08',
     ]);
     expect(compiled.unavailableForms.every((form) => form.reason.length > 0)).toBe(true);
   });

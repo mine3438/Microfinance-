@@ -1,6 +1,11 @@
 import { type Database } from '@mfi/db';
 import {
+  type AgentBankingBalance,
   type ClassifiedExposure,
+  type CounterpartyHolding,
+  type FinanceEntry,
+  type HoldingKind,
+  type Msp2_02Line,
   type Disbursement,
   type DistrictInHierarchy,
   type DistrictPresence,
@@ -152,6 +157,14 @@ export interface PortfolioSnapshot {
   readonly classificationsUpdatedAt: Date | null;
   /** Active branches with no BOT district, which MSP2-10 cannot place. */
   readonly unlocatedBranchCount: number;
+
+  /** MSP2-02's line taxonomy, and the entries recorded against it. */
+  readonly msp2_02Lines: readonly Msp2_02Line[];
+  readonly financeEntries: readonly FinanceEntry[];
+  /** MSP2-07's four sections, and MSP2-08's single column. */
+  readonly holdings: readonly CounterpartyHolding[];
+  readonly agentBankingCodes: readonly string[];
+  readonly agentBankingBalances: readonly AgentBankingBalance[];
 }
 
 export interface ReportRepository {
@@ -159,6 +172,8 @@ export interface ReportRepository {
     institutionId: string,
     userId: string,
     period: ReportingPeriod,
+    /** Earliest entry date the year-to-date column covers, `YYYY-MM-DD`. */
+    fiscalYearStart: string,
   ): Promise<PortfolioSnapshot>;
 }
 
@@ -169,6 +184,7 @@ export class PostgresReportRepository implements ReportRepository {
     institutionId: string,
     userId: string,
     period: ReportingPeriod,
+    fiscalYearStart: string,
   ): Promise<PortfolioSnapshot> {
     return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
       const [sectors, loanTypes, districts, bands] = await Promise.all([
@@ -273,19 +289,20 @@ export class PostgresReportRepository implements ReportRepository {
         );
       }
 
-      const [disbursed, presence, writeOffs, health, unlocated] = await Promise.all([
-        client.query<{ sector_code: string; gender: Gender; principal: string }>(
-          `SELECT c.sector_code, c.gender, l.principal
+      const [disbursed, presence, writeOffs, health, unlocated, lines, entries, balances] =
+        await Promise.all([
+          client.query<{ sector_code: string; gender: Gender; principal: string }>(
+            `SELECT c.sector_code, c.gender, l.principal
              FROM loans l JOIN clients c ON c.id = l.client_id
             WHERE l.disbursement_date BETWEEN $1 AND $2`,
-          [period.startDate, period.endDate],
-        ),
-        // Branches counted where the branch is, and staff counted where their
-        // branch is. Grouping by the districts a branch's *clients* live in
-        // would count one Arusha branch four times over — once per district it
-        // lends into — and file four branches where there is one.
-        client.query<{ district_code: string; branch_count: string; employee_count: string }>(
-          `SELECT b.district_code,
+            [period.startDate, period.endDate],
+          ),
+          // Branches counted where the branch is, and staff counted where their
+          // branch is. Grouping by the districts a branch's *clients* live in
+          // would count one Arusha branch four times over — once per district it
+          // lends into — and file four branches where there is one.
+          client.query<{ district_code: string; branch_count: string; employee_count: string }>(
+            `SELECT b.district_code,
                   count(DISTINCT b.id)::text AS branch_count,
                   count(DISTINCT u.id)::text AS employee_count
              FROM branches b
@@ -293,30 +310,80 @@ export class PostgresReportRepository implements ReportRepository {
             WHERE b.status = 'active'
               AND b.district_code IS NOT NULL
             GROUP BY b.district_code`,
-        ),
-        client.query<{ sector_code: string; amount: string }>(
-          // The only record of what a write-off was worth and when it happened.
-          // The domain-event seam was built in stage 8 for a ledger that does
-          // not exist yet; this is its first real consumer.
-          `SELECT c.sector_code, sum((e.payload->>'outstanding')::numeric) AS amount
+          ),
+          client.query<{ sector_code: string; amount: string }>(
+            // The only record of what a write-off was worth and when it happened.
+            // The domain-event seam was built in stage 8 for a ledger that does
+            // not exist yet; this is its first real consumer.
+            `SELECT c.sector_code, sum((e.payload->>'outstanding')::numeric) AS amount
              FROM domain_events e
              JOIN loans l ON l.id = e.aggregate_id
              JOIN clients c ON c.id = l.client_id
             WHERE e.event_type = 'loan.written_off'
               AND e.occurred_at::date BETWEEN $1 AND $2
             GROUP BY c.sector_code`,
-          [period.startDate, period.endDate],
-        ),
-        client.query<{ classifications_updated_at: Date | null }>(
-          `SELECT classifications_updated_at FROM system_health WHERE institution_id = $1`,
-          [institutionId],
-        ),
-        client.query<{ count: string }>(
-          `SELECT count(*)::text AS count
+            [period.startDate, period.endDate],
+          ),
+          client.query<{ classifications_updated_at: Date | null }>(
+            `SELECT classifications_updated_at FROM system_health WHERE institution_id = $1`,
+            [institutionId],
+          ),
+          client.query<{ count: string }>(
+            `SELECT count(*)::text AS count
              FROM branches
             WHERE status = 'active' AND district_code IS NULL`,
-        ),
-      ]);
+          ),
+          client.query<{
+            sno: number;
+            label: string;
+            is_computed: boolean;
+            entry_direction: 'income' | 'expense' | null;
+          }>(
+            `SELECT sno, label, is_computed, entry_direction
+             FROM reference.form_lines WHERE form_code = 'MSP2-02' ORDER BY sno`,
+          ),
+          // From the start of the fiscal year, because MSP2-02's second column
+          // is year-to-date. The quarter column is cut from the same rows by the
+          // compiler, which is only possible because entries carry a date.
+          client.query<{
+            sno: number;
+            direction: 'income' | 'expense';
+            amount: string;
+            entry_date: Date;
+          }>(
+            `SELECT sno, direction, amount, entry_date
+             FROM finance_entries
+            WHERE entry_date BETWEEN $1 AND $2`,
+            [fiscalYearStart, period.endDate],
+          ),
+          client.query<{
+            holding_kind: HoldingKind;
+            counterparty: string;
+            institution_code: string | null;
+            currency_code: string;
+            deposit_balance_tzs: string;
+            borrowing_balance_tzs: string;
+            agent_banking_balance: string;
+          }>(
+            `SELECT a.holding_kind,
+                  COALESCE(f.name, a.counterparty_name) AS counterparty,
+                  a.institution_code,
+                  a.currency_code,
+                  v.deposit_balance_tzs,
+                  v.borrowing_balance_tzs,
+                  v.agent_banking_balance
+             FROM bank_account_balances v
+             JOIN bank_accounts a ON a.id = v.bank_account_id
+             LEFT JOIN reference.financial_institutions f ON f.code = a.institution_code
+            WHERE v.year = $1 AND v.quarter = $2`,
+            [period.year, period.quarter],
+          ),
+        ]);
+
+      const agentBankingCodes = await client.query<{ code: string }>(
+        `SELECT code FROM reference.financial_institutions
+          WHERE in_agent_banking_list ORDER BY sort_order`,
+      );
 
       return {
         sectorCodes: sectors.rows.map((row) => row.code),
@@ -344,6 +411,43 @@ export class PostgresReportRepository implements ReportRepository {
         })),
         classificationsUpdatedAt: health.rows[0]?.classifications_updated_at ?? null,
         unlocatedBranchCount: Number(unlocated.rows[0]?.count ?? '0'),
+        msp2_02Lines: lines.rows.map((row) => ({
+          sno: row.sno,
+          label: row.label,
+          isComputed: row.is_computed,
+          entryDirection: row.entry_direction,
+        })),
+        financeEntries: entries.rows.map((row) => ({
+          sno: row.sno,
+          direction: row.direction,
+          amount: Money.fromDatabaseValue(row.amount),
+          entryDate: formatDateOnly(row.entry_date),
+        })),
+        // A TZS account fills BOT's shilling column and a foreign one fills the
+        // equivalent column beside it. Which column a balance lands in is
+        // decided by the account's currency, not by a second field somebody
+        // could set to disagree with it.
+        holdings: balances.rows.map((row) => {
+          const inTzs = row.currency_code === 'TZS';
+          const deposit = Money.fromDatabaseValue(row.deposit_balance_tzs);
+          const borrowing = Money.fromDatabaseValue(row.borrowing_balance_tzs);
+
+          return {
+            kind: row.holding_kind,
+            counterparty: row.counterparty,
+            depositTzs: inTzs ? deposit : Money.zero(),
+            borrowingTzs: inTzs ? borrowing : Money.zero(),
+            depositForeignTzsEquivalent: inTzs ? Money.zero() : deposit,
+            borrowingForeignTzsEquivalent: inTzs ? Money.zero() : borrowing,
+          };
+        }),
+        agentBankingCodes: agentBankingCodes.rows.map((row) => row.code),
+        agentBankingBalances: balances.rows
+          .filter((row) => row.institution_code !== null)
+          .map((row) => ({
+            institutionCode: row.institution_code ?? '',
+            balance: Money.fromDatabaseValue(row.agent_banking_balance),
+          })),
       };
     });
   }

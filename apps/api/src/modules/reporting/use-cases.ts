@@ -1,13 +1,19 @@
 import {
   assessReportingReadiness,
+  compileMsp2_02,
   compileMsp2_03,
   compileMsp2_04,
+  compileMsp2_07,
+  compileMsp2_08,
   compileMsp2_09,
   compileMsp2_10,
   reportingPeriod,
   validatePortfolioForms,
+  type Msp2_02,
   type Msp2_03,
   type Msp2_04,
+  type Msp2_07,
+  type Msp2_08,
   type Msp2_09,
   type Msp2_10,
   type ReportingPeriod,
@@ -22,8 +28,11 @@ import { type ReportRepository } from './report-repository.js';
 /** A compiled quarterly return, with the verdict on whether it may be filed. */
 export interface CompiledReturn {
   readonly period: ReportingPeriod;
+  readonly msp2_02: Msp2_02;
   readonly msp2_03: Msp2_03;
   readonly msp2_04: Msp2_04;
+  readonly msp2_07: Msp2_07;
+  readonly msp2_08: Msp2_08;
   readonly msp2_09: Msp2_09;
   readonly msp2_10: Msp2_10;
   readonly validation: ValidationResult;
@@ -31,26 +40,38 @@ export interface CompiledReturn {
   readonly unavailableForms: readonly { readonly code: string; readonly reason: string }[];
 }
 
-/** The six forms not built, and why. Reported rather than omitted. */
+/** The forms not built, and why. Reported rather than omitted. */
 const UNAVAILABLE_FORMS = Object.freeze([
   {
     code: 'MSP2-01',
     reason: 'The balance sheet needs the financial statements module (stage 12).',
   },
-  {
-    code: 'MSP2-02',
-    reason: 'Income and expense needs expense and income records (stage 11).',
-  },
   { code: 'MSP2-05', reason: 'Liquid assets are derived from MSP2-01.' },
   { code: 'MSP2-06', reason: 'Complaints are not yet recorded (stage 14).' },
-  { code: 'MSP2-07', reason: 'Bank, MSP and MNO balances need the finance module (stage 11).' },
-  { code: 'MSP2-08', reason: 'Agent banking needs the finance module (stage 11).' },
 ]);
+
+/**
+ * The first day of the fiscal year a quarter falls in.
+ *
+ * The most recent occurrence of the start month on or before the quarter, so a
+ * July fiscal year puts the January quarter in the year that began the
+ * preceding July. §11.8 does not say whether BOT reads the calendar year or an
+ * institution's own, which is why the month is a parameter with January as its
+ * stated default rather than a constant — and the window actually used comes
+ * back on the compiled form.
+ */
+export function fiscalYearStartFor(period: ReportingPeriod, startMonth: number): string {
+  const quarterStartMonth = (period.quarter - 1) * 3 + 1;
+  const year = quarterStartMonth >= startMonth ? period.year : period.year - 1;
+  return `${String(year).padStart(4, '0')}-${String(startMonth).padStart(2, '0')}-01`;
+}
 
 export interface CompileReturnRequest {
   readonly year: number;
   readonly quarter: number;
   readonly annualisation?: AnnualisationConvention | undefined;
+  /** Month the fiscal year begins, 1-12. January unless stated. */
+  readonly fiscalYearStartMonth?: number | undefined;
 }
 
 /**
@@ -83,7 +104,14 @@ export async function compileQuarterlyReturn(
     );
   }
 
-  const snapshot = await reports.snapshot(principal.institutionId, principal.userId, period);
+  const fiscalYearStart = fiscalYearStartFor(period, request.fiscalYearStartMonth ?? 1);
+
+  const snapshot = await reports.snapshot(
+    principal.institutionId,
+    principal.userId,
+    period,
+    fiscalYearStart,
+  );
 
   const unclassifiable = snapshot.classifiedExposures.filter(
     (exposure) => exposure.classification === null,
@@ -106,6 +134,20 @@ export async function compileQuarterlyReturn(
       })),
     );
   }
+
+  const msp2_02 = compileMsp2_02({
+    lines: snapshot.msp2_02Lines,
+    entries: snapshot.financeEntries,
+    period,
+    fiscalYearStart,
+  });
+
+  const msp2_07 = compileMsp2_07({ holdings: snapshot.holdings });
+
+  const msp2_08 = compileMsp2_08({
+    institutionCodes: snapshot.agentBankingCodes,
+    balances: snapshot.agentBankingBalances,
+  });
 
   const msp2_03 = compileMsp2_03({
     sectorCodes: snapshot.sectorCodes,
@@ -139,8 +181,11 @@ export async function compileQuarterlyReturn(
 
   return {
     period,
+    msp2_02,
     msp2_03,
     msp2_04,
+    msp2_07,
+    msp2_08,
     msp2_09,
     msp2_10,
     validation: validatePortfolioForms({ msp2_03, msp2_04, msp2_09, msp2_10 }),

@@ -270,8 +270,18 @@ function checkGeographicSubtotals(form: Msp2_10): ValidationFinding[] {
 function unavailableCrossFormRules(): ValidationFinding[] {
   const unavailable: { ruleId: number; formCode: string; needs: string }[] = [
     { ruleId: 1, formCode: 'MSP2-01', needs: 'the balance sheet' },
-    { ruleId: 2, formCode: 'MSP2-02', needs: 'the income and expense statement' },
+    { ruleId: 2, formCode: 'MSP2-02', needs: 'MSP2-01’s profit and loss line' },
     { ruleId: 4, formCode: 'MSP2-04', needs: 'MSP2-01’s loans and allowance lines' },
+    // Every cross-check BOT publishes for MSP2-07 and MSP2-08 ties a total to
+    // a balance-sheet line, so compiling those forms does not make any of them
+    // checkable. Both are produced and neither is verified against anything.
+    { ruleId: 9, formCode: 'MSP2-07', needs: 'MSP2-01’s borrowings-from-banks line' },
+    { ruleId: 10, formCode: 'MSP2-07', needs: 'MSP2-01’s microfinance-provider lines' },
+    { ruleId: 11, formCode: 'MSP2-07', needs: 'MSP2-01’s MNO float line' },
+    { ruleId: 12, formCode: 'MSP2-07', needs: 'MSP2-01’s cash-equivalent lines' },
+    { ruleId: 13, formCode: 'MSP2-07', needs: 'MSP2-01’s borrowings-from-abroad line' },
+    { ruleId: 14, formCode: 'MSP2-07', needs: 'MSP2-01’s balances-with-banks line' },
+    { ruleId: 15, formCode: 'MSP2-08', needs: 'MSP2-01’s agent-banking line' },
     { ruleId: 16, formCode: 'MSP2-10', needs: 'MSP2-01’s compulsory savings line' },
   ];
 

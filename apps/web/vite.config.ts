@@ -15,6 +15,8 @@ export default defineConfig({
       '/loan-products': 'http://127.0.0.1:3000',
       '/payments': 'http://127.0.0.1:3000',
       '/reports': 'http://127.0.0.1:3000',
+      '/finance': 'http://127.0.0.1:3000',
+      '/reference': 'http://127.0.0.1:3000',
       '/health': 'http://127.0.0.1:3000',
       '/ready': 'http://127.0.0.1:3000',
     },

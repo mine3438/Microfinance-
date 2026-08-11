@@ -14,6 +14,8 @@ import { registerClientRoutes } from '../modules/clients/routes.js';
 import { type LoanRepository } from '../modules/loans/loan-repository.js';
 import { registerLoanRoutes } from '../modules/loans/routes.js';
 import { type PaymentRepository } from '../modules/payments/payment-repository.js';
+import { type FinanceRepository } from '../modules/finance/finance-repository.js';
+import { registerFinanceRoutes } from '../modules/finance/routes.js';
 import { registerPaymentRoutes } from '../modules/payments/routes.js';
 import { type ReportRepository } from '../modules/reporting/report-repository.js';
 import { registerReportRoutes } from '../modules/reporting/routes.js';
@@ -42,6 +44,7 @@ export interface ServerDependencies {
   readonly loans: LoanRepository;
   readonly payments: PaymentRepository;
   readonly reports: ReportRepository;
+  readonly finance: FinanceRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -59,8 +62,18 @@ export interface ServerDependencies {
  * headers, then CORS, then the rate limiter, then routes.
  */
 export async function buildServer(dependencies: ServerDependencies): Promise<FastifyInstance> {
-  const { environment, database, redis, sessions, clients, loans, payments, reports, tokens } =
-    dependencies;
+  const {
+    environment,
+    database,
+    redis,
+    sessions,
+    clients,
+    loans,
+    payments,
+    reports,
+    finance,
+    tokens,
+  } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
 
   const app = Fastify({
@@ -210,6 +223,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerClientRoutes(app, { clients, tokens });
   registerLoanRoutes(app, { loans, tokens });
   registerPaymentRoutes(app, { payments, tokens });
+  registerFinanceRoutes(app, { finance, tokens });
   registerReportRoutes(app, { reports, tokens, now });
 
   return app;

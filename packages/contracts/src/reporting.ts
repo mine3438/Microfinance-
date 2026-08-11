@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { type Gender } from './clients.js';
+import { HOLDING_KINDS } from './finance.js';
 import { isoDateSchema, moneyAmountSchema } from './scalars.js';
 
 /**
@@ -248,6 +249,72 @@ export const msp2_10Schema = z
 
 export type Msp2_10 = z.infer<typeof msp2_10Schema>;
 
+/** MSP2-02 — Statement of Income and Expense. */
+export const msp2_02RowSchema = z
+  .object({
+    sno: z.number().int().positive(),
+    label: z.string(),
+    isComputed: z.boolean(),
+    /**
+     * The quarter, and the fiscal year so far.
+     *
+     * Both can be negative: an institution whose interest expense exceeds its
+     * interest income files a negative Sno13, and a loss is a negative Sno42.
+     */
+    quarterAmount: moneyAmountSchema,
+    yearToDateAmount: moneyAmountSchema,
+  })
+  .strict();
+
+export const msp2_02Schema = z
+  .object({
+    rows: z.array(msp2_02RowSchema),
+    /** The window the year-to-date column covers, so a reader can check it. */
+    yearToDateFrom: isoDateSchema,
+    yearToDateTo: isoDateSchema,
+  })
+  .strict();
+
+export type Msp2_02 = z.infer<typeof msp2_02Schema>;
+
+const msp2_07AmountsSchema = z
+  .object({
+    depositTzs: moneyAmountSchema,
+    depositForeignTzsEquivalent: moneyAmountSchema,
+    depositTotal: moneyAmountSchema,
+    borrowingTzs: moneyAmountSchema,
+    borrowingForeignTzsEquivalent: moneyAmountSchema,
+    borrowingTotal: moneyAmountSchema,
+  })
+  .strict();
+
+export const msp2_07RowSchema = msp2_07AmountsSchema.extend({ counterparty: z.string() }).strict();
+
+export const msp2_07SectionSchema = z
+  .object({
+    kind: z.enum(HOLDING_KINDS),
+    rows: z.array(msp2_07RowSchema),
+    subtotal: msp2_07AmountsSchema,
+  })
+  .strict();
+
+/** MSP2-07 — Deposits and Borrowings with banks, MSPs and MNOs. */
+export const msp2_07Schema = z
+  .object({ sections: z.array(msp2_07SectionSchema), total: msp2_07AmountsSchema })
+  .strict();
+
+export type Msp2_07 = z.infer<typeof msp2_07Schema>;
+
+/** MSP2-08 — Agent Banking Balances. */
+export const msp2_08Schema = z
+  .object({
+    rows: z.array(z.object({ institutionCode: z.string(), balance: moneyAmountSchema }).strict()),
+    total: moneyAmountSchema,
+  })
+  .strict();
+
+export type Msp2_08 = z.infer<typeof msp2_08Schema>;
+
 export const VALIDATION_SEVERITIES = ['blocking', 'warning'] as const;
 
 export type ValidationSeverity = (typeof VALIDATION_SEVERITIES)[number];
@@ -289,8 +356,11 @@ export type UnavailableForm = z.infer<typeof unavailableFormSchema>;
 export const compiledReturnSchema = z
   .object({
     period: reportingPeriodSchema,
+    msp2_02: msp2_02Schema,
     msp2_03: msp2_03Schema,
     msp2_04: msp2_04Schema,
+    msp2_07: msp2_07Schema,
+    msp2_08: msp2_08Schema,
     msp2_09: msp2_09Schema,
     msp2_10: msp2_10Schema,
     validation: validationResultSchema,
@@ -302,7 +372,19 @@ export type CompiledReturn = z.infer<typeof compiledReturnSchema>;
 
 /** Options on the compile request, beyond the period named in the path. */
 export const compileReturnQuerySchema = z
-  .object({ annualisation: z.enum(ANNUALISATION_CONVENTIONS).optional() })
+  .object({
+    annualisation: z.enum(ANNUALISATION_CONVENTIONS).optional(),
+    /**
+     * Month the institution's fiscal year begins, 1–12.
+     *
+     * MSP2-02 carries a year-to-date column and §11.8 does not say whether that
+     * year is the calendar year or the institution's own. A visible parameter
+     * with a stated default (January) rather than a constant, following the
+     * same treatment §16.1 gave the rate convention — and the window actually
+     * used comes back on the form as `yearToDateFrom`.
+     */
+    fiscalYearStartMonth: z.coerce.number().int().min(1).max(12).optional(),
+  })
   .strict();
 
 export type CompileReturnQuery = z.infer<typeof compileReturnQuerySchema>;

@@ -1,15 +1,23 @@
 import {
   type CompiledReturn as WireCompiledReturn,
+  type Msp2_02 as WireMsp2_02,
   type Msp2_03 as WireMsp2_03,
   type Msp2_04 as WireMsp2_04,
+  type Msp2_07 as WireMsp2_07,
+  type Msp2_08 as WireMsp2_08,
   type Msp2_09 as WireMsp2_09,
   type Msp2_10 as WireMsp2_10,
 } from '@mfi/contracts';
 import {
+  type Msp2_02,
   type Msp2_03,
   type Msp2_03Row,
   type Msp2_04,
   type Msp2_04Row,
+  type Msp2_07,
+  type Msp2_07Row,
+  type Msp2_07Section,
+  type Msp2_08,
   type Msp2_09,
   type Msp2_09Row,
   type Msp2_10,
@@ -137,6 +145,59 @@ function msp2_10Subtotal(subtotal: Msp2_10RegionSubtotal): WireMsp2_10['grandTot
   };
 }
 
+export function presentMsp2_02(form: Msp2_02): WireMsp2_02 {
+  return {
+    rows: form.rows.map((row) => ({
+      sno: row.sno,
+      label: row.label,
+      isComputed: row.isComputed,
+      quarterAmount: money(row.quarterAmount),
+      yearToDateAmount: money(row.yearToDateAmount),
+    })),
+    yearToDateFrom: form.yearToDateFrom,
+    yearToDateTo: form.yearToDateTo,
+  };
+}
+
+function msp2_07Amounts(row: Msp2_07Row | Omit<Msp2_07Row, 'counterparty'>): WireMsp2_07['total'] {
+  return {
+    depositTzs: money(row.depositTzs),
+    depositForeignTzsEquivalent: money(row.depositForeignTzsEquivalent),
+    depositTotal: money(row.depositTotal),
+    borrowingTzs: money(row.borrowingTzs),
+    borrowingForeignTzsEquivalent: money(row.borrowingForeignTzsEquivalent),
+    borrowingTotal: money(row.borrowingTotal),
+  };
+}
+
+function msp2_07Section(section: Msp2_07Section): WireMsp2_07['sections'][number] {
+  return {
+    kind: section.kind,
+    rows: section.rows.map((row) => ({
+      counterparty: row.counterparty,
+      ...msp2_07Amounts(row),
+    })),
+    subtotal: msp2_07Amounts(section.subtotal),
+  };
+}
+
+export function presentMsp2_07(form: Msp2_07): WireMsp2_07 {
+  return {
+    sections: form.sections.map(msp2_07Section),
+    total: msp2_07Amounts(form.total),
+  };
+}
+
+export function presentMsp2_08(form: Msp2_08): WireMsp2_08 {
+  return {
+    rows: form.rows.map((row) => ({
+      institutionCode: row.institutionCode,
+      balance: money(row.balance),
+    })),
+    total: money(form.total),
+  };
+}
+
 export function presentMsp2_03(form: Msp2_03): WireMsp2_03 {
   return {
     rows: form.rows.map(msp2_03Row),
@@ -179,8 +240,11 @@ export function presentCompiledReturn(compiled: CompiledReturn): WireCompiledRet
       startDate: compiled.period.startDate,
       endDate: compiled.period.endDate,
     },
+    msp2_02: presentMsp2_02(compiled.msp2_02),
     msp2_03: presentMsp2_03(compiled.msp2_03),
     msp2_04: presentMsp2_04(compiled.msp2_04),
+    msp2_07: presentMsp2_07(compiled.msp2_07),
+    msp2_08: presentMsp2_08(compiled.msp2_08),
     msp2_09: presentMsp2_09(compiled.msp2_09),
     msp2_10: presentMsp2_10(compiled.msp2_10),
     validation: {
