@@ -925,3 +925,112 @@ registers that itself only under Vitest globals, which this project does not
 use — without it every render accumulated in one document and queries failed as
 "found multiple elements", which reads like a component bug rather than a
 harness one.
+
+---
+
+## 19. Amendments — Finops Stage
+
+### 19.1 A category is a BOT line, not a string
+
+`finance_entries` carries no category column. It carries `(form_code, sno,
+direction)`, a foreign key into `reference.form_lines`, and that key admits
+only lines BOT accepts entry on, on the correct side of the statement.
+
+Three classes of error the database now refuses outright, each verified by a
+test that tries it:
+
+- an entry against a line BOT **computes** (Sno23, the non-interest expense
+  subtotal, would be double-counted against the sixteen lines beneath it);
+- an expense recorded against an **income** line, or the reverse;
+- a line number BOT does not publish.
+
+This closes R12. The mechanism is a `UNIQUE (form_code, sno, entry_direction)`
+on the reference table where `entry_direction` is `NULL` for every computed
+line — a `NOT NULL` child column can never match a `NULL` parent, so "computed
+lines take no entries" is enforced without a rule that says so.
+
+### 19.2 Entries are dated, not bucketed by quarter
+
+The previous schema scoped an entry to `(institution, year, quarter)`, which
+makes the quarter something a person types. MSP2-02 carries a year-to-date
+column, so the same rows must aggregate two ways, and §11.8 has not settled
+whether that year is the calendar year or an institution's own fiscal year.
+
+A date supports both. `compileMsp2_02` takes `fiscalYearStart` as a **required**
+parameter — never defaulted, the same treatment `asAt` gets on MSP2-10 — so
+whichever way §11.8 is answered, no row is restated.
+
+### 19.3 MSP2-02's subtotals are derived, never re-summed
+
+Seven of the forty-two lines are computed by BOT's template. Their composition
+is written out once in `msp2-02.ts`, mirroring the formulas seeded in
+`reference.form_lines.formula`, and the compiler **refuses** a taxonomy whose
+structure does not match — a revised template fails loudly rather than
+reporting subtotals that no longer describe the rows above them.
+
+Losses are reported as negative figures. An institution whose interest expense
+exceeds its interest income files a negative Sno13, and flooring that at zero
+would report a profit that was not made.
+
+### 19.4 `bank_accounts` — two sections listed, two typed in
+
+MSP2-07 has four sections and BOT publishes a fixed list for only two of them:
+banks in Tanzania (56) and MNOs (6). Balances with other microfinance providers
+and with banks abroad are typed in by name. So the counterparty is a foreign
+key for the first two and free text for the last two, and a check makes it
+impossible to supply both or neither.
+
+Two further facts are enforced by composite foreign key rather than by
+application code:
+
+- **An MNO cannot be filed as a bank.** A generated `reference_kind` column
+  maps the holding kind onto BOT's own `kind`, and the key resolves against
+  `(code, kind)`.
+- **Agent banking follows BOT's list, not a preference.** `supports_agent_banking`
+  must equal `reference.financial_institutions.in_agent_banking_list` exactly,
+  so a balance can never be recorded against a bank MSP2-08 has no row for.
+
+### 19.5 Foreign currency: the rate is recorded, not chosen
+
+§11.6 asks which rate converts a foreign holding to TZS. That question is not
+answered here, and it does not need to be for the data to be sound: a balance
+row in any currency other than TZS must carry both an `exchange_rate` and the
+`rate_date` it was taken on, or the check refuses it. Whatever an institution
+used, the filed figure can be explained afterwards.
+
+A TZS balance converts at par: the check requires the TZS columns to equal the
+balances and forbids a rate, so the two can never quietly disagree.
+
+The conversion itself happens in `@mfi/money` on the way in, never in the
+database. A generated column would do the multiplication in double precision,
+which is the one thing this system does not do with money.
+
+### 19.6 Editable, unlike a payment
+
+`finance_entries` grants UPDATE and DELETE, where `payments` grants neither. A
+payment is evidence of money a borrower handed over; an expense entry is a
+bookkeeping classification of the institution's own spending, and reclassifying
+one between two BOT lines is ordinary work rather than a correction to a record
+of fact. What makes it safe is that the audit trigger captures every move, so
+"who put this figure on that line" stays answerable.
+
+`bank_accounts` and `bank_account_balances` grant UPDATE but not DELETE: a
+quarter's reported balance stays on the record, and closing an account is a
+status change.
+
+### 19.7 What this does not yet produce
+
+MSP2-02, MSP2-07 and MSP2-08 now have compilers, but none of them can be
+*filed* until MSP2-01 exists: every one of BOT's cross-validation rules for
+these three forms (2, 9–15) ties a total to a balance-sheet line. They will be
+reported as unavailable, exactly as rules 1, 4 and 16 already are, until stage
+12 lands.
+
+**A reading recorded rather than assumed.** §16.1 chose Option 1 — quarterly
+financial-statement entry — for "MSP2-01 / MSP2-02 production", while §16.4
+stage 11 calls for "expenses/income mapped to BOT lines". Every entered line on
+MSP2-02 *is* an income or expense line, so the two are not alternatives: finance
+entries are the source, and stage 12's statement dataset auto-populates MSP2-02
+from them and locks it, in the same way Option 1 locks the loan-derived lines.
+MSP2-01's 61 lines, most of which no operational system can derive, remain
+entered.

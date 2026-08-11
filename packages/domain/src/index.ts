@@ -108,6 +108,29 @@ export {
 } from './reporting/period.js';
 export type { Quarter, ReportingPeriod } from './reporting/period.js';
 
+export type { FinanceDirection, FinanceEntry, Msp2_02Line } from './finance/entry.js';
+
+export { compileMsp2_02 } from './reporting/msp2-02.js';
+export type { Msp2_02, Msp2_02Request, Msp2_02Row } from './reporting/msp2-02.js';
+
+export { HOLDING_KINDS, compileMsp2_07 } from './reporting/msp2-07.js';
+export type {
+  CounterpartyHolding,
+  HoldingKind,
+  Msp2_07,
+  Msp2_07Request,
+  Msp2_07Row,
+  Msp2_07Section,
+} from './reporting/msp2-07.js';
+
+export { compileMsp2_08 } from './reporting/msp2-08.js';
+export type {
+  AgentBankingBalance,
+  Msp2_08,
+  Msp2_08Request,
+  Msp2_08Row,
+} from './reporting/msp2-08.js';
+
 export { compileMsp2_03 } from './reporting/msp2-03.js';
 export type {
   ClassifiedExposure,
