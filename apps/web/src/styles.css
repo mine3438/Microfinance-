@@ -598,3 +598,8 @@ code,
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+.field--wide {
+  min-width: 20rem;
+  flex: 1 1 20rem;
+}

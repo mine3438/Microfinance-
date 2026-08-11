@@ -82,7 +82,7 @@ export class NetworkError extends Error {
 }
 
 interface RequestOptions {
-  readonly method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly body?: unknown;
   /** Set false on the auth endpoints, which manage their own token. */
   readonly authenticated?: boolean;
@@ -212,7 +212,10 @@ export async function apiRequest<T>(
     return toError(response);
   }
 
-  const body: unknown = await response.json();
+  // A 204 carries no body, and `json()` on an empty response rejects — which
+  // would turn a successful delete into a network error the user is told to
+  // retry.
+  const body: unknown = response.status === 204 ? undefined : await response.json();
   const parsed = schema.safeParse(body);
 
   if (!parsed.success) {

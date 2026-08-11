@@ -1080,3 +1080,30 @@ cross-check BOT publishes for them (9–15) ties a total to a balance-sheet line
 They are reported alongside rules 1, 2, 4 and 16 as checks that could not be
 performed. Producing a form is not the same as being able to verify it, and the
 validator says which of the two happened.
+
+### 19.11 The finance screens
+
+Two routes, both behind `expense.read`, with the write controls behind
+`expense.manage`: `/finance` for income and expenditure, `/finance/banks` for
+accounts and their quarter-end balances.
+
+**There is no category field.** The line picker is built from the taxonomy the
+server serves, and the lines BOT computes are absent from it entirely — an
+entry against a subtotal would be counted twice against the lines beneath it.
+The server refuses it regardless; leaving it out of the list means nobody has
+to be told. Changing the side clears a line chosen for the old one rather than
+leaving it for the server to reject.
+
+**The TZS equivalent is never entered.** A foreign balance is sent with its
+rate and the server multiplies, so the figure filed is this system's arithmetic.
+The screen asks for the rate and its date only when the account is not held in
+shillings, and says why (§11.6).
+
+**Agent-banking eligibility is never asked.** It is BOT's fact about the
+institution, read from their list when the account is opened, so the field
+simply does not exist on the form.
+
+One client fix came out of this: `apiRequest` treated every successful response
+as having a body, so a `204` from a delete rejected inside `json()` and
+surfaced as a network error telling the user to retry something that had
+already succeeded.

@@ -1,10 +1,25 @@
 import {
   acknowledgementSchema,
   allocationPreviewSchema,
+  bankAccountBalanceSchema,
+  bankAccountSchema,
   clientSchema,
   compiledReturnSchema,
+  financeEntrySchema,
+  financialInstitutionSchema,
+  msp2_02LineSchema,
   type AnnualisationConvention,
+  type BankAccount,
+  type BankAccountBalance,
   type CompiledReturn,
+  type CreateBankAccountRequest,
+  type CreateFinanceEntryRequest,
+  type FinanceEntry,
+  type FinanceEntryListQuery,
+  type FinancialInstitution,
+  type Msp2_02Line,
+  type RecordBankBalanceRequest,
+  type UpdateFinanceEntryRequest,
   loanProductSchema,
   loanSchema,
   loanWithScheduleSchema,
@@ -49,6 +64,11 @@ const clientPageSchema = pageSchema(clientSchema);
 const loanPageSchema = pageSchema(loanSchema);
 const paymentPageSchema = pageSchema(paymentSchema);
 const productListSchema = z.array(loanProductSchema);
+const financeEntryPageSchema = pageSchema(financeEntrySchema);
+const lineListSchema = z.array(msp2_02LineSchema);
+const institutionListSchema = z.array(financialInstitutionSchema);
+const bankAccountListSchema = z.array(bankAccountSchema);
+const bankBalanceListSchema = z.array(bankAccountBalanceSchema);
 
 /** Build a query string, omitting anything unset. */
 function query(parameters: Record<string, string | number | undefined>): string {
@@ -188,6 +208,71 @@ export const payments = {
   async reverse(paymentId: string, request: ReversePaymentRequest): Promise<Payment> {
     return apiRequest(`/payments/${paymentId}/reversal`, paymentSchema, {
       method: 'POST',
+      body: request,
+    });
+  },
+};
+
+/**
+ * BOT's own reference data.
+ *
+ * Fetched rather than embedded. The MSP2-02 line list and the published
+ * institution lists are BOT's, they change when BOT revises a template, and a
+ * copy compiled into this bundle is a copy that can disagree with the one the
+ * database enforces.
+ */
+export const reference = {
+  async msp2_02Lines(): Promise<Msp2_02Line[]> {
+    return apiRequest('/reference/msp2-02-lines', lineListSchema);
+  },
+
+  async financialInstitutions(): Promise<FinancialInstitution[]> {
+    return apiRequest('/reference/financial-institutions', institutionListSchema);
+  },
+};
+
+export const finance = {
+  async listEntries(parameters: Partial<FinanceEntryListQuery> = {}): Promise<Page<FinanceEntry>> {
+    return apiRequest(`/finance/entries${query({ ...parameters })}`, financeEntryPageSchema);
+  },
+
+  async recordEntry(request: CreateFinanceEntryRequest): Promise<FinanceEntry> {
+    return apiRequest('/finance/entries', financeEntrySchema, { method: 'POST', body: request });
+  },
+
+  async amendEntry(id: string, request: UpdateFinanceEntryRequest): Promise<FinanceEntry> {
+    return apiRequest(`/finance/entries/${id}`, financeEntrySchema, {
+      method: 'PATCH',
+      body: request,
+    });
+  },
+
+  async removeEntry(id: string): Promise<void> {
+    await apiRequest(`/finance/entries/${id}`, z.unknown(), { method: 'DELETE' });
+  },
+
+  async listBankAccounts(): Promise<BankAccount[]> {
+    return apiRequest('/finance/bank-accounts', bankAccountListSchema);
+  },
+
+  async openBankAccount(request: CreateBankAccountRequest): Promise<BankAccount> {
+    return apiRequest('/finance/bank-accounts', bankAccountSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  async listBankBalances(year: number, quarter: number): Promise<BankAccountBalance[]> {
+    return apiRequest(`/finance/bank-balances${query({ year, quarter })}`, bankBalanceListSchema);
+  },
+
+  /** One figure per account per quarter, so recording is a replace. */
+  async recordBankBalance(
+    accountId: string,
+    request: RecordBankBalanceRequest,
+  ): Promise<BankAccountBalance> {
+    return apiRequest(`/finance/bank-accounts/${accountId}/balances`, bankAccountBalanceSchema, {
+      method: 'PUT',
       body: request,
     });
   },
