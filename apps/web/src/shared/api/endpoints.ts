@@ -7,7 +7,9 @@ import {
   compiledReturnSchema,
   financeEntrySchema,
   financialInstitutionSchema,
+  msp2_01Schema,
   msp2_02LineSchema,
+  msp2_05Schema,
   type AnnualisationConvention,
   type BankAccount,
   type BankAccountBalance,
@@ -19,6 +21,8 @@ import {
   type FinancialInstitution,
   type Msp2_02Line,
   type RecordBankBalanceRequest,
+  type SaveStatementLinesRequest,
+  type StatementForm,
   type UpdateFinanceEntryRequest,
   loanProductSchema,
   loanSchema,
@@ -69,6 +73,25 @@ const lineListSchema = z.array(msp2_02LineSchema);
 const institutionListSchema = z.array(financialInstitutionSchema);
 const bankAccountListSchema = z.array(bankAccountSchema);
 const bankBalanceListSchema = z.array(bankAccountBalanceSchema);
+
+/**
+ * A statement view.
+ *
+ * One form comes back per request and the other field is absent, so the shape
+ * is optional on both. Parsed rather than cast: a response naming a form this
+ * client did not ask for is a version mismatch, not something to render.
+ */
+const statementViewSchema = z
+  .object({
+    form: z.enum(['MSP2-01', 'MSP2-05']),
+    year: z.number().int(),
+    quarter: z.number().int(),
+    msp2_01: msp2_01Schema.optional(),
+    msp2_05: msp2_05Schema.optional(),
+  })
+  .strict();
+
+export type StatementView = z.infer<typeof statementViewSchema>;
 
 /** Build a query string, omitting anything unset. */
 function query(parameters: Record<string, string | number | undefined>): string {
@@ -275,6 +298,38 @@ export const finance = {
       method: 'PUT',
       body: request,
     });
+  },
+};
+
+export const statements = {
+  async view(form: StatementForm, year: number, quarter: number): Promise<StatementView> {
+    return apiRequest(
+      `/statements/${form}/${String(year)}/${String(quarter)}`,
+      statementViewSchema,
+    );
+  },
+
+  /**
+   * Save figures and receive the form they produce.
+   *
+   * The response is the recompiled statement rather than an acknowledgement, so
+   * every total that moved is visible without a second call — including a
+   * balance sheet that has stopped balancing.
+   */
+  async save(
+    form: StatementForm,
+    year: number,
+    quarter: number,
+    request: SaveStatementLinesRequest,
+  ): Promise<StatementView> {
+    return apiRequest(
+      `/statements/${form}/${String(year)}/${String(quarter)}`,
+      statementViewSchema,
+      {
+        method: 'PUT',
+        body: request,
+      },
+    );
   },
 };
 

@@ -603,3 +603,10 @@ code,
   min-width: 20rem;
   flex: 1 1 20rem;
 }
+
+/* A figure typed into a table cell, sized to the column it sits in. */
+.input--figure {
+  width: 10rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

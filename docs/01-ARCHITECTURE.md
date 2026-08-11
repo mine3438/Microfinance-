@@ -1225,3 +1225,24 @@ exists so the two share one implementation rather than two that can drift.
 `derivedBalanceSheetFigures` lives in `@mfi/domain` rather than the API: it
 encodes how BOT's forms relate to one another, which is the same kind of
 knowledge the validation rules encode and belongs beside them.
+
+### 20.8 The statement screen
+
+`/statements`, behind `expense.read`, with the inputs behind `expense.manage`.
+One screen for both forms, chosen with the period.
+
+Three kinds of line rendered three different ways, because conflating them would
+hide which figures a person can actually change: **entered** lines are inputs,
+**derived** lines are shown as figures with their source named, and **computed**
+lines carry BOT's own arithmetic. There is no input for a derived line at all —
+the API refuses one and the database has no row for it, so offering the control
+would only invite a refusal.
+
+Only changed figures are sent. The response is the recompiled form rather than
+an acknowledgement, so a sheet that has just started balancing says so
+immediately instead of after a refetch — and the screen leads with whether it
+balances, which is BOT's first validation rule, rather than leaving that to be
+discovered at submission.
+
+A draft is cleared when the form or the quarter changes. Carrying it across
+would offer to write last quarter's figures into this one.

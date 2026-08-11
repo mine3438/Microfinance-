@@ -10,6 +10,7 @@ import { NewLoanPage } from '../features/loans/new-loan-page.js';
 import { BankBalancesPage } from '../features/finance/bank-balances-page.js';
 import { FinancePage } from '../features/finance/finance-page.js';
 import { ReportsPage } from '../features/reports/reports-page.js';
+import { StatementsPage } from '../features/statements/statements-page.js';
 import { RequirePermission, RequireSession } from './guards.js';
 import { Shell } from './shell.js';
 
@@ -91,6 +92,15 @@ export function AppRoutes(): ReactNode {
           element={
             <RequirePermission permission="expense.read">
               <BankBalancesPage />
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="/statements"
+          element={
+            <RequirePermission permission="expense.read">
+              <StatementsPage />
             </RequirePermission>
           }
         />
