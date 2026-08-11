@@ -370,6 +370,8 @@ describe('GET /reports/msp2/:year/:quarter', () => {
     // against them, and MSP2-07 prints all four of its sections.
     expect(compiled.msp2_02.rows).toHaveLength(42);
     expect(compiled.msp2_07.sections).toHaveLength(4);
+    // 61 lines less the heading BOT's own Total Liabilities formula ignores.
+    expect(compiled.msp2_01.rows).toHaveLength(60);
 
     // Sectors in BOT's own serial order, not alphabetical. Sorting by code
     // would file every figure one row out.
@@ -496,32 +498,37 @@ describe('GET /reports/msp2/:year/:quarter', () => {
     // A screen showing four forms and saying nothing about the other six reads
     // as a complete submission, and the institution finds out otherwise at the
     // filing desk.
-    // Three, since stage 11 supplied MSP2-02, MSP2-07 and MSP2-08. The three
-    // that remain all wait on the balance sheet.
-    expect(compiled.unavailableForms.map((form) => form.code)).toEqual([
-      'MSP2-01',
-      'MSP2-05',
-      'MSP2-06',
-    ]);
+    // One, since stage 12 supplied MSP2-01 and MSP2-05. Complaints are the
+    // only form left.
+    expect(compiled.unavailableForms.map((form) => form.code)).toEqual(['MSP2-06']);
     expect(compiled.unavailableForms.every((form) => form.reason.length > 0)).toBe(true);
   });
 
-  it('runs BOT’s own validation rules and reports the ones it could not check', async () => {
+  it('refuses to call a return submittable while the balance sheet is empty', async () => {
     await markClassified(new Date());
 
     const compiled = (await compile()).json<CompiledReturn>();
 
-    expect(compiled.validation.submittable).toBe(true);
-    expect(
-      compiled.validation.findings.some((finding) =>
-        finding.message.includes('could not be checked'),
-      ),
-    ).toBe(true);
-    // Warnings do not stop a filing; blocking findings do, and there are none
-    // on a consistent set of forms.
-    expect(
-      compiled.validation.findings.filter((finding) => finding.severity === 'blocking'),
-    ).toEqual([]);
+    // Rule 1 doing its job rather than a defect: nothing has been entered
+    // against MSP2-01, so it does not balance. The finding names the rule and
+    // says what to look at first.
+    const ruleOne = compiled.validation.findings.find((finding) => finding.ruleId === 1);
+    expect(ruleOne?.severity).toBe('blocking');
+    expect(ruleOne?.message).toMatch(/have not been filled in yet/);
+    expect(compiled.validation.submittable).toBe(false);
+  });
+
+  it('warns rather than blocks when compulsory savings are nil', async () => {
+    await markClassified(new Date());
+
+    const compiled = (await compile()).json<CompiledReturn>();
+
+    // An institution may genuinely hold none. What the warning says is that
+    // rule 16 passes only because both sides derive from the same nil.
+    const warning = compiled.validation.findings.find((finding) =>
+      finding.message.includes('Compulsory savings are reported as nil'),
+    );
+    expect(warning?.severity).toBe('warning');
   });
 
   it('keeps one institution’s figures out of another’s return', async () => {

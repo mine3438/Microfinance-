@@ -159,6 +159,22 @@ export {
 } from './finance.js';
 
 export {
+  LINE_SOURCES,
+  STATEMENT_FORMS,
+  msp2_01Schema,
+  msp2_05Schema,
+  saveStatementLinesRequestSchema,
+  statementLineInputSchema,
+  statementRowSchema,
+  type LineSource,
+  type Msp2_01,
+  type Msp2_05,
+  type SaveStatementLinesRequest,
+  type StatementForm,
+  type StatementRow,
+} from './statements.js';
+
+export {
   AGE_BANDS,
   AMORTISATION_METHODS,
   ANNUALISATION_CONVENTIONS,

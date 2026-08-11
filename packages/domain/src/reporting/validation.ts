@@ -1,7 +1,12 @@
 import { Money } from '@mfi/money';
 
+import { amountAt, type Msp2_01 } from './msp2-01.js';
+import { type Msp2_02 } from './msp2-02.js';
 import { type Msp2_03 } from './msp2-03.js';
 import { type Msp2_04 } from './msp2-04.js';
+import { type Msp2_05 } from './msp2-05.js';
+import { type Msp2_07 } from './msp2-07.js';
+import { type Msp2_08 } from './msp2-08.js';
 import { type Msp2_09 } from './msp2-09.js';
 import { type Msp2_10 } from './msp2-10.js';
 
@@ -46,11 +51,37 @@ export interface ValidationResult {
 }
 
 export interface PortfolioForms {
+  readonly msp2_01: Msp2_01;
+  readonly msp2_02: Msp2_02;
   readonly msp2_03: Msp2_03;
   readonly msp2_04: Msp2_04;
+  readonly msp2_05: Msp2_05;
+  readonly msp2_07: Msp2_07;
+  readonly msp2_08: Msp2_08;
   readonly msp2_09: Msp2_09;
   readonly msp2_10: Msp2_10;
 }
+
+/** The MSP2-01 lines BOT's rules address by number. */
+const SNO = {
+  cashInHand: 2,
+  balancesWithBanks: 3,
+  agentBanking: 5,
+  balancesWithMsps: 6,
+  mnoFloat: 7,
+  loansNet: 17,
+  allowance: 22,
+  totalAssets: 33,
+  borrowingsFromBanksTz: 37,
+  borrowingsFromMsps: 38,
+  borrowingsAbroad: 43,
+  compulsorySavings: 46,
+  profitOrLoss: 59,
+  totalLiabilitiesAndCapital: 61,
+} as const;
+
+/** MSP2-02's net income after tax, which rule 2 reads on the YTD column. */
+const NET_INCOME_AFTER_TAX_SNO = 42;
 
 /**
  * Check the forms this system compiles against each other.
@@ -63,13 +94,19 @@ export interface PortfolioForms {
  */
 export function validatePortfolioForms(forms: PortfolioForms): ValidationResult {
   const findings: ValidationFinding[] = [
+    ...checkBalanceSheetBalances(forms.msp2_01),
+    ...checkNetIncomeAgreesWithBalanceSheet(forms.msp2_01, forms.msp2_02),
+    ...checkGrossLoansAgree(forms.msp2_01, forms.msp2_04),
+    ...checkLiquidAssetsRestateBalanceSheet(forms.msp2_01, forms.msp2_05),
+    ...checkLiquidityRequirement(forms.msp2_05),
+    ...checkBankBalancesAgree(forms.msp2_01, forms.msp2_07, forms.msp2_08),
+    ...checkCompulsorySavingsAgree(forms.msp2_01, forms.msp2_10),
     ...checkSectorTotals(forms.msp2_03),
     ...checkBorrowerCountsAgree(forms.msp2_03, forms.msp2_04),
     ...checkNonPerformingRatio(forms.msp2_03),
     ...checkUnclassifiedExposures(forms.msp2_03),
     ...checkGenderSplitsSum(forms.msp2_09),
     ...checkGeographicSubtotals(forms.msp2_10),
-    ...unavailableCrossFormRules(),
   ];
 
   return {
@@ -252,43 +289,240 @@ function checkGeographicSubtotals(form: Msp2_10): ValidationFinding[] {
       severity: 'warning',
       message:
         'Compulsory savings are reported as nil. Savings are not yet modelled (stage 15), so ' +
-        'this figure is absent rather than measured — and BOT validates it against MSP2-01 ' +
-        'Sno46. Confirm the institution holds none before filing.',
+        'this figure is absent rather than measured. Rule 16 passes, but only because MSP2-01 ' +
+        'Sno46 is derived from this same nil — the two agree without either being observed. ' +
+        'Confirm the institution holds none before filing.',
     });
   }
 
   return findings;
 }
 
+/** Two amounts that BOT requires to be equal, reported when they are not. */
+function requireEqual(
+  ruleId: number | null,
+  formCode: string,
+  what: string,
+  left: Money,
+  right: Money,
+): ValidationFinding[] {
+  if (left.equals(right)) {
+    return [];
+  }
+
+  return [
+    {
+      ruleId,
+      formCode,
+      severity: 'blocking',
+      message:
+        `${what}: ${left.toDatabaseValue()} against ${right.toDatabaseValue()}. ` +
+        'BOT validates this identity.',
+    },
+  ];
+}
+
 /**
- * Rules whose other side does not exist yet.
+ * Rule 1 — the balance sheet must balance.
  *
- * Reported explicitly. A compliance tool that silently skips the checks it
- * cannot perform teaches its user that a clean run means a valid return, and
- * that lesson is wrong in exactly the cases that matter.
+ * The one check on MSP2-01 that can genuinely fail. Most of the others hold by
+ * construction now that their lines are derived from the same figures the other
+ * forms report; this one compares two sides assembled from different inputs,
+ * and an incomplete sheet fails it. That is the intended behaviour: a balance
+ * sheet still being filled in is not one that may be filed.
  */
-function unavailableCrossFormRules(): ValidationFinding[] {
-  const unavailable: { ruleId: number; formCode: string; needs: string }[] = [
-    { ruleId: 1, formCode: 'MSP2-01', needs: 'the balance sheet' },
-    { ruleId: 2, formCode: 'MSP2-02', needs: 'MSP2-01’s profit and loss line' },
-    { ruleId: 4, formCode: 'MSP2-04', needs: 'MSP2-01’s loans and allowance lines' },
-    // Every cross-check BOT publishes for MSP2-07 and MSP2-08 ties a total to
-    // a balance-sheet line, so compiling those forms does not make any of them
-    // checkable. Both are produced and neither is verified against anything.
-    { ruleId: 9, formCode: 'MSP2-07', needs: 'MSP2-01’s borrowings-from-banks line' },
-    { ruleId: 10, formCode: 'MSP2-07', needs: 'MSP2-01’s microfinance-provider lines' },
-    { ruleId: 11, formCode: 'MSP2-07', needs: 'MSP2-01’s MNO float line' },
-    { ruleId: 12, formCode: 'MSP2-07', needs: 'MSP2-01’s cash-equivalent lines' },
-    { ruleId: 13, formCode: 'MSP2-07', needs: 'MSP2-01’s borrowings-from-abroad line' },
-    { ruleId: 14, formCode: 'MSP2-07', needs: 'MSP2-01’s balances-with-banks line' },
-    { ruleId: 15, formCode: 'MSP2-08', needs: 'MSP2-01’s agent-banking line' },
-    { ruleId: 16, formCode: 'MSP2-10', needs: 'MSP2-01’s compulsory savings line' },
+function checkBalanceSheetBalances(form: Msp2_01): ValidationFinding[] {
+  const assets = amountAt(form, SNO.totalAssets);
+  const liabilitiesAndCapital = amountAt(form, SNO.totalLiabilitiesAndCapital);
+
+  if (assets.equals(liabilitiesAndCapital)) {
+    return [];
+  }
+
+  const outstanding = form.missingEntries.length;
+
+  return [
+    {
+      ruleId: 1,
+      formCode: 'MSP2-01',
+      severity: 'blocking',
+      message:
+        `Total assets (${assets.toDatabaseValue()}) do not equal total liabilities and capital ` +
+        `(${liabilitiesAndCapital.toDatabaseValue()}). BOT enforces this identity.` +
+        (outstanding === 0
+          ? ''
+          : ` ${String(outstanding)} line(s) have not been filled in yet, which is the first ` +
+            'thing to check.'),
+    },
+  ];
+}
+
+/** Rule 2 — MSP2-02's year-to-date net income is the balance sheet's profit. */
+function checkNetIncomeAgreesWithBalanceSheet(
+  balanceSheet: Msp2_01,
+  income: Msp2_02,
+): ValidationFinding[] {
+  const netIncome =
+    income.rows.find((row) => row.sno === NET_INCOME_AFTER_TAX_SNO)?.yearToDateAmount ??
+    Money.zero();
+
+  return requireEqual(
+    2,
+    'MSP2-02',
+    'Net income after tax year-to-date does not match the balance sheet’s profit line',
+    netIncome,
+    amountAt(balanceSheet, SNO.profitOrLoss),
+  );
+}
+
+/** Rule 4 — MSP2-04's total outstanding is gross loans: net plus allowance. */
+function checkGrossLoansAgree(balanceSheet: Msp2_01, rates: Msp2_04): ValidationFinding[] {
+  const gross = amountAt(balanceSheet, SNO.loansNet).plus(amountAt(balanceSheet, SNO.allowance));
+
+  return requireEqual(
+    4,
+    'MSP2-04',
+    'Total outstanding does not equal the balance sheet’s loans net plus its allowance',
+    rates.total.totalOutstanding,
+    gross,
+  );
+}
+
+/** Rule 5 — MSP2-05's first four lines restate MSP2-01. */
+function checkLiquidAssetsRestateBalanceSheet(
+  balanceSheet: Msp2_01,
+  liquid: Msp2_05,
+): ValidationFinding[] {
+  const restated: readonly [number, number, string][] = [
+    [2, SNO.cashInHand, 'Cash in hand'],
+    [3, SNO.balancesWithBanks, 'Balances with banks'],
+    [4, SNO.balancesWithMsps, 'Balances with microfinance service providers'],
+    [5, SNO.mnoFloat, 'MNO float balances'],
   ];
 
-  return unavailable.map(({ ruleId, formCode, needs }) => ({
-    ruleId,
-    formCode,
-    severity: 'warning' as const,
-    message: `Rule ${String(ruleId)} could not be checked: it requires ${needs}, which is not built.`,
-  }));
+  return restated.flatMap(([liquidSno, balanceSno, what]) =>
+    requireEqual(
+      5,
+      'MSP2-05',
+      `${what} does not match MSP2-01`,
+      liquid.rows.find((row) => row.sno === liquidSno)?.amount ?? Money.zero(),
+      amountAt(balanceSheet, balanceSno),
+    ),
+  );
+}
+
+/**
+ * Rule 6 — the liquidity computation, and the floor it measures against.
+ *
+ * The arithmetic is checked, and separately the prudential outcome is reported.
+ * A breach is not a filing error — the return is valid and says the institution
+ * is short — so it is a warning here and a supervisory matter there. Reporting
+ * it at all is the point: §6 of the reporting specification is explicit that
+ * discovering a shortfall at submission is too late to act on.
+ */
+function checkLiquidityRequirement(form: Msp2_05): ValidationFinding[] {
+  const findings = requireEqual(
+    6,
+    'MSP2-05',
+    'Excess liquid assets is not available less the required minimum',
+    form.excess,
+    form.availableLiquidAssets.minus(form.requiredMinimum),
+  );
+
+  if (!form.meetsRequirement) {
+    findings.push({
+      ruleId: 6,
+      formCode: 'MSP2-05',
+      severity: 'warning',
+      message:
+        `Liquid assets are ${form.excess.abs().toDatabaseValue()} below BOT’s 5% minimum ` +
+        `(${form.requiredMinimum.toDatabaseValue()} required, ` +
+        `${form.availableLiquidAssets.toDatabaseValue()} available). The return is valid and ` +
+        'says so; the shortfall is a supervisory matter, not a filing error.',
+    });
+  }
+
+  return findings;
+}
+
+/** Rules 9 to 15 — every balance held elsewhere, tied to the balance sheet. */
+function checkBankBalancesAgree(
+  balanceSheet: Msp2_01,
+  holdings: Msp2_07,
+  agentBanking: Msp2_08,
+): ValidationFinding[] {
+  const subtotal = (kind: Msp2_07['sections'][number]['kind']): Msp2_07['total'] | undefined =>
+    holdings.sections.find((section) => section.kind === kind)?.subtotal;
+
+  const banks = subtotal('bank_tanzania');
+  const msps = subtotal('microfinance_service_provider');
+  const mnos = subtotal('mno');
+  const abroad = subtotal('bank_abroad');
+  const nil = Money.zero();
+
+  return [
+    ...requireEqual(
+      9,
+      'MSP2-07',
+      'Borrowings from banks in Tanzania do not match the balance sheet',
+      banks?.borrowingTotal ?? nil,
+      amountAt(balanceSheet, SNO.borrowingsFromBanksTz),
+    ),
+    ...requireEqual(
+      10,
+      'MSP2-07',
+      'Balances with microfinance service providers do not match the balance sheet',
+      msps?.depositTotal ?? nil,
+      amountAt(balanceSheet, SNO.balancesWithMsps),
+    ),
+    ...requireEqual(
+      10,
+      'MSP2-07',
+      'Borrowings from microfinance service providers do not match the balance sheet',
+      msps?.borrowingTotal ?? nil,
+      amountAt(balanceSheet, SNO.borrowingsFromMsps),
+    ),
+    ...requireEqual(
+      11,
+      'MSP2-07',
+      'MNO float balances do not match the balance sheet',
+      mnos?.depositTotal ?? nil,
+      amountAt(balanceSheet, SNO.mnoFloat),
+    ),
+    ...requireEqual(
+      13,
+      'MSP2-07',
+      'Borrowings from banks abroad do not match the balance sheet',
+      abroad?.borrowingTotal ?? nil,
+      amountAt(balanceSheet, SNO.borrowingsAbroad),
+    ),
+    ...requireEqual(
+      14,
+      'MSP2-07',
+      'Deposits with banks do not match the balance sheet’s bank balances',
+      banks?.depositTotal ?? nil,
+      amountAt(balanceSheet, SNO.balancesWithBanks),
+    ),
+    ...requireEqual(
+      15,
+      'MSP2-08',
+      'Total agent-banking balances do not match the balance sheet',
+      agentBanking.total,
+      amountAt(balanceSheet, SNO.agentBanking),
+    ),
+  ];
+}
+
+/** Rule 16 — MSP2-10's compulsory savings tie to the balance sheet. */
+function checkCompulsorySavingsAgree(
+  balanceSheet: Msp2_01,
+  geography: Msp2_10,
+): ValidationFinding[] {
+  return requireEqual(
+    16,
+    'MSP2-10',
+    'Compulsory savings do not match the balance sheet',
+    geography.grandTotal.compulsorySavings,
+    amountAt(balanceSheet, SNO.compulsorySavings),
+  );
 }

@@ -13,6 +13,7 @@ import { PostgresLoanRepository } from './modules/loans/loan-repository.js';
 import { PostgresFinanceRepository } from './modules/finance/finance-repository.js';
 import { PostgresPaymentRepository } from './modules/payments/payment-repository.js';
 import { PostgresReportRepository } from './modules/reporting/report-repository.js';
+import { PostgresStatementRepository } from './modules/statements/statement-repository.js';
 
 /**
  * The composition root.
@@ -58,6 +59,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const payments = new PostgresPaymentRepository(database);
   const reports = new PostgresReportRepository(database);
   const finance = new PostgresFinanceRepository(database);
+  const statements = new PostgresStatementRepository(database);
 
   const server = await buildServer({
     environment,
@@ -69,6 +71,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     payments,
     reports,
     finance,
+    statements,
     tokens,
   });
 

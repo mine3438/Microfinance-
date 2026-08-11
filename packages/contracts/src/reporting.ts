@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { type Gender } from './clients.js';
 import { HOLDING_KINDS } from './finance.js';
+import { msp2_01Schema, msp2_05Schema } from './statements.js';
 import { isoDateSchema, moneyAmountSchema } from './scalars.js';
 
 /**
@@ -356,9 +357,11 @@ export type UnavailableForm = z.infer<typeof unavailableFormSchema>;
 export const compiledReturnSchema = z
   .object({
     period: reportingPeriodSchema,
+    msp2_01: msp2_01Schema,
     msp2_02: msp2_02Schema,
     msp2_03: msp2_03Schema,
     msp2_04: msp2_04Schema,
+    msp2_05: msp2_05Schema,
     msp2_07: msp2_07Schema,
     msp2_08: msp2_08Schema,
     msp2_09: msp2_09Schema,

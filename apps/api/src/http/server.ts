@@ -19,6 +19,8 @@ import { registerFinanceRoutes } from '../modules/finance/routes.js';
 import { registerPaymentRoutes } from '../modules/payments/routes.js';
 import { type ReportRepository } from '../modules/reporting/report-repository.js';
 import { registerReportRoutes } from '../modules/reporting/routes.js';
+import { type StatementRepository } from '../modules/statements/statement-repository.js';
+import { registerStatementRoutes } from '../modules/statements/routes.js';
 import { registerAuthRoutes } from '../modules/auth/routes.js';
 import { registerHealthRoutes } from '../modules/health/routes.js';
 import { registerCorrelationId } from './correlation.js';
@@ -45,6 +47,7 @@ export interface ServerDependencies {
   readonly payments: PaymentRepository;
   readonly reports: ReportRepository;
   readonly finance: FinanceRepository;
+  readonly statements: StatementRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -72,6 +75,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     payments,
     reports,
     finance,
+    statements,
     tokens,
   } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
@@ -224,6 +228,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerLoanRoutes(app, { loans, tokens });
   registerPaymentRoutes(app, { payments, tokens });
   registerFinanceRoutes(app, { finance, tokens });
+  registerStatementRoutes(app, { statements, reports, tokens });
   registerReportRoutes(app, { reports, tokens, now });
 
   return app;

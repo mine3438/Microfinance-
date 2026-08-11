@@ -1,6 +1,9 @@
 import {
   type CompiledReturn,
+  type Msp2_01,
   type Msp2_02,
+  type Msp2_05,
+  type StatementRow,
   type Msp2_03,
   type Msp2_04,
   type Msp2_07,
@@ -38,6 +41,115 @@ function Rate({ value }: { value: string | null }): ReactNode {
   // Distinguished from zero on purpose: a loan type with no straight-line
   // lending has no lowest rate, and printing 0% would say it lends at nothing.
   return value === null ? <span className="muted">—</span> : <>{formatPercentage(value)}</>;
+}
+
+/**
+ * A statement row, showing where its figure came from.
+ *
+ * The distinction is the whole design of stage 12: an entered figure is the
+ * institution's, a derived one is this system's answer that nobody may type
+ * over, and a computed one is BOT's own arithmetic. Rendering all three the
+ * same way would hide which figures a reader can go and change.
+ */
+function StatementRows({ rows }: { rows: readonly StatementRow[] }): ReactNode {
+  return (
+    <>
+      {rows.map((row) => (
+        <tr key={row.sno} className={row.source === 'computed' ? 'row--computed' : ''}>
+          <td className="numeric">{row.sno}</td>
+          <td>{row.label}</td>
+          <td>
+            <span className={`badge badge--${row.source === 'entered' ? 'info' : 'neutral'}`}>
+              {row.source}
+            </span>
+          </td>
+          <td className="numeric">{formatMoney(row.amount)}</td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+export function Msp2_01Table({ form }: { form: Msp2_01 }): ReactNode {
+  return (
+    <Panel title="MSP2-01 — Balance sheet">
+      {form.missingEntries.length > 0 && (
+        <p className="hint-block">
+          {form.missingEntries.length} line(s) have not been filled in yet. An incomplete balance
+          sheet does not balance, which is what BOT&rsquo;s first validation rule catches.
+        </p>
+      )}
+
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Sno</th>
+              <th scope="col">Line</th>
+              <th scope="col">Source</th>
+              <th scope="col" className="numeric">
+                Amount
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <StatementRows rows={form.rows} />
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
+export function Msp2_05Table({ form }: { form: Msp2_05 }): ReactNode {
+  return (
+    <Panel title="MSP2-05 — Liquid assets" tone={form.meetsRequirement ? 'neutral' : 'warning'}>
+      <dl className="totals">
+        <div>
+          <dt>Available liquid assets</dt>
+          <dd>{formatMoney(form.availableLiquidAssets)}</dd>
+        </div>
+        <div>
+          <dt>Required minimum (5% of total assets)</dt>
+          <dd>{formatMoney(form.requiredMinimum)}</dd>
+        </div>
+        <div>
+          <dt>Excess (deficiency)</dt>
+          <dd>{formatMoney(form.excess)}</dd>
+        </div>
+        <div>
+          <dt>Liquid asset ratio</dt>
+          <dd>{form.liquidAssetRatio === null ? '—' : formatPercentage(form.liquidAssetRatio)}</dd>
+        </div>
+      </dl>
+
+      {!form.meetsRequirement && (
+        <p className="hint-block">
+          Liquid assets are below BOT&rsquo;s 5% minimum. The return is valid and says so — a
+          shortfall is a supervisory matter rather than a filing error, and it is shown here because
+          finding it at submission would be too late to act on.
+        </p>
+      )}
+
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Sno</th>
+              <th scope="col">Line</th>
+              <th scope="col">Source</th>
+              <th scope="col" className="numeric">
+                Amount
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <StatementRows rows={form.rows} />
+          </tbody>
+        </table>
+      </div>
+    </Panel>
+  );
 }
 
 /** How BOT labels each section of MSP2-07. */
@@ -601,9 +713,11 @@ export function Msp2_10Table({ form }: { form: Msp2_10 }): ReactNode {
 export function ReturnForms({ compiled }: { compiled: CompiledReturn }): ReactNode {
   return (
     <>
+      <Msp2_01Table form={compiled.msp2_01} />
       <Msp2_02Table form={compiled.msp2_02} />
       <Msp2_03Table form={compiled.msp2_03} />
       <Msp2_04Table form={compiled.msp2_04} />
+      <Msp2_05Table form={compiled.msp2_05} />
       <Msp2_07Table form={compiled.msp2_07} />
       <Msp2_08Table form={compiled.msp2_08} />
       <Msp2_09Table form={compiled.msp2_09} />

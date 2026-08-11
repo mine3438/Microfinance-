@@ -125,6 +125,9 @@ export type {
   StatementLine,
 } from './reporting/msp2-01.js';
 
+export { derivedBalanceSheetFigures } from './reporting/derived.js';
+export type { FormsFeedingBalanceSheet } from './reporting/derived.js';
+
 export { MINIMUM_LIQUID_ASSET_RATIO, compileMsp2_05 } from './reporting/msp2-05.js';
 export type { Msp2_05, Msp2_05Request, Msp2_05Row } from './reporting/msp2-05.js';
 

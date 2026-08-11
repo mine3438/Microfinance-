@@ -1185,3 +1185,43 @@ alongside the ratio.
 
 The ratio is `null` — not zero — when total assets are nil. Zero percent would
 say an institution holds no liquidity, when in fact it holds nothing at all.
+
+### 20.6 Nine forms compile, and eleven rules became real
+
+The compiled return now carries MSP2-01, -02, -03, -04, -05, -07, -08, -09 and
+-10. Only MSP2-06 remains unavailable, and it waits on complaints (stage 14).
+
+Rules 1, 2, 4, 5, 6, 9–16 are now checked rather than reported as unavailable.
+An honest note about most of them: they hold **by construction**, because the
+lines they compare are derived from the same figures the other forms report.
+That does not make them worthless — they catch a regression in
+`derivedBalanceSheetFigures`, which is the only way they can now fail — but it
+would be misleading to present eleven passing checks as eleven independent
+confirmations.
+
+**Rule 1 is the exception, and it is the valuable one.** Total assets against
+total liabilities and capital compares two sides assembled from different
+inputs, and an unfilled sheet fails it. Its message says how many lines are
+still blank, because that is the first thing to check rather than something an
+accountant should deduce by comparing two seven-figure totals by eye.
+
+**Rule 6 reports a liquidity shortfall as a warning, not a block.** The return
+is valid and says the institution is short; the breach is a supervisory matter,
+and refusing to file would be the wrong response to it.
+
+### 20.7 The statement screen has no freshness gate
+
+Compiling a *return* refuses when overdue classifications are stale, because
+filing on stale figures is the defect this system exists to prevent. Typing
+last quarter's rent into a balance sheet is not filing, so
+`GET /statements/:form/:year/:quarter` compiles without that gate. The gate
+stays where the filing happens.
+
+Both endpoints return the form compiled — derived lines filled in, totals
+rolled up — so an accountant sees the balance sheet move as figures are entered
+rather than discovering at submission that it does not balance. `compileForms`
+exists so the two share one implementation rather than two that can drift.
+
+`derivedBalanceSheetFigures` lives in `@mfi/domain` rather than the API: it
+encodes how BOT's forms relate to one another, which is the same kind of
+knowledge the validation rules encode and belongs beside them.

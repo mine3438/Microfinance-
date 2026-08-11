@@ -1,19 +1,23 @@
 import {
   type CompiledReturn as WireCompiledReturn,
+  type Msp2_01 as WireMsp2_01,
   type Msp2_02 as WireMsp2_02,
   type Msp2_03 as WireMsp2_03,
   type Msp2_04 as WireMsp2_04,
+  type Msp2_05 as WireMsp2_05,
   type Msp2_07 as WireMsp2_07,
   type Msp2_08 as WireMsp2_08,
   type Msp2_09 as WireMsp2_09,
   type Msp2_10 as WireMsp2_10,
 } from '@mfi/contracts';
 import {
+  type Msp2_01,
   type Msp2_02,
   type Msp2_03,
   type Msp2_03Row,
   type Msp2_04,
   type Msp2_04Row,
+  type Msp2_05,
   type Msp2_07,
   type Msp2_07Row,
   type Msp2_07Section,
@@ -145,6 +149,38 @@ function msp2_10Subtotal(subtotal: Msp2_10RegionSubtotal): WireMsp2_10['grandTot
   };
 }
 
+/** A statement row, which names where its figure came from. */
+const statementRow = (row: {
+  sno: number;
+  label: string;
+  source: 'computed' | 'derived' | 'entered';
+  amount: Money;
+}): WireMsp2_01['rows'][number] => ({
+  sno: row.sno,
+  label: row.label,
+  source: row.source,
+  amount: money(row.amount),
+});
+
+export function presentMsp2_01(form: Msp2_01): WireMsp2_01 {
+  return {
+    rows: form.rows.map(statementRow),
+    missingEntries: [...form.missingEntries],
+  };
+}
+
+export function presentMsp2_05(form: Msp2_05): WireMsp2_05 {
+  return {
+    rows: form.rows.map(statementRow),
+    availableLiquidAssets: money(form.availableLiquidAssets),
+    totalAssets: money(form.totalAssets),
+    requiredMinimum: money(form.requiredMinimum),
+    excess: money(form.excess),
+    liquidAssetRatio: form.liquidAssetRatio === null ? null : percentage(form.liquidAssetRatio),
+    meetsRequirement: form.meetsRequirement,
+  };
+}
+
 export function presentMsp2_02(form: Msp2_02): WireMsp2_02 {
   return {
     rows: form.rows.map((row) => ({
@@ -240,9 +276,11 @@ export function presentCompiledReturn(compiled: CompiledReturn): WireCompiledRet
       startDate: compiled.period.startDate,
       endDate: compiled.period.endDate,
     },
+    msp2_01: presentMsp2_01(compiled.msp2_01),
     msp2_02: presentMsp2_02(compiled.msp2_02),
     msp2_03: presentMsp2_03(compiled.msp2_03),
     msp2_04: presentMsp2_04(compiled.msp2_04),
+    msp2_05: presentMsp2_05(compiled.msp2_05),
     msp2_07: presentMsp2_07(compiled.msp2_07),
     msp2_08: presentMsp2_08(compiled.msp2_08),
     msp2_09: presentMsp2_09(compiled.msp2_09),

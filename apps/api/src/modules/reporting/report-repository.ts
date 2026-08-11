@@ -6,6 +6,7 @@ import {
   type FinanceEntry,
   type HoldingKind,
   type Msp2_02Line,
+  type StatementLine,
   type Disbursement,
   type DistrictInHierarchy,
   type DistrictPresence,
@@ -165,6 +166,12 @@ export interface PortfolioSnapshot {
   readonly holdings: readonly CounterpartyHolding[];
   readonly agentBankingCodes: readonly string[];
   readonly agentBankingBalances: readonly AgentBankingBalance[];
+
+  /** MSP2-01 and MSP2-05's taxonomies, and the figures entered against them. */
+  readonly msp2_01Lines: readonly StatementLine[];
+  readonly msp2_05Lines: readonly StatementLine[];
+  readonly enteredMsp2_01: ReadonlyMap<number, Money>;
+  readonly enteredMsp2_05: ReadonlyMap<number, Money>;
 }
 
 export interface ReportRepository {
@@ -380,10 +387,47 @@ export class PostgresReportRepository implements ReportRepository {
           ),
         ]);
 
-      const agentBankingCodes = await client.query<{ code: string }>(
-        `SELECT code FROM reference.financial_institutions
-          WHERE in_agent_banking_list ORDER BY sort_order`,
-      );
+      const [agentBankingCodes, statementLines, enteredLines] = await Promise.all([
+        client.query<{ code: string }>(
+          `SELECT code FROM reference.financial_institutions
+            WHERE in_agent_banking_list ORDER BY sort_order`,
+        ),
+        client.query<{
+          form_code: string;
+          sno: number;
+          label: string;
+          is_computed: boolean;
+          accepts_statement_entry: boolean | null;
+        }>(
+          `SELECT form_code, sno, label, is_computed, accepts_statement_entry
+             FROM reference.form_lines
+            WHERE form_code IN ('MSP2-01', 'MSP2-05')
+            ORDER BY form_code, sno`,
+        ),
+        client.query<{ form_code: string; sno: number; amount: string }>(
+          `SELECT form_code, sno, amount
+             FROM financial_statement_lines
+            WHERE year = $1 AND quarter = $2`,
+          [period.year, period.quarter],
+        ),
+      ]);
+
+      const linesFor = (formCode: string): StatementLine[] =>
+        statementLines.rows
+          .filter((row) => row.form_code === formCode)
+          .map((row) => ({
+            sno: row.sno,
+            label: row.label,
+            isComputed: row.is_computed,
+            acceptsEntry: row.accepts_statement_entry === true,
+          }));
+
+      const enteredFor = (formCode: string): Map<number, Money> =>
+        new Map(
+          enteredLines.rows
+            .filter((row) => row.form_code === formCode)
+            .map((row) => [row.sno, Money.fromDatabaseValue(row.amount)]),
+        );
 
       return {
         sectorCodes: sectors.rows.map((row) => row.code),
@@ -448,6 +492,10 @@ export class PostgresReportRepository implements ReportRepository {
             institutionCode: row.institution_code ?? '',
             balance: Money.fromDatabaseValue(row.agent_banking_balance),
           })),
+        msp2_01Lines: linesFor('MSP2-01'),
+        msp2_05Lines: linesFor('MSP2-05'),
+        enteredMsp2_01: enteredFor('MSP2-01'),
+        enteredMsp2_05: enteredFor('MSP2-05'),
       };
     });
   }

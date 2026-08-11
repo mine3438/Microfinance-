@@ -33,6 +33,26 @@ function compiledReturn(overrides: Partial<CompiledReturn> = {}): CompiledReturn
 
   return {
     period: { year: 2026, quarter: 1, startDate: '2026-01-01', endDate: '2026-03-31' },
+    msp2_01: {
+      rows: [
+        { sno: 2, label: '(a) Cash in Hand', source: 'entered', amount: '1500000.00' },
+        { sno: 18, label: '(a) Loans to Clients', source: 'derived', amount: '1234567.89' },
+        { sno: 33, label: '7. TOTAL ASSETS', source: 'computed', amount: '2734567.89' },
+      ],
+      missingEntries: [21, 24],
+    },
+    msp2_05: {
+      rows: [
+        { sno: 2, label: '(a) Cash in hand', source: 'derived', amount: '1500000.00' },
+        { sno: 6, label: '(e) Treasury Bills', source: 'entered', amount: '0.00' },
+      ],
+      availableLiquidAssets: '1500000.00',
+      totalAssets: '2734567.89',
+      requiredMinimum: '136728.39',
+      excess: '1363271.61',
+      liquidAssetRatio: '54.8531',
+      meetsRequirement: true,
+    },
     msp2_02: {
       rows: [
         {
@@ -305,6 +325,19 @@ describe('ReportsPage', () => {
     expect(cells.length).toBeGreaterThan(0);
   });
 
+  it('marks each balance-sheet line with where its figure came from', async () => {
+    quarterlyReturn.mockResolvedValue(compiledReturn());
+    renderPage();
+
+    // Entered, derived and computed are three different things, and a screen
+    // that rendered them alike would hide which figures a reader can change.
+    expect(await screen.findByText('7. TOTAL ASSETS')).toBeInTheDocument();
+    expect(screen.getAllByText('derived').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('entered').length).toBeGreaterThan(0);
+    // An incomplete sheet says so rather than leaving rule 1 to explain it.
+    expect(screen.getByText(/2 line\(s\) have not been filled in yet/)).toBeInTheDocument();
+  });
+
   it('shows MSP2-02 as two columns and marks the lines BOT derives', async () => {
     quarterlyReturn.mockResolvedValue(compiledReturn());
     renderPage();
@@ -313,6 +346,22 @@ describe('ReportsPage', () => {
     // The window the year-to-date column covers is stated, because §11.8 does
     // not settle whether that year is the calendar year or the institution's.
     expect(screen.getByText(/Year to date covers 1 Jan 2026/)).toBeInTheDocument();
+  });
+
+  it('shows a liquidity shortfall as a supervisory matter, not a filing error', async () => {
+    const base = compiledReturn();
+    quarterlyReturn.mockResolvedValue({
+      ...base,
+      msp2_05: {
+        ...base.msp2_05,
+        excess: '-300000.00',
+        liquidAssetRatio: '2.0000',
+        meetsRequirement: false,
+      },
+    });
+    renderPage();
+
+    expect(await screen.findByText(/below BOT’s 5% minimum/)).toBeInTheDocument();
   });
 
   it('shows every MSP2-07 section, including one holding nothing', async () => {

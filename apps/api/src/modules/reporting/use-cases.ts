@@ -1,17 +1,22 @@
 import {
   assessReportingReadiness,
+  derivedBalanceSheetFigures,
+  compileMsp2_01,
   compileMsp2_02,
   compileMsp2_03,
   compileMsp2_04,
+  compileMsp2_05,
   compileMsp2_07,
   compileMsp2_08,
   compileMsp2_09,
   compileMsp2_10,
   reportingPeriod,
   validatePortfolioForms,
+  type Msp2_01,
   type Msp2_02,
   type Msp2_03,
   type Msp2_04,
+  type Msp2_05,
   type Msp2_07,
   type Msp2_08,
   type Msp2_09,
@@ -23,18 +28,24 @@ import { type Principal } from '@mfi/identity';
 import { type AnnualisationConvention } from '@mfi/money';
 
 import { ApiError, ruleViolation } from '../../http/errors.js';
-import { type ReportRepository } from './report-repository.js';
+import { type PortfolioSnapshot, type ReportRepository } from './report-repository.js';
 
-/** A compiled quarterly return, with the verdict on whether it may be filed. */
-export interface CompiledReturn {
-  readonly period: ReportingPeriod;
+/** Every form this system compiles, before anything is checked. */
+export interface CompiledForms {
+  readonly msp2_01: Msp2_01;
   readonly msp2_02: Msp2_02;
   readonly msp2_03: Msp2_03;
   readonly msp2_04: Msp2_04;
+  readonly msp2_05: Msp2_05;
   readonly msp2_07: Msp2_07;
   readonly msp2_08: Msp2_08;
   readonly msp2_09: Msp2_09;
   readonly msp2_10: Msp2_10;
+}
+
+/** A compiled quarterly return, with the verdict on whether it may be filed. */
+export interface CompiledReturn extends CompiledForms {
+  readonly period: ReportingPeriod;
   readonly validation: ValidationResult;
   /** Which forms BOT requires that this system cannot yet produce. */
   readonly unavailableForms: readonly { readonly code: string; readonly reason: string }[];
@@ -42,11 +53,6 @@ export interface CompiledReturn {
 
 /** The forms not built, and why. Reported rather than omitted. */
 const UNAVAILABLE_FORMS = Object.freeze([
-  {
-    code: 'MSP2-01',
-    reason: 'The balance sheet needs the financial statements module (stage 12).',
-  },
-  { code: 'MSP2-05', reason: 'Liquid assets are derived from MSP2-01.' },
   { code: 'MSP2-06', reason: 'Complaints are not yet recorded (stage 14).' },
 ]);
 
@@ -135,6 +141,34 @@ export async function compileQuarterlyReturn(
     );
   }
 
+  const forms = compileForms(snapshot, period, fiscalYearStart, request.annualisation);
+
+  return {
+    ...forms,
+    period,
+    validation: validatePortfolioForms(forms),
+    unavailableForms: UNAVAILABLE_FORMS,
+  };
+}
+
+/**
+ * Compile every form, with nothing checked and nothing refused.
+ *
+ * Separate from the return above so the statement screen can show an
+ * accountant a live balance sheet — with its derived lines filled in and its
+ * totals moving as figures are entered — without inheriting the freshness gate.
+ * That gate exists to stop a *filing* resting on stale classifications; it has
+ * no business stopping someone typing in last quarter's rent.
+ *
+ * The order matters. MSP2-01 reads figures from five other forms, and MSP2-05
+ * reads MSP2-01, so each is compiled after everything it depends on.
+ */
+export function compileForms(
+  snapshot: PortfolioSnapshot,
+  period: ReportingPeriod,
+  fiscalYearStart: string,
+  annualisation?: AnnualisationConvention,
+): CompiledForms {
   const msp2_02 = compileMsp2_02({
     lines: snapshot.msp2_02Lines,
     entries: snapshot.financeEntries,
@@ -161,7 +195,7 @@ export async function compileQuarterlyReturn(
   const msp2_04 = compileMsp2_04({
     loanTypeCodes: snapshot.loanTypeCodes,
     exposures: snapshot.rateExposures,
-    ...(request.annualisation === undefined ? {} : { annualisation: request.annualisation }),
+    ...(annualisation === undefined ? {} : { annualisation }),
   });
 
   const msp2_09 = compileMsp2_09({
@@ -179,16 +213,17 @@ export async function compileQuarterlyReturn(
     asAt: new Date(`${period.endDate}T00:00:00Z`),
   });
 
-  return {
-    period,
-    msp2_02,
-    msp2_03,
-    msp2_04,
-    msp2_07,
-    msp2_08,
-    msp2_09,
-    msp2_10,
-    validation: validatePortfolioForms({ msp2_03, msp2_04, msp2_09, msp2_10 }),
-    unavailableForms: UNAVAILABLE_FORMS,
-  };
+  const msp2_01 = compileMsp2_01({
+    lines: snapshot.msp2_01Lines,
+    entered: snapshot.enteredMsp2_01,
+    derived: derivedBalanceSheetFigures({ msp2_02, msp2_03, msp2_07, msp2_08, msp2_10 }),
+  });
+
+  const msp2_05 = compileMsp2_05({
+    lines: snapshot.msp2_05Lines,
+    entered: snapshot.enteredMsp2_05,
+    balanceSheet: msp2_01,
+  });
+
+  return { msp2_01, msp2_02, msp2_03, msp2_04, msp2_05, msp2_07, msp2_08, msp2_09, msp2_10 };
 }
