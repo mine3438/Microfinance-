@@ -1107,3 +1107,81 @@ One client fix came out of this: `apiRequest` treated every successful response
 as having a body, so a `204` from a delete rejected inside `json()` and
 surfaced as a network error telling the user to retry something that had
 already succeeded.
+
+---
+
+## 20. Amendments — Financial Statements Stage
+
+### 20.1 MSP2-05's lines came from the template, not from guesswork
+
+`bot-taxonomies.json` carries MSP2-01 and MSP2-02 and no others, so the eight
+liquid-asset categories were read from the template's own `MSP2-05` sheet in
+`docs/reference/`. That is supplied documentation; inventing labels for a
+regulatory form would not have been.
+
+Thirteen lines: four typed in (unencumbered securities and other liquid assets),
+four restating MSP2-01 (rule 5), five computed.
+
+### 20.2 "Locked" means having nowhere to write
+
+§16.2 item 4 asks for lines that distinguish auto-derived from entered. The
+distinction is enforced by a composite foreign key rather than a flag: a derived
+line has `accepts_statement_entry` NULL in `reference.form_lines`, so
+`financial_statement_lines` cannot resolve its key and the row is refused.
+
+An institution therefore cannot supply a second answer to a question the loan
+book already answers, because there is no column that would hold their version
+of it. Eleven MSP2-01 lines are derived this way, and every one is named by §9's
+list or by a BOT validation rule:
+
+| Sno | Line | Source |
+|---|---|---|
+| 4, 5 | Non-agent and agent banking balances | MSP2-07 / MSP2-08 (rules 14, 15) |
+| 6, 7 | Microfinance provider and MNO balances | MSP2-07 (rules 10, 11) |
+| 18 | Loans to clients | the loan book |
+| 22 | Allowance for probable losses | the provisioning engine |
+| 37, 38 | Borrowings in Tanzania | MSP2-07 (rules 9, 10) |
+| 43 | Borrowings from abroad | MSP2-07 (rule 13) |
+| 46 | Cash collateral / compulsory savings | MSP2-10 (rule 16) |
+| 59 | Profit or loss | MSP2-02 Sno42 year-to-date (rule 2) |
+
+Accrued interest (Sno21), loans to staff (Sno19) and loans to other providers
+(Sno20) stay **entered**: this system does not model them, and deriving a zero
+would be asserting a figure rather than leaving it to the institution.
+
+### 20.3 Sno34 is a heading, and BOT's own arithmetic says so
+
+The template gives "8. LIABILITIES" an enterable cell. Sno50, Total Liabilities,
+sums Sno35, 46, 47, 48 and 49 — not Sno34. A figure typed there is reported
+nowhere and reduces no total, so it would vanish silently from a filed balance
+sheet.
+
+Entry is refused rather than accepted and discarded. This is the same class of
+finding as the MSP2-04 weighted-average anomaly (§5.1 of the reporting spec),
+and it gets the opposite treatment for a reason: there, BOT's formula produces
+an output to replicate; here it produces none, so there is nothing to be
+faithful to except the fact that the cell is dead.
+
+### 20.4 An incomplete balance sheet compiles, and does not balance
+
+`compileMsp2_01` reports the lines nobody has filled in yet rather than
+refusing. A balance sheet is assembled over days as figures arrive from
+elsewhere in the institution, and a compiler that refused until all thirty-five
+entered lines were present would be unusable during exactly the period it is
+needed.
+
+Whether the result may be *filed* is a separate question, and rule 1 answers it:
+an incomplete sheet does not balance. That is the one check on this form that
+can genuinely fail, because its two sides are assembled from different figures —
+most of the others hold by construction now that their lines are derived.
+
+### 20.5 MSP2-05 reports a breach, not just a ratio
+
+BOT sets a floor of 5% of total assets, and §6 of the reporting spec is explicit
+that this is prudential rather than a disclosure: a breach is a supervisory
+matter, and finding it at quarter-end submission is too late to act on. So
+`compileMsp2_05` returns `excess` (negative when short) and `meetsRequirement`
+alongside the ratio.
+
+The ratio is `null` — not zero — when total assets are nil. Zero percent would
+say an institution holds no liquidity, when in fact it holds nothing at all.

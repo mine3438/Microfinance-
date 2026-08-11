@@ -110,6 +110,24 @@ export type { Quarter, ReportingPeriod } from './reporting/period.js';
 
 export type { FinanceDirection, FinanceEntry, Msp2_02Line } from './finance/entry.js';
 
+export {
+  TOTAL_ASSETS_SNO,
+  TOTAL_LIABILITIES_AND_CAPITAL_SNO,
+  amountAt,
+  compileMsp2_01,
+} from './reporting/msp2-01.js';
+export type {
+  LineSource,
+  Msp2_01,
+  Msp2_01Derived,
+  Msp2_01Request,
+  Msp2_01Row,
+  StatementLine,
+} from './reporting/msp2-01.js';
+
+export { MINIMUM_LIQUID_ASSET_RATIO, compileMsp2_05 } from './reporting/msp2-05.js';
+export type { Msp2_05, Msp2_05Request, Msp2_05Row } from './reporting/msp2-05.js';
+
 export { compileMsp2_02 } from './reporting/msp2-02.js';
 export type { Msp2_02, Msp2_02Request, Msp2_02Row } from './reporting/msp2-02.js';
 
