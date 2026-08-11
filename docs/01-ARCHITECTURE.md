@@ -889,3 +889,39 @@ Sectors and loan types are read `ORDER BY sno`, districts by their region's
 and their own `sort_order`. Every MSP2 form has a fixed number of rows in a
 fixed order and BOT's EDI validator reads them by position, so ordering by code
 would file every figure one row out.
+
+### 18.6 The reports screen renders refusals as a first-class outcome
+
+`/reports` is guarded on `report.generate`, which in the seeded catalogue is
+held by the accountant and the institution administrator — a loan officer sees
+no nav entry and the route refuses regardless.
+
+The screen is built around a property that is easy to design away: this report
+refuses more often than it succeeds, and the refusals are the product. A 422
+carries one detail per readiness problem, and each is rendered as its own list
+item with the remedy stated. Collapsing them into one line would leave an
+operator fixing one problem per filing window.
+
+Nothing partial is shown beside a refusal — no tables, no totals — because
+figures rendered next to "this cannot be filed" get copied out of the screen.
+
+Three display decisions, all recorded rather than assumed:
+
+- **Empty rows are kept.** BOT reads its templates by position, so a sector
+  with no lending is a row of zeros. Hiding it would show the operator a
+  different document from the one being filed.
+- **MSP2-10 opens on districts in use**, with a control to show all 193. The
+  filed form carries every district; burying the dozen an institution operates
+  in under 180 rows of zeros helps nobody checking a return.
+- **A rate band with no lending prints as a dash, not 0%.** A loan type with no
+  straight-line lending has no lowest rate, and zero would say it lends at
+  nothing.
+
+The period defaults to the last quarter that has *ended*. Defaulting to the
+current one would open the screen on the API's refusal every time.
+
+`apps/web/src/test-setup.ts` now unmounts between tests. Testing Library
+registers that itself only under Vitest globals, which this project does not
+use — without it every render accumulated in one document and queries failed as
+"found multiple elements", which reads like a component bug rather than a
+harness one.

@@ -533,3 +533,55 @@ code,
   margin: 0.25rem 0 1.5rem;
   color: var(--ink-muted);
 }
+
+/* ── Reports ────────────────────────────────────────────────────────────── */
+
+.panel--danger {
+  border-color: #e6b5b3;
+  background: var(--danger-soft);
+}
+
+.panel--success {
+  border-color: #b6ddc7;
+  background: var(--success-soft);
+}
+
+.report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--gap);
+}
+
+.report-controls .field {
+  min-width: 11rem;
+  margin: 0;
+}
+
+.report-controls__action {
+  /* Aligned with the inputs rather than their labels. */
+  padding-top: 1.6rem;
+}
+
+/*
+ * Problems, one per line.
+ *
+ * A list rather than a paragraph because these arrive as a set — several rules
+ * can fail at once, and an operator reading a run-on sentence cannot tell
+ * whether they are looking at one problem or four.
+ */
+.problem-list {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.problem-list li {
+  line-height: 1.45;
+}
+
+.problem-list--muted {
+  color: var(--ink-muted);
+  font-size: 0.93rem;
+}

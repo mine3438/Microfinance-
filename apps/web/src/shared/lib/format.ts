@@ -53,6 +53,24 @@ export function formatMonthlyRate(fraction: string): string {
   return `${trimmed === '' ? '0' : trimmed}% a month`;
 }
 
+/**
+ * A percentage the server already computed, trimmed for reading.
+ *
+ * `24.0000` becomes `24%`, `26.8242` stays `26.8242%`. Trailing zeros are
+ * removed as text; nothing is rounded here. A BOT return reports rates to four
+ * places and the server decided them — re-rounding in the browser would produce
+ * a screen figure that differs from the filed one.
+ */
+export function formatPercentage(value: string): string {
+  const trimmed = value.includes('.') ? value.replace(/0+$/, '').replace(/\.$/, '') : value;
+  return `${trimmed === '' ? '0' : trimmed}%`;
+}
+
+/** A quarter, as `Q1 2026`. */
+export function formatQuarter(year: number, quarter: number): string {
+  return `Q${String(quarter)} ${String(year)}`;
+}
+
 /** A calendar date, as `31 Mar 2026`. */
 export function formatDate(isoDate: string): string {
   // Shape-checked rather than split-and-hoped. Splitting `not-a-date` on the

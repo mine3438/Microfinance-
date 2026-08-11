@@ -20,6 +20,7 @@ export function Shell(): ReactNode {
               page that would refuse it. The API refuses regardless. */}
           {session.can('client.read') && <NavLink to="/clients">Borrowers</NavLink>}
           {session.can('loan.read') && <NavLink to="/loans">Loans</NavLink>}
+          {session.can('report.generate') && <NavLink to="/reports">BOT return</NavLink>}
         </nav>
 
         <div className="shell__account">

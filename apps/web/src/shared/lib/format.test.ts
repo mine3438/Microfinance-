@@ -5,6 +5,8 @@ import {
   formatMoney,
   formatMoneyWithCurrency,
   formatMonthlyRate,
+  formatPercentage,
+  formatQuarter,
   formatStatus,
 } from './format.js';
 
@@ -73,5 +75,29 @@ describe('formatStatus', () => {
   it('renders an underscored status as words', () => {
     expect(formatStatus('pending_approval')).toBe('Pending approval');
     expect(formatStatus('written_off')).toBe('Written off');
+  });
+});
+
+describe('formatPercentage', () => {
+  it('trims the trailing zeros a four-place figure carries', () => {
+    expect(formatPercentage('24.0000')).toBe('24%');
+    expect(formatPercentage('1.5000')).toBe('1.5%');
+  });
+
+  it('keeps every significant place the server sent', () => {
+    // 2% a month compounded is 26.8242% a year. Rounding it here would show a
+    // figure that differs from the one filed with BOT.
+    expect(formatPercentage('26.8242')).toBe('26.8242%');
+  });
+
+  it('renders zero as zero rather than as an empty string', () => {
+    expect(formatPercentage('0.0000')).toBe('0%');
+    expect(formatPercentage('0')).toBe('0%');
+  });
+});
+
+describe('formatQuarter', () => {
+  it('names a reporting period the way BOT does', () => {
+    expect(formatQuarter(2026, 1)).toBe('Q1 2026');
   });
 });

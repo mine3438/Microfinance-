@@ -2,6 +2,9 @@ import {
   acknowledgementSchema,
   allocationPreviewSchema,
   clientSchema,
+  compiledReturnSchema,
+  type AnnualisationConvention,
+  type CompiledReturn,
   loanProductSchema,
   loanSchema,
   loanWithScheduleSchema,
@@ -187,5 +190,30 @@ export const payments = {
       method: 'POST',
       body: request,
     });
+  },
+};
+
+export const reports = {
+  /**
+   * Compile a quarterly BOT return.
+   *
+   * A `GET` that computes. Nothing is stored, the same quarter asked twice
+   * gives the same answer, and the figures are produced entirely on the server
+   * — this app receives a finished return and renders it.
+   *
+   * It fails often and on purpose: a 422 when classifications are stale or a
+   * loan falls outside every provisioning band, carrying one detail per
+   * problem. Those refusals are the feature, so the screen renders them rather
+   * than reducing them to "something went wrong".
+   */
+  async quarterlyReturn(
+    year: number,
+    quarter: number,
+    annualisation?: AnnualisationConvention,
+  ): Promise<CompiledReturn> {
+    return apiRequest(
+      `/reports/msp2/${String(year)}/${String(quarter)}${query({ annualisation })}`,
+      compiledReturnSchema,
+    );
   },
 };
