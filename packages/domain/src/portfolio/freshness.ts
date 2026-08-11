@@ -18,7 +18,9 @@ export type ReadinessProblem =
   /** The last classification run is older than the permitted age. */
   | 'classifications_stale'
   /** Some loans have no classification BOT has defined. */
-  | 'unclassifiable_loans';
+  | 'unclassifiable_loans'
+  /** Some active branches have not been placed in a BOT district. */
+  | 'unlocated_branches';
 
 /** Whether figures derived from classification may be reported. */
 export type ReportingReadiness =
@@ -36,6 +38,14 @@ export interface ReadinessRequest {
   readonly classificationsUpdatedAt: Date | null;
   /** Loans that no provisioning band covers. */
   readonly unclassifiableLoanCount: number;
+  /**
+   * Active branches with no BOT district recorded against them.
+   *
+   * Defaults to zero, because the two checks above are about the loan book and
+   * this one is about MSP2-10 alone. A caller compiling only the portfolio
+   * forms has nothing to pass.
+   */
+  readonly unlocatedBranchCount?: number;
   readonly now: Date;
   readonly maximumAgeHours?: number;
 }
@@ -69,6 +79,11 @@ export function assessReportingReadiness(request: ReadinessRequest): ReportingRe
     throw new DomainValidationError('Unclassifiable loan count cannot be negative.');
   }
 
+  const unlocatedBranchCount = request.unlocatedBranchCount ?? 0;
+  if (unlocatedBranchCount < 0) {
+    throw new DomainValidationError('Unlocated branch count cannot be negative.');
+  }
+
   const problems: { problem: ReadinessProblem; message: string }[] = [];
 
   if (request.classificationsUpdatedAt === null) {
@@ -100,6 +115,17 @@ export function assessReportingReadiness(request: ReadinessRequest): ReportingRe
         `${String(request.unclassifiableLoanCount)} loan(s) fall outside every provisioning band ` +
         'and have no classification. MSP2-03 provides no unclassified column, so they cannot be ' +
         'placed on the return. See 02-BOT-REPORTING-SPEC.md §11.5.',
+    });
+  }
+
+  if (unlocatedBranchCount > 0) {
+    problems.push({
+      problem: 'unlocated_branches',
+      message:
+        `${String(unlocatedBranchCount)} active branch(es) have no BOT district recorded. ` +
+        'MSP2-10 reports branches and employees per district, so each of them would be counted ' +
+        'in no district at all and the filed branch total would be short. Record where they ' +
+        'operate before filing.',
     });
   }
 

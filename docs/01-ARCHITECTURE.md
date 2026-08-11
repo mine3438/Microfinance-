@@ -817,3 +817,75 @@ situation. The two alternatives were both worse: inventing a `completed →
 active` transition would contradict a rule already written and tested, and
 letting the database trigger reject it produces an error that explains nothing
 to the person holding the bounced cheque.
+
+---
+
+## 18. Amendments — BOT Reporting Stage
+
+### 18.1 Reports restate the past; they do not read the present
+
+The reporting repository reads neither `loans.outstanding_balance` nor
+`loans.overdue_class`. Both describe the book *today*, and a return filed on 15
+April for the quarter ending 31 March must describe it as it stood on 31 March.
+Fifteen days of ageing move loans between classification buckets, and a payment
+received on 2 April reduces a balance BOT wants reported unreduced.
+
+Both figures are reconstructed instead:
+
+- **Outstanding** is `payments.balance_after` from the latest payment dated on
+  or before the period end, or the principal where there is none.
+- **Days overdue** compares the schedule's cumulative amount due by each date
+  against payments received by that date. `loan_days_overdue()` cannot be used
+  here: it reads `repayment_schedules.is_paid`, which is current state, so an
+  instalment due in March and settled in April would show as paid when asked
+  about March.
+
+This works only because payments are append-only and carry their own balance
+snapshots — a stage 9 decision made for reconciliation that turns out to be
+what makes restatement possible at all. No new tables were needed.
+
+The figure reported as outstanding is **principal outstanding**, gross of
+provisions, which is what §5 of the BOT specification ties to MSP2-01's
+`Sno17 + Sno22`. Allocation is interest-first, so a payment smaller than the
+interest owed moves no reported figure.
+
+### 18.2 `branches.district_code` — a gap in stage 2, closed by migration 0013
+
+02-BOT-REPORTING-SPEC.md §8 and §12.2 require a branch→district mapping;
+`branches` carried employee assignment and not location. Without it a branch's
+district could only be inferred from where its clients live, which counts one
+Arusha branch once per district it lends into.
+
+The column is nullable, because no migration can invent a district for a branch
+that already exists, and a fabricated figure on a regulatory return is worse
+than an absent one. `NULL` means "not yet located", and the readiness gate
+refuses to compile while any **active** branch is in that state — the same
+treatment an unclassifiable loan already receives.
+
+### 18.3 The readiness gate gained a third problem
+
+`assessReportingReadiness` now reports `unlocated_branches` alongside
+`never_classified`, `classifications_stale` and `unclassifiable_loans`. The
+refusal is a 422 whose details name each problem and what to do about it,
+rather than a single message — an operator needs the whole list, because
+one filing window per mistake is not a workable pace.
+
+### 18.4 Four forms of ten, and the other six are named
+
+`GET /reports/msp2/:year/:quarter` compiles MSP2-03, -04, -09 and -10, runs
+BOT's cross-form validation rules over them, and returns the six it cannot
+produce with the reason for each. The four rules that tie a portfolio form to
+MSP2-01 or MSP2-02 are reported as warnings naming what is missing rather than
+skipped in silence: a validator that reports "no problems" while omitting half
+its rules is worse than one that reports none, because it is believed.
+
+`annualisation` is a query parameter (`simple` by default) and the convention
+applied is echoed on the compiled form, because §11.2 does not settle whether
+BOT reads a monthly rate as simple or compounded.
+
+### 18.5 Reference order is form layout
+
+Sectors and loan types are read `ORDER BY sno`, districts by their region's
+and their own `sort_order`. Every MSP2 form has a fixed number of rows in a
+fixed order and BOT's EDI validator reads them by position, so ordering by code
+would file every figure one row out.

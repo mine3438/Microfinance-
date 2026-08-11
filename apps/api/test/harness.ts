@@ -13,6 +13,7 @@ import { PostgresSessionRepository } from '../src/modules/auth/session-repositor
 import { PostgresClientRepository } from '../src/modules/clients/client-repository.js';
 import { PostgresLoanRepository } from '../src/modules/loans/loan-repository.js';
 import { PostgresPaymentRepository } from '../src/modules/payments/payment-repository.js';
+import { PostgresReportRepository } from '../src/modules/reporting/report-repository.js';
 import { testDatabaseUrl, testRedisUrl } from './global-setup.js';
 
 /**
@@ -109,6 +110,7 @@ export async function startHarness(
     clients: new PostgresClientRepository(database),
     loans: new PostgresLoanRepository(database),
     payments: new PostgresPaymentRepository(database),
+    reports: new PostgresReportRepository(database),
     tokens,
   });
   await server.ready();
@@ -180,8 +182,13 @@ export async function seedUser(database: Database, options: SeedOptions = {}): P
     ]);
 
     const branch = await client.query<{ id: string }>(
-      `INSERT INTO branches (institution_id, code, name, is_head_office)
-       VALUES ($1, 'HQ', 'Seed Head Office', true) RETURNING id`,
+      // Located, because MSP2-10 refuses to compile while an active branch has
+      // no district. A fixture that left it NULL would make every reporting
+      // test fail for a reason unrelated to what it was testing.
+      `INSERT INTO branches (institution_id, code, name, is_head_office, district_code)
+       VALUES ($1, 'HQ', 'Seed Head Office', true,
+               (SELECT code FROM reference.districts ORDER BY code LIMIT 1))
+       RETURNING id`,
       [institutionId],
     );
     const branchId = branch.rows[0]!.id;

@@ -92,11 +92,17 @@ async function main() {
     const reference = await client.query(
       `SELECT
          (SELECT code FROM reference.districts ORDER BY code LIMIT 1) AS district,
+         (SELECT code FROM reference.districts ORDER BY code OFFSET 1 LIMIT 1) AS second_district,
          (SELECT code FROM reference.sectors   ORDER BY code LIMIT 1) AS sector,
          (SELECT code FROM reference.loan_types ORDER BY code LIMIT 1) AS loan_type`,
     );
-    const { district, sector, loan_type: loanType } = reference.rows[0] ?? {};
-    if (!district || !sector || !loanType) {
+    const {
+      district,
+      second_district: secondDistrict,
+      sector,
+      loan_type: loanType,
+    } = reference.rows[0] ?? {};
+    if (!district || !secondDistrict || !sector || !loanType) {
       throw new Error('BOT reference data is missing. Run `pnpm db:migrate` first.');
     }
 
@@ -109,11 +115,15 @@ async function main() {
     const institutionId = institution.rows[0].id;
 
     const branches = await client.query(
-      `INSERT INTO branches (institution_id, code, name, is_head_office)
-       VALUES ($1, 'KRK', 'Kariakoo Head Office', true),
-              ($1, 'MWZ', 'Mwanza Branch', false)
+      // Both branches are placed in a district. MSP2-10 reports branches and
+      // employees per district and refuses to compile while any active branch
+      // has none, so a seed that left them unlocated would produce a
+      // development database on which no return can be generated.
+      `INSERT INTO branches (institution_id, code, name, is_head_office, district_code)
+       VALUES ($1, 'KRK', 'Kariakoo Head Office', true, $2),
+              ($1, 'MWZ', 'Mwanza Branch', false, $3)
        RETURNING id, code`,
-      [institutionId],
+      [institutionId, district, secondDistrict],
     );
     const headOffice = branches.rows.find((row) => row.code === 'KRK').id;
 

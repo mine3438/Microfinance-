@@ -109,6 +109,29 @@ describe('unclassifiable loans block generation', () => {
   });
 });
 
+describe('branches without a district', () => {
+  it('permits generation while every active branch is located', () => {
+    expect(assessReportingReadiness(request({ unlocatedBranchCount: 0 }))).toEqual({ ready: true });
+  });
+
+  it('refuses while any active branch has no district', () => {
+    // MSP2-10 reports branches and employees per district. A branch in no
+    // district is counted in none of them, so the filed branch total is short
+    // by one and nothing on the form says so.
+    const assessment = assessReportingReadiness(request({ unlocatedBranchCount: 2 }));
+
+    expect(assessment.ready).toBe(false);
+    if (!assessment.ready) {
+      expect(assessment.problems.map((entry) => entry.problem)).toEqual(['unlocated_branches']);
+      expect(assessment.problems[0]?.message).toContain('2 active branch');
+    }
+  });
+
+  it('treats an absent count as none, so the loan-book checks stand alone', () => {
+    expect(assessReportingReadiness(request())).toEqual({ ready: true });
+  });
+});
+
 describe('rejected input', () => {
   it('refuses a non-positive age limit', () => {
     expect(() => assessReportingReadiness(request({ maximumAgeHours: 0 }))).toThrow(
@@ -118,6 +141,12 @@ describe('rejected input', () => {
 
   it('refuses a negative unclassifiable count', () => {
     expect(() => assessReportingReadiness(request({ unclassifiableLoanCount: -1 }))).toThrow(
+      DomainValidationError,
+    );
+  });
+
+  it('refuses a negative unlocated branch count', () => {
+    expect(() => assessReportingReadiness(request({ unlocatedBranchCount: -1 }))).toThrow(
       DomainValidationError,
     );
   });
