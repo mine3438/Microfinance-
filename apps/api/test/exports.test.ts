@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { inflateRawSync } from 'node:zlib';
+import { inflateRawSync, inflateSync } from 'node:zlib';
 
 import { type ErrorResponse, type FiledReturnDetail } from '@mfi/contracts';
 import { hashPassword } from '@mfi/identity';
@@ -215,6 +215,47 @@ async function openWorkbook(response: InjectResponse): Promise<ExcelJS.Workbook>
   return workbook;
 }
 
+/**
+ * The text of a PDF, flattened.
+ *
+ * PDFKit writes each `text()` call as a `TJ` array of hex-encoded runs with
+ * kerning adjustments between them, inside a compressed content stream. So the
+ * words are recoverable without a parser: inflate every stream, take the runs
+ * out of each array and drop the numbers. Crude, and enough to assert that a
+ * figure reached the page rather than that it looks right there.
+ */
+function pdfText(response: InjectResponse): string {
+  const showText = /\[((?:<[0-9a-fA-F]*>|[-\d.\s])*)\]\s*TJ/gu;
+  const runs = /<([0-9a-fA-F]*)>/gu;
+
+  const linesOf = (stream: string): string[] =>
+    [...stream.matchAll(showText)].map((operator) =>
+      [...(operator[1] ?? '').matchAll(runs)]
+        .map((run) => Buffer.from(run[1] ?? '', 'hex').toString('latin1'))
+        .join(''),
+    );
+
+  const found: string[] = [];
+  const pdf = response.rawPayload;
+  for (
+    let at = pdf.indexOf('stream');
+    at !== -1 && at < pdf.length;
+    at = pdf.indexOf('stream', at + 6)
+  ) {
+    const start = pdf[at + 6] === 0x0d ? at + 8 : at + 7;
+    const end = pdf.indexOf('endstream', start);
+    if (end === -1) {
+      break;
+    }
+    try {
+      found.push(...linesOf(inflateSync(pdf.subarray(start, end)).toString('latin1')));
+    } catch {
+      // Not a deflated content stream — a font or an image. Nothing to read.
+    }
+  }
+  return found.join('\n');
+}
+
 describe('GET /filings/:id/workbook', () => {
   it('fills BOT’s template rather than producing a spreadsheet of its own', async () => {
     await setMspCode(accountant.institutionId, MSP_CODE);
@@ -338,6 +379,81 @@ describe('GET /filings/:id/workbook', () => {
       `/filings/${filed.id}/workbook`,
       await tokenFor(outsider),
     );
+
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+describe('GET /filings/:id/pdf', () => {
+  it('renders the filed return for a reader', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    const filed = await fileBalancedQuarter('6250000.00');
+
+    const response = await request('GET', `/filings/${filed.id}/pdf`, accountantToken);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('application/pdf');
+    expect(response.headers['content-disposition']).toContain(
+      `MSP2_${MSP_CODE}_${String(filed.year)}Q${String(filed.quarter)}.pdf`,
+    );
+    expect(response.rawPayload.subarray(0, 5).toString()).toBe('%PDF-');
+
+    const text = pdfText(response);
+    // Who filed it, which is the thing the workbook cannot carry.
+    expect(text).toContain('Seed Accountant');
+    expect(text).toContain(MSP_CODE);
+    // And every form, named as BOT names it.
+    for (const form of ['MSP2-01', 'MSP2-03', 'MSP2-05', 'MSP2-10']) {
+      expect(text).toContain(form);
+    }
+  });
+
+  it('prints the archived figure rather than recomputing it', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    const filed = await fileBalancedQuarter('6250000.00');
+
+    // The book moves after filing, exactly as in the archive suite.
+    await request(
+      'PUT',
+      `/statements/MSP2-01/${String(filed.year)}/${String(filed.quarter)}`,
+      accountantToken,
+      { lines: [{ sno: CASH_IN_HAND, amount: '9999999.00' }] },
+    );
+
+    const text = pdfText(await request('GET', `/filings/${filed.id}/pdf`, accountantToken));
+
+    expect(text).toContain('6250000.00');
+    expect(text).not.toContain('9999999.00');
+  });
+
+  it('carries the warnings that stood when it was filed', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    // Two lines entered out of thirty-five, so the "a sheet of zeros balances
+    // trivially" warning is on this filing.
+    const filed = await fileBalancedQuarter();
+
+    const text = pdfText(await request('GET', `/filings/${filed.id}/pdf`, accountantToken));
+
+    expect(filed.findingCount).toBeGreaterThan(0);
+    expect(text).toContain('Validation at the time of filing');
+    expect(text).toContain('warning');
+  });
+
+  it('refuses a caller without report.read', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    const filed = await fileBalancedQuarter();
+
+    const response = await request('GET', `/filings/${filed.id}/pdf`, officerToken);
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('does not render another institution’s filing', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    const filed = await fileBalancedQuarter();
+
+    const outsider = await seedUser(harness.database, { roles: ['accountant'] });
+    const response = await request('GET', `/filings/${filed.id}/pdf`, await tokenFor(outsider));
 
     expect(response.statusCode).toBe(404);
   });

@@ -6,6 +6,7 @@ import { type FilingRepository } from '../filings/filing-repository.js';
 import { getFiling } from '../filings/use-cases.js';
 import { type CellMapRepository } from './cell-map.js';
 import { type ExportRepository } from './export-repository.js';
+import { buildReturnPdf } from './pdf.js';
 import { buildReturnWorkbook } from './workbook.js';
 
 /**
@@ -17,7 +18,7 @@ import { buildReturnWorkbook } from './workbook.js';
  * quarter's answer to the same question.
  */
 
-export interface ReturnWorkbook {
+export interface ReturnDocument {
   readonly filename: string;
   readonly bytes: Buffer;
 }
@@ -28,7 +29,7 @@ export async function exportFiledReturn(
   filings: FilingRepository,
   exports: ExportRepository,
   cellMaps: CellMapRepository,
-): Promise<ReturnWorkbook> {
+): Promise<ReturnDocument> {
   const filing = await getFiling(principal, id, filings);
   const identity = await exports.identity(principal.institutionId, principal.userId);
 
@@ -43,7 +44,7 @@ export async function exportFiledReturn(
   }
 
   const period = reportingPeriod(filing.year, filing.quarter);
-  const [map, names] = await Promise.all([cellMaps.load(), exports.institutionNames()]);
+  const [map, labels] = await Promise.all([cellMaps.load(), exports.labels()]);
 
   const bytes = await buildReturnWorkbook(
     filing.document,
@@ -53,13 +54,55 @@ export async function exportFiledReturn(
       quarterEndsOn: period.endDate,
     },
     map,
-    names,
+    labels.institutions,
   );
 
   return {
     // The MSP code and the quarter, because a supervisor's inbox holds one of
     // these from every institution in the country.
     filename: `MSP2_${identity.mspCode}_${String(filing.year)}Q${String(filing.quarter)}.xlsx`,
+    bytes,
+  };
+}
+
+/**
+ * The same return, rendered for a person rather than for BOT's validator.
+ *
+ * The workbook is the submission; this is the document a board signs and an
+ * auditor is handed. Both come from the archived filing, so the two can never
+ * disagree about what was sent.
+ */
+export async function exportFiledReturnPdf(
+  principal: Principal,
+  id: string,
+  filings: FilingRepository,
+  exports: ExportRepository,
+): Promise<ReturnDocument> {
+  const filing = await getFiling(principal, id, filings);
+  const identity = await exports.identity(principal.institutionId, principal.userId);
+
+  if (identity.mspCode === null) {
+    throw ruleViolation(
+      'This institution has no BOT registration code recorded, and every MSP2 form carries it. ' +
+        'Add the MSP code before exporting a return.',
+    );
+  }
+
+  const labels = await exports.labels();
+  const bytes = await buildReturnPdf(
+    filing.document,
+    {
+      institutionName: identity.name,
+      mspCode: identity.mspCode,
+      filedAt: filing.filedAt,
+      filedByName: filing.filedByName,
+      submissionReference: filing.submissionReference,
+    },
+    labels,
+  );
+
+  return {
+    filename: `MSP2_${identity.mspCode}_${String(filing.year)}Q${String(filing.quarter)}.pdf`,
     bytes,
   };
 }

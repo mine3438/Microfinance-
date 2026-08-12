@@ -7,9 +7,10 @@ import { validationFailed } from '../../http/errors.js';
 import { type FilingRepository } from '../filings/filing-repository.js';
 import { type CellMapRepository } from './cell-map.js';
 import { type ExportRepository } from './export-repository.js';
-import { exportFiledReturn } from './use-cases.js';
+import { exportFiledReturn, exportFiledReturnPdf } from './use-cases.js';
 
 const XLSX_MEDIA_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const PDF_MEDIA_TYPE = 'application/pdf';
 
 export interface ExportRouteOptions {
   readonly filings: FilingRepository;
@@ -58,6 +59,33 @@ export function registerExportRoutes(app: FastifyInstance, options: ExportRouteO
         .header('content-disposition', `attachment; filename="${workbook.filename}"`);
 
       return workbook.bytes;
+    },
+  );
+
+  /**
+   * The same filing, rendered to be read.
+   *
+   * Not a second submission format — BOT takes the workbook. This is the
+   * document that goes to a board, an auditor or a file, and it carries what a
+   * spreadsheet cell cannot: who filed it, when, and every validation warning
+   * that stood at the time.
+   */
+  app.get(
+    '/filings/:id/pdf',
+    { preHandler: [authenticated, requirePermission('report.read')] },
+    async (request, reply): Promise<Buffer> => {
+      const rendered = await exportFiledReturnPdf(
+        principalOf(request),
+        idOf(request),
+        filings,
+        exports,
+      );
+
+      void reply
+        .type(PDF_MEDIA_TYPE)
+        .header('content-disposition', `attachment; filename="${rendered.filename}"`);
+
+      return rendered.bytes;
     },
   );
 }

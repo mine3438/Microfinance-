@@ -1409,3 +1409,45 @@ solution to it. MSP2-08's compiled form does carry a row per published
 institution so that its total is provably over all of them; only the non-zero
 ones are written, because a zero row says nothing the total does not and BOT's
 sheet has no cell for it to say it in.
+
+### 21.9 The PDF is for a reader, and is not a second submission
+
+§11 promised PDF alongside XLSX. It is worth being precise about what it is for,
+because the two are not alternatives: BOT takes the workbook, and nothing this
+system produces as a PDF is uploadable. The PDF is the document a board signs
+before anything is sent, an auditor is handed afterwards, and a file keeps.
+
+That makes it a different document rather than a second rendering of the same
+one. It carries three things the workbook structurally cannot:
+
+- **Who filed it, when, and against which acknowledgement.** BOT's template has
+  no cell for any of that; the filing record does.
+- **Every validation finding as it stood at the moment of filing.** Warnings are
+  printed in full rather than counted, because "three warnings" tells a board
+  nothing and the warnings are the part worth reading before signing.
+- **The forms the return does not carry**, named with their reasons, so a
+  partial return is never read as a complete one.
+
+It shares the two properties that matter with the workbook. It is built from the
+**archived document**, so the two can never disagree about what was sent. And
+**no figure is recomputed** — every amount is the string the archive holds,
+printed as it stands. A renderer that re-totalled a column could disagree with
+the return, and the return is the record. Codes become names here and only here,
+which is the one thing the renderer needs reference data for.
+
+**pdfkit, not a headless browser.** Rendering HTML in Chromium would give richer
+layout at the cost of a browser in every production container, a process to
+supervise and a sandbox to keep patched — for a document that is nine tables.
+pdfkit draws directly, needs no font files for the standard Helvetica it uses,
+and adds no runtime beyond Node. If the PDF ever needs to look like a designed
+document rather than a legible one, that trade is worth revisiting; it is not
+worth making in advance.
+
+Two layout decisions are worth recording because they lose something. MSP2-10's
+fifteen numeric columns will not fit across a page at a size anyone can read, so
+they are **split across two tables over the same district rows** — every figure
+appears, in two passes rather than one. And districts the institution has
+nothing in are **left out of the PDF**, while the workbook still files all 193,
+because BOT's grand total is over the whole country and ten pages of zeros does
+not help a reader see where an institution actually operates. The count of
+omitted districts is printed, so the omission is visible rather than silent.
