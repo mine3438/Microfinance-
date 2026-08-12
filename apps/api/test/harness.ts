@@ -15,6 +15,8 @@ import { PostgresLoanRepository } from '../src/modules/loans/loan-repository.js'
 import { PostgresFinanceRepository } from '../src/modules/finance/finance-repository.js';
 import { PostgresPaymentRepository } from '../src/modules/payments/payment-repository.js';
 import { PostgresFilingRepository } from '../src/modules/filings/filing-repository.js';
+import { PostgresCellMapRepository } from '../src/modules/exports/cell-map.js';
+import { PostgresExportRepository } from '../src/modules/exports/export-repository.js';
 import { PostgresReportRepository } from '../src/modules/reporting/report-repository.js';
 import { PostgresStatementRepository } from '../src/modules/statements/statement-repository.js';
 import { testDatabaseUrl, testRedisUrl } from './global-setup.js';
@@ -117,6 +119,8 @@ export async function startHarness(
     finance: new PostgresFinanceRepository(database),
     statements: new PostgresStatementRepository(database),
     filings: new PostgresFilingRepository(database),
+    exports: new PostgresExportRepository(database),
+    cellMaps: new PostgresCellMapRepository(database),
     tokens,
   });
   await server.ready();

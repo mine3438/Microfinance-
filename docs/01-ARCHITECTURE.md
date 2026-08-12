@@ -1305,3 +1305,107 @@ A warning and not a block: a line may be legitimately nil and never touched, and
 refusing to file on that basis would be wrong. This is not one of BOT's rules —
 it is the gap between what their rules can see and what an institution needs to
 know before submitting.
+
+### 21.5 The exporter fills BOT's workbook, and never argues with it
+
+The cell map §21.3 deferred is now here, seeded by migration 0017 and read by
+the exporter that is its only consumer. It is generated from the template itself
+by `docs/reference/extract-bot-cells.py`, which resolves every taxonomy code
+against migration 0004's seeds and fails at generation time on a name it cannot
+match. The template moved to `apps/api/assets/` — it is no longer only reference
+material, it is an input the running API reads.
+
+Four tables rather than one, because BOT addresses four kinds of thing:
+
+| Table | Holds |
+| --- | --- |
+| `reference.form_sheets` | Each form's tab, its Sno-to-row offset, and the column carrying the header block |
+| `reference.form_columns` | This system's own field name → a spreadsheet column letter |
+| `reference.form_rows` | A row, and the one thing it is about: an Sno, a sector, a loan type or a district — each a real foreign key |
+| `reference.form_sections` | The blank ranges MSP2-07 and MSP2-08 are filled into in order |
+
+`form_rows` uses an exclusive arc — four nullable code columns, a check that
+exactly one is set, and a foreign key on each — so a map row naming a district
+Tanzania does not have cannot be inserted at all. `(form_code, sno)` additionally
+references `reference.form_lines`, which is what makes "the map cannot invent a
+line BOT does not have" a database fact rather than a convention.
+
+**The governing rule is that this system writes only where BOT has no formula.**
+Every total, subtotal and ratio on the ten sheets is the template's own
+arithmetic, and it is the arithmetic their EDI validator checks. Writing over
+one would substitute ours; if the two ever disagreed, the institution would file
+the wrong answer without seeing it. Computed cells therefore have no address in
+the map at all — the same "locked means having nowhere to write" idiom as §20.2,
+one layer out.
+
+The conversion to a spreadsheet's doubles is the single place in this system
+where a money figure stops being an exact decimal. It is checked rather than
+assumed: the double is parsed back into a `Money` and compared, and a figure
+that does not survive exactly refuses the export instead of rounding quietly.
+
+### 21.6 BOT's template points at a file on somebody's machine
+
+`BOT-MSP2-template.xlsx` carries an external link to `minne.xlsm`, which BOT
+does not distribute with it. Four things resolve through that link:
+
+- **The header block on nine of the ten sheets.** `MSP2-02!C2` and its eight
+  siblings are `=[1]MSP2_01!C2`, cached as **"TESTING MSP"**, **"M001"** and
+  **31-12-2021**. An institution that fills in the balance sheet and files the
+  workbook sends nine forms carrying another institution's name.
+- **`MSP2-05!C23` — Total Assets**, `=[1]MSP2_01!C46`, cached as **10**. The 5%
+  minimum, the excess and the liquid-asset ratio are all computed from it, so
+  three prudential figures on that form derive from a stale cell.
+- **The `Banks` dropdown on MSP2-07** and **`Agent_Banking` on MSP2-08**, both
+  defined as `'[1]Static Information'!…` — even though the workbook ships a
+  local `Static Information` sheet holding identical values at identical
+  addresses.
+
+This is the third finding to raise with BOT, alongside the MSP2-04
+weighted-average anomaly (§5.1 of the reporting spec) and MSP2-01's dead Sno34
+cell (§20.3). It is treated differently from both: the anomaly is replicated
+because BOT's formula produces an output, Sno34 refuses entry because it
+produces none — and here the formulas produce a *wrong* output, so the exporter
+overwrites them with the right one and repoints the two dropdowns at the sheet
+the template already contains. Every repair is the value BOT's own formula was
+reaching for; none of them changes what the form means.
+
+### 21.7 What the round trip actually preserves
+
+Writing a Node library over a regulator's workbook was the risk worth checking
+before designing around it, so it was checked: all 6,138 populated cells across
+the eleven sheets were compared before and after an untouched load-and-save.
+
+Preserved: every sheet, all 906 formulas, cached results, styles, number
+formats, merged ranges, data validations and the local lookup sheet. Four
+differences, all the same cosmetic thing — a backslash dropped before a literal
+parenthesis in a number format Excel reads identically either way. Two parts are
+dropped on write: `calcChain.xml`, which Excel rebuilds, and the external-link
+part, whose loss §21.6 turns into a repair rather than a regression.
+
+One consequence needs stating plainly: every cached formula result in the
+exported file is BOT's sample data until Excel recalculates. `fullCalcOnLoad` is
+set so it recalculates on open — which means **a reader that parses the .xlsx
+without evaluating formulas sees stale totals.** If BOT's validator turns out to
+read cached values rather than recalculating, this system will have to compute
+and write their totals too, and the "never argue with BOT's arithmetic" rule of
+§21.5 would need revisiting. That is a question for BOT, not an assumption to
+make quietly.
+
+### 21.8 The export is of a filing, not of a quarter
+
+`GET /filings/:id/workbook` builds from the archived document, never from a
+fresh compilation, for the reason §21.1 gives: recompiling the same quarter
+later produces a different answer. It carries `report.read` rather than
+`report.generate` — deciding to file was the `report.generate` act that produced
+the document, and rendering what was filed is reading it.
+
+Two refusals live here rather than earlier. **No MSP code, no export**: BOT
+prints it on all ten forms and keys submissions on it, and this is the pre-flight
+check §11 promised, arriving where it bites. **A section that overflows refuses
+the whole return**: BOT's MSP2-07 allows twenty-nine banks and MSP2-08
+twenty-eight, and an institution with more counterparties than rows has a real
+problem BOT has to answer — filing a return quietly short by one bank is not a
+solution to it. MSP2-08's compiled form does carry a row per published
+institution so that its total is provably over all of them; only the non-zero
+ones are written, because a zero row says nothing the total does not and BOT's
+sheet has no cell for it to say it in.

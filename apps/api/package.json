@@ -25,6 +25,7 @@
     "@mfi/domain": "workspace:*",
     "@mfi/identity": "workspace:*",
     "@mfi/money": "workspace:*",
+    "exceljs": "^4.4.0",
     "fastify": "^5.11.3",
     "ioredis": "^5.11.1",
     "jose": "^6.2.8",

@@ -1,6 +1,6 @@
 # BOT MSP2 Reporting Specification
 
-**Source:** `docs/reference/BOT-MSP2-template.xlsx` — the official BOT
+**Source:** `apps/api/assets/BOT-MSP2-template.xlsx` — the official BOT
 template, supplied by the product owner. 11 sheets: MSP2-01 … MSP2-10
 plus `Static Information`.
 **Derived data:** `docs/reference/bot-taxonomies.json` — every list,
