@@ -192,6 +192,7 @@ export function buildReturnPdf(
   writeMsp2_03(sheet, document, labels);
   writeMsp2_04(sheet, document, labels);
   writeMsp2_05(sheet, document);
+  writeMsp2_06(sheet, document, labels);
   writeMsp2_07(sheet, document);
   writeMsp2_08(sheet, document, labels);
   writeMsp2_09(sheet, document, labels);
@@ -411,6 +412,49 @@ function writeMsp2_05(sheet: Sheet, document: CompiledReturn): void {
       { heading: 'Amount (TZS)', width: 110, align: 'right' },
     ],
     document.msp2_05.rows.map((row) => [String(row.sno), row.label, row.source, row.amount]),
+  );
+}
+
+/**
+ * MSP2-06 — the complaints roll-forward.
+ *
+ * The one form on the return that is a movement statement, so it is set out as
+ * one: the four lines that move, the closing balance they produce, and the
+ * referrals of what is left. Nature columns carry BOT's own labels.
+ */
+function writeMsp2_06(sheet: Sheet, document: CompiledReturn, labels: ReferenceLabels): void {
+  sheet.title('MSP2-06 — Complaints');
+  sheet.paragraph(
+    'A movement statement: opening plus new, less those resolved by the institution and by ' +
+      'other parties, gives what was unresolved at the quarter end. Every line is derived from ' +
+      'the complaint records by date, so nothing is carried forward from a previous return.',
+  );
+
+  const natures = [
+    ...(document.msp2_06.rows[0]?.byNature === undefined
+      ? []
+      : Object.keys(document.msp2_06.rows[0].byNature)),
+  ];
+
+  sheet.table(
+    [
+      { heading: 'Sno', width: 30, align: 'right' },
+      { heading: 'Particulars', width: 240 },
+      { heading: 'Number', width: 46, align: 'right' },
+      { heading: 'Value (TZS)', width: 88, align: 'right' },
+      ...natures.map((code) => ({
+        heading: labels.complaintNatures.get(code) ?? code,
+        width: (CONTENT_WIDTH - 30 - 240 - 46 - 88 - 4 * (natures.length + 4)) / natures.length,
+        align: 'right' as const,
+      })),
+    ],
+    document.msp2_06.rows.map((row) => [
+      String(row.sno),
+      row.label,
+      count(row.count),
+      row.value,
+      ...natures.map((code) => count(row.byNature[code] ?? 0)),
+    ]),
   );
 }
 

@@ -172,10 +172,12 @@ describe('POST /reports/msp2/:year/:quarter/filing', () => {
     expect(filed.year).toBe(period.year);
     expect(filed.quarter).toBe(period.quarter);
     expect(filed.filedByName).toBe('Seed Accountant');
-    // Nine forms, named as BOT spells them rather than as the wire shape does.
+    // All ten forms, named as BOT spells them rather than as the wire shape
+    // does. MSP2-06 joined them in stage 14.
     expect(filed.formCodes).toContain('MSP2-01');
+    expect(filed.formCodes).toContain('MSP2-06');
     expect(filed.formCodes).toContain('MSP2-10');
-    expect(filed.formCodes).toHaveLength(9);
+    expect(filed.formCodes).toHaveLength(10);
   });
 
   it('refuses a return BOT’s own validator would reject', async () => {

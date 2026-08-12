@@ -175,6 +175,27 @@ export {
 } from './statements.js';
 
 export {
+  COMPLAINT_STATES,
+  REFERRAL_DESTINATIONS,
+  RESOLUTION_ROUTES,
+  complaintListQuerySchema,
+  complaintNatureSchema,
+  complaintSchema,
+  logComplaintRequestSchema,
+  referComplaintRequestSchema,
+  resolveComplaintRequestSchema,
+  type Complaint,
+  type ComplaintListQuery,
+  type ComplaintNature,
+  type ComplaintState,
+  type LogComplaintRequest,
+  type ReferComplaintRequest,
+  type ReferralDestination,
+  type ResolutionRoute,
+  type ResolveComplaintRequest,
+} from './complaints.js';
+
+export {
   AGE_BANDS,
   AMORTISATION_METHODS,
   ANNUALISATION_CONVENTIONS,
@@ -189,6 +210,8 @@ export {
   msp2_03Schema,
   msp2_04RowSchema,
   msp2_04Schema,
+  msp2_06RowSchema,
+  msp2_06Schema,
   msp2_07RowSchema,
   msp2_07Schema,
   msp2_07SectionSchema,
@@ -212,6 +235,7 @@ export {
   type Msp2_02,
   type Msp2_03,
   type Msp2_04,
+  type Msp2_06,
   type Msp2_07,
   type Msp2_08,
   type Msp2_09,

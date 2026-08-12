@@ -184,6 +184,7 @@ export async function buildReturnWorkbook(
   writeMsp2_03(writerFor('MSP2-03'), map.sheet('MSP2-03'), document);
   writeMsp2_04(writerFor('MSP2-04'), map.sheet('MSP2-04'), document);
   writeMsp2_05(writerFor('MSP2-05'), document);
+  writeMsp2_06(writerFor('MSP2-06'), document);
   writeMsp2_07(writerFor('MSP2-07'), map.sheet('MSP2-07'), document);
   writeMsp2_08(writerFor('MSP2-08'), map.sheet('MSP2-08'), document, institutionNames);
   writeMsp2_09(writerFor('MSP2-09'), map.sheet('MSP2-09'), document);
@@ -302,6 +303,33 @@ function writeMsp2_05(writer: SheetWriter, document: CompiledReturn): void {
       continue;
     }
     writer.put(row, 'amount', asCellNumber(line.amount, `MSP2-05 Sno${String(line.sno)}`));
+  }
+}
+
+/**
+ * MSP2-06 — complaints.
+ *
+ * Sno5 is absent from the map because BOT's template computes the whole of that
+ * row, the count and value columns included. So the roll-forward this system
+ * derives from the records and the one their sheet computes from the four lines
+ * above it are produced independently — and validation rule 8 is what makes
+ * sure they say the same thing before anything is filed.
+ *
+ * The nature columns are keyed by BOT's own nature codes, so a category they
+ * add would be a migration rather than a change here.
+ */
+function writeMsp2_06(writer: SheetWriter, document: CompiledReturn): void {
+  for (const line of document.msp2_06.rows) {
+    const row = writer.rowForSno(line.sno);
+    if (row === undefined) {
+      continue;
+    }
+    const where = `MSP2-06 Sno${String(line.sno)}`;
+    writer.put(row, 'number', line.count);
+    writer.put(row, 'value', asCellNumber(line.value, `${where} value`));
+    for (const [natureCode, count] of Object.entries(line.byNature)) {
+      writer.put(row, natureCode, count);
+    }
   }
 }
 

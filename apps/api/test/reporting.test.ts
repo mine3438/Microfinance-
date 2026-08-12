@@ -490,18 +490,17 @@ describe('GET /reports/msp2/:year/:quarter', () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it('lists the forms it cannot produce rather than filing four of ten silently', async () => {
+  it('compiles all ten of BOT’s forms, and still says which it cannot', async () => {
     await markClassified(new Date());
 
     const compiled = (await compile()).json<CompiledReturn>();
 
-    // A screen showing four forms and saying nothing about the other six reads
-    // as a complete submission, and the institution finds out otherwise at the
-    // filing desk.
-    // One, since stage 12 supplied MSP2-01 and MSP2-05. Complaints are the
-    // only form left.
-    expect(compiled.unavailableForms.map((form) => form.code)).toEqual(['MSP2-06']);
-    expect(compiled.unavailableForms.every((form) => form.reason.length > 0)).toBe(true);
+    // Empty since stage 14 supplied complaints. The field stays in the contract
+    // rather than being deleted: a client that stopped reading it would present
+    // a partial return as a complete one the next time a form went missing, and
+    // the institution would find out at the filing desk.
+    expect(compiled.unavailableForms).toEqual([]);
+    expect(compiled.msp2_06.rows).toHaveLength(9);
   });
 
   it('refuses to call a return submittable while the balance sheet is empty', async () => {

@@ -5,6 +5,7 @@ import {
   type Msp2_03 as WireMsp2_03,
   type Msp2_04 as WireMsp2_04,
   type Msp2_05 as WireMsp2_05,
+  type Msp2_06 as WireMsp2_06,
   type Msp2_07 as WireMsp2_07,
   type Msp2_08 as WireMsp2_08,
   type Msp2_09 as WireMsp2_09,
@@ -18,6 +19,7 @@ import {
   type Msp2_04,
   type Msp2_04Row,
   type Msp2_05,
+  type Msp2_06,
   type Msp2_07,
   type Msp2_07Row,
   type Msp2_07Section,
@@ -181,6 +183,26 @@ export function presentMsp2_05(form: Msp2_05): WireMsp2_05 {
   };
 }
 
+/**
+ * MSP2-06.
+ *
+ * The nature split becomes a plain object keyed by BOT's nature code: a client
+ * looks one up by code, and every published category is present including the
+ * empty ones, because their sheet has a column per category.
+ */
+export function presentMsp2_06(form: Msp2_06): WireMsp2_06 {
+  return {
+    rows: form.rows.map((row) => ({
+      sno: row.sno,
+      label: row.label,
+      isComputed: row.isComputed,
+      count: row.count,
+      value: money(row.value),
+      byNature: Object.fromEntries(row.byNature),
+    })),
+  };
+}
+
 export function presentMsp2_02(form: Msp2_02): WireMsp2_02 {
   return {
     rows: form.rows.map((row) => ({
@@ -281,6 +303,7 @@ export function presentCompiledReturn(compiled: CompiledReturn): WireCompiledRet
     msp2_03: presentMsp2_03(compiled.msp2_03),
     msp2_04: presentMsp2_04(compiled.msp2_04),
     msp2_05: presentMsp2_05(compiled.msp2_05),
+    msp2_06: presentMsp2_06(compiled.msp2_06),
     msp2_07: presentMsp2_07(compiled.msp2_07),
     msp2_08: presentMsp2_08(compiled.msp2_08),
     msp2_09: presentMsp2_09(compiled.msp2_09),

@@ -172,6 +172,22 @@ export type {
   RateExposure,
 } from './reporting/msp2-04.js';
 
+export {
+  COMPLAINT_LINE,
+  REFERRAL_DESTINATIONS,
+  RESOLUTION_ROUTES,
+  compileMsp2_06,
+} from './reporting/msp2-06.js';
+export type {
+  ComplaintLineLabel,
+  ComplaintRecord,
+  Msp2_06,
+  Msp2_06Request,
+  Msp2_06Row,
+  ReferralDestination,
+  ResolutionRoute,
+} from './reporting/msp2-06.js';
+
 export { compileMsp2_09 } from './reporting/msp2-09.js';
 export type {
   Disbursement,

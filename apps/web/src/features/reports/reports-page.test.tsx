@@ -30,6 +30,14 @@ function compiledReturn(overrides: Partial<CompiledReturn> = {}): CompiledReturn
   };
   const nilBand = { lowest: null, highest: null, weightedAverage: null };
   const nilCell = { borrowerCount: 0, loanCount: 0, outstanding: '0.00' };
+  const nilNatures = {
+    interest_rate: 0,
+    agreements: 0,
+    repayments: 0,
+    loan_statement: 0,
+    loan_processing: 0,
+    others: 0,
+  };
 
   return {
     period: { year: 2026, quarter: 1, startDate: '2026-01-01', endDate: '2026-03-31' },
@@ -72,6 +80,82 @@ function compiledReturn(overrides: Partial<CompiledReturn> = {}): CompiledReturn
       ],
       yearToDateFrom: '2026-01-01',
       yearToDateTo: '2026-03-31',
+    },
+    msp2_06: {
+      rows: [
+        {
+          sno: 1,
+          label: 'Opening',
+          isComputed: false,
+          count: 1,
+          value: '480000.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 2,
+          label: 'Received',
+          isComputed: false,
+          count: 0,
+          value: '0.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 3,
+          label: 'Resolved by the institution',
+          isComputed: false,
+          count: 0,
+          value: '0.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 4,
+          label: 'Resolved by other parties',
+          isComputed: false,
+          count: 0,
+          value: '0.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 5,
+          label: 'Unresolved at the quarter end',
+          isComputed: true,
+          count: 1,
+          value: '480000.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 6,
+          label: 'Referred to Bank of Tanzania',
+          isComputed: false,
+          count: 0,
+          value: '0.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 7,
+          label: 'Referred to Fair Competition Commission',
+          isComputed: false,
+          count: 0,
+          value: '0.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 8,
+          label: 'Referred to Courts',
+          isComputed: false,
+          count: 0,
+          value: '0.00',
+          byNature: nilNatures,
+        },
+        {
+          sno: 9,
+          label: 'Referred to Other Parties',
+          isComputed: false,
+          count: 0,
+          value: '0.00',
+          byNature: nilNatures,
+        },
+      ],
     },
     msp2_07: {
       sections: [
@@ -506,5 +590,19 @@ describe('ReportsPage', () => {
 
     expect(await screen.findByText('Not valid for submission')).toBeInTheDocument();
     expect(screen.getByText(/do not sum to total outstanding/)).toBeInTheDocument();
+  });
+
+  it('shows the complaints roll-forward, with the closing line marked as BOT’s', async () => {
+    quarterlyReturn.mockResolvedValue(compiledReturn());
+    renderPage();
+
+    const panel = (await screen.findByText('MSP2-06 — Complaints')).closest('section');
+    if (panel === null) {
+      throw new Error('The complaints form was not rendered inside a panel.');
+    }
+
+    // Line 5 is the one BOT's template computes; the four above it move.
+    expect(within(panel).getByText('Unresolved at the quarter end')).toBeTruthy();
+    expect(within(panel).getByText('Referred to Courts')).toBeTruthy();
   });
 });

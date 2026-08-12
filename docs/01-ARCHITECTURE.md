@@ -1451,3 +1451,84 @@ nothing in are **left out of the PDF**, while the workbook still files all 193,
 because BOT's grand total is over the whole country and ten pages of zeros does
 not help a reader see where an institution actually operates. The count of
 omitted districts is printed, so the omission is visible rather than silent.
+
+## 22. Amendments — Complaints Stage
+
+### 22.1 MSP2-06 is a movement statement, so complaints are records
+
+Every other form on the return reports a position as at the quarter end.
+MSP2-06 reports a *movement*: opening, plus new, less those resolved by the
+institution and by other parties, gives what was unresolved at the quarter end —
+as a count, a TZS value, and a split across BOT's six nature categories, with
+four further lines counting where the unresolved ones were referred.
+
+No stored quarterly figure can answer any of that. So complaints are kept as
+records with dates, and **every line of the form is derived from them**,
+including the opening balance. The alternative — an entered dataset, as MSP2-01
+is — would make an institution retype last quarter's closing figure as this
+quarter's opening one, and a single typo would then propagate through every
+return that followed it. Here, restating an old quarter is a matter of asking
+the same question with different dates.
+
+The prior documents described complaints as "resolved / unresolved counts",
+which is the gap §8 of the reporting spec identified. What was missing is a
+monetary value, a resolution *route* (institution or other party — BOT's lines 3
+and 4 are the only ways a complaint leaves the unresolved population), and a
+dated referral destination.
+
+### 22.2 BOT's rule 8 is an identity, not arithmetic — because of a CHECK
+
+The compiler derives the closing line directly from the records, and BOT's
+template computes it from the four lines above. That the two agree is not a
+coincidence and not something this system arranges: a complaint resolved inside
+the quarter was either open at the start or received during it, so the closing
+set is exactly opening plus new less resolved — **provided a complaint cannot be
+resolved before it was received**.
+
+That proviso is `complaints_resolved_after_received`, a database check. Without
+it the roll-forward is a claim; with it, it is an identity. The validator checks
+rule 8 anyway, because the guarantee lives in a constraint a future migration
+could weaken, and it checks rule 7 for the same reason. That completes all
+eighteen of BOT's published rules.
+
+The workbook writes the eight lines BOT accepts entry on and leaves row 18 to
+their formula, so the figure this system derives and the figure their sheet
+computes are produced independently. Rule 8 is what makes sure they agree before
+anything is filed.
+
+### 22.3 Three refusals that are about dates
+
+- **A resolution dated before the complaint arrived** is refused, naming the
+  roll-forward it would break.
+- **A referral on a resolved complaint** is refused: BOT's lines 6 to 9 count
+  referrals of *unresolved* complaints, so it would be counted nowhere.
+- **Any of these dated in the future** is refused, because MSP2-06 counts as at
+  a quarter end and a figure dated next month would appear on no return until
+  that month arrives — and then on one that may already have been filed.
+
+Resolving is guarded by `resolved_on IS NULL` in the UPDATE predicate rather
+than by a read-then-write, so two operators closing the same complaint at once
+cannot both succeed and overwrite one another's route and note. There is no
+DELETE and no privilege for one: a complaint counted on a filed return cannot be
+made not to have happened, and one logged in error is resolved with a note
+saying so.
+
+### 22.4 A complainant need not be a client
+
+`client_id` is nullable. Somebody refused a loan, or a guarantor pursued for one
+they did not take, has a complaint BOT counts and no client record to hang it
+on. Refusing to log one because the complainant is not on the books would lose
+it from the return entirely — which is the opposite of what the form is for.
+
+Logging is guarded by `complaint.manage`, which the seeded catalogue gives the
+loan officer and the branch manager as well as the accountant. A complaint is
+usually made to the person the borrower already deals with, and a system where
+only head office can log one gets complaints logged late or not at all.
+
+### 22.5 All ten forms
+
+`unavailableForms` is now empty, and it stays in the wire contract rather than
+being deleted. A client that stopped reading it would present a partial return
+as a complete one the next time a form went missing, and the institution would
+find out at the filing desk — which is the failure §11 introduced the field to
+prevent.

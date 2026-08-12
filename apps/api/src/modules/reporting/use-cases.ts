@@ -6,6 +6,7 @@ import {
   compileMsp2_03,
   compileMsp2_04,
   compileMsp2_05,
+  compileMsp2_06,
   compileMsp2_07,
   compileMsp2_08,
   compileMsp2_09,
@@ -17,6 +18,7 @@ import {
   type Msp2_03,
   type Msp2_04,
   type Msp2_05,
+  type Msp2_06,
   type Msp2_07,
   type Msp2_08,
   type Msp2_09,
@@ -37,6 +39,7 @@ export interface CompiledForms {
   readonly msp2_03: Msp2_03;
   readonly msp2_04: Msp2_04;
   readonly msp2_05: Msp2_05;
+  readonly msp2_06: Msp2_06;
   readonly msp2_07: Msp2_07;
   readonly msp2_08: Msp2_08;
   readonly msp2_09: Msp2_09;
@@ -52,9 +55,14 @@ export interface CompiledReturn extends CompiledForms {
 }
 
 /** The forms not built, and why. Reported rather than omitted. */
-const UNAVAILABLE_FORMS = Object.freeze([
-  { code: 'MSP2-06', reason: 'Complaints are not yet recorded (stage 14).' },
-]);
+/**
+ * Forms BOT requires that this system cannot produce.
+ *
+ * Empty, as of stage 14. Kept rather than deleted: the field is part of the
+ * wire contract and a client that stopped reading it would silently present a
+ * partial return as a complete one the next time a form went missing.
+ */
+const UNAVAILABLE_FORMS: readonly { code: string; reason: string }[] = Object.freeze([]);
 
 /**
  * The first day of the fiscal year a quarter falls in.
@@ -225,5 +233,21 @@ export function compileForms(
     balanceSheet: msp2_01,
   });
 
-  return { msp2_01, msp2_02, msp2_03, msp2_04, msp2_05, msp2_07, msp2_08, msp2_09, msp2_10 };
+  const msp2_06 = compileMsp2_06(
+    { period, natureCodes: snapshot.natureCodes, complaints: snapshot.complaints },
+    snapshot.msp2_06Lines,
+  );
+
+  return {
+    msp2_01,
+    msp2_02,
+    msp2_03,
+    msp2_04,
+    msp2_05,
+    msp2_06,
+    msp2_07,
+    msp2_08,
+    msp2_09,
+    msp2_10,
+  };
 }

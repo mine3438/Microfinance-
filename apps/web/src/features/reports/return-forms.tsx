@@ -3,6 +3,7 @@ import {
   type Msp2_01,
   type Msp2_02,
   type Msp2_05,
+  type Msp2_06,
   type StatementRow,
   type Msp2_03,
   type Msp2_04,
@@ -334,6 +335,59 @@ export function Msp2_08Table({ form }: { form: Msp2_08 }): ReactNode {
               <td className="numeric">{formatMoney(form.total)}</td>
             </tr>
           </tfoot>
+        </table>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * MSP2-06 — the complaints roll-forward.
+ *
+ * The only form on the return that is a movement statement, so it is shown as
+ * one: the four lines that move, the closing balance they produce, and the
+ * referrals of what is left. The nature split is the count broken six ways, and
+ * BOT validates that it sums to the count on every line.
+ */
+export function Msp2_06Table({ form }: { form: Msp2_06 }): ReactNode {
+  const natures = Object.keys(form.rows[0]?.byNature ?? {});
+
+  return (
+    <Panel title="MSP2-06 — Complaints">
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th scope="col">Sno</th>
+              <th scope="col">Particulars</th>
+              <th scope="col" className="numeric">
+                Number
+              </th>
+              <th scope="col" className="numeric">
+                Value
+              </th>
+              {natures.map((code) => (
+                <th key={code} scope="col" className="numeric">
+                  {formatStatus(code)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {form.rows.map((row) => (
+              <tr key={row.sno} className={row.isComputed ? 'row--muted' : undefined}>
+                <td className="numeric">{row.sno}</td>
+                <td>{row.label}</td>
+                <td className="numeric">{row.count}</td>
+                <td className="numeric">{formatMoney(row.value)}</td>
+                {natures.map((code) => (
+                  <td key={code} className="numeric">
+                    {row.byNature[code] ?? 0}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </Panel>
@@ -718,6 +772,7 @@ export function ReturnForms({ compiled }: { compiled: CompiledReturn }): ReactNo
       <Msp2_03Table form={compiled.msp2_03} />
       <Msp2_04Table form={compiled.msp2_04} />
       <Msp2_05Table form={compiled.msp2_05} />
+      <Msp2_06Table form={compiled.msp2_06} />
       <Msp2_07Table form={compiled.msp2_07} />
       <Msp2_08Table form={compiled.msp2_08} />
       <Msp2_09Table form={compiled.msp2_09} />

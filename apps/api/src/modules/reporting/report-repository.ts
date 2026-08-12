@@ -2,6 +2,8 @@ import { type Database } from '@mfi/db';
 import {
   type AgentBankingBalance,
   type ClassifiedExposure,
+  type ComplaintLineLabel,
+  type ComplaintRecord,
   type CounterpartyHolding,
   type FinanceEntry,
   type HoldingKind,
@@ -15,7 +17,9 @@ import {
   type InterestMethod,
   type OverdueClassification,
   type RateExposure,
+  type ReferralDestination,
   type ReportingPeriod,
+  type ResolutionRoute,
   type SectorWriteOff,
   classifyByDaysOverdue,
   type ProvisioningBand,
@@ -172,6 +176,11 @@ export interface PortfolioSnapshot {
   readonly msp2_05Lines: readonly StatementLine[];
   readonly enteredMsp2_01: ReadonlyMap<number, Money>;
   readonly enteredMsp2_05: ReadonlyMap<number, Money>;
+
+  /** MSP2-06's nine lines, BOT's six natures, and the complaints behind them. */
+  readonly msp2_06Lines: readonly ComplaintLineLabel[];
+  readonly natureCodes: readonly string[];
+  readonly complaints: readonly ComplaintRecord[];
 }
 
 export interface ReportRepository {
@@ -387,30 +396,55 @@ export class PostgresReportRepository implements ReportRepository {
           ),
         ]);
 
-      const [agentBankingCodes, statementLines, enteredLines] = await Promise.all([
-        client.query<{ code: string }>(
-          `SELECT code FROM reference.financial_institutions
+      const [agentBankingCodes, statementLines, enteredLines, natures, complaints] =
+        await Promise.all([
+          client.query<{ code: string }>(
+            `SELECT code FROM reference.financial_institutions
             WHERE in_agent_banking_list ORDER BY sort_order`,
-        ),
-        client.query<{
-          form_code: string;
-          sno: number;
-          label: string;
-          is_computed: boolean;
-          accepts_statement_entry: boolean | null;
-        }>(
-          `SELECT form_code, sno, label, is_computed, accepts_statement_entry
+          ),
+          client.query<{
+            form_code: string;
+            sno: number;
+            label: string;
+            is_computed: boolean;
+            accepts_statement_entry: boolean | null;
+          }>(
+            `SELECT form_code, sno, label, is_computed, accepts_statement_entry
              FROM reference.form_lines
-            WHERE form_code IN ('MSP2-01', 'MSP2-05')
+            WHERE form_code IN ('MSP2-01', 'MSP2-05', 'MSP2-06')
             ORDER BY form_code, sno`,
-        ),
-        client.query<{ form_code: string; sno: number; amount: string }>(
-          `SELECT form_code, sno, amount
+          ),
+          client.query<{ form_code: string; sno: number; amount: string }>(
+            `SELECT form_code, sno, amount
              FROM financial_statement_lines
             WHERE year = $1 AND quarter = $2`,
-          [period.year, period.quarter],
-        ),
-      ]);
+            [period.year, period.quarter],
+          ),
+          client.query<{ code: string }>(
+            'SELECT code FROM reference.complaint_natures ORDER BY sno',
+          ),
+          // Every complaint that could touch this quarter, which is wider than
+          // the ones received in it: one raised two years ago and still open
+          // counts on the opening line, and one resolved this quarter counts on
+          // line 3 or 4 whenever it arrived. Complaints closed before the quarter
+          // began belong to an earlier return and are not read at all.
+          client.query<{
+            nature_code: string;
+            amount: string;
+            received_on: Date;
+            resolved_on: Date | null;
+            resolved_by: ResolutionRoute | null;
+            referred_to: ReferralDestination | null;
+            referred_on: Date | null;
+          }>(
+            `SELECT nature_code, amount, received_on, resolved_on, resolved_by,
+                  referred_to, referred_on
+             FROM complaints
+            WHERE received_on <= $2
+              AND (resolved_on IS NULL OR resolved_on >= $1)`,
+            [period.startDate, period.endDate],
+          ),
+        ]);
 
       const linesFor = (formCode: string): StatementLine[] =>
         statementLines.rows
@@ -496,6 +530,19 @@ export class PostgresReportRepository implements ReportRepository {
         msp2_05Lines: linesFor('MSP2-05'),
         enteredMsp2_01: enteredFor('MSP2-01'),
         enteredMsp2_05: enteredFor('MSP2-05'),
+        msp2_06Lines: statementLines.rows
+          .filter((row) => row.form_code === 'MSP2-06')
+          .map((row) => ({ sno: row.sno, label: row.label, isComputed: row.is_computed })),
+        natureCodes: natures.rows.map((row) => row.code),
+        complaints: complaints.rows.map((row) => ({
+          natureCode: row.nature_code,
+          amount: Money.fromDatabaseValue(row.amount),
+          receivedOn: formatDateOnly(row.received_on),
+          resolvedOn: row.resolved_on === null ? null : formatDateOnly(row.resolved_on),
+          resolvedBy: row.resolved_by,
+          referredTo: row.referred_to,
+          referredOn: row.referred_on === null ? null : formatDateOnly(row.referred_on),
+        })),
       };
     });
   }

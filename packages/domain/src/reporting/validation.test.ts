@@ -8,6 +8,7 @@ import { type Msp2_02Line } from '../finance/entry.js';
 import { compileMsp2_03, type Msp2_03 } from './msp2-03.js';
 import { compileMsp2_04 } from './msp2-04.js';
 import { compileMsp2_05 } from './msp2-05.js';
+import { compileMsp2_06, type ComplaintLineLabel } from './msp2-06.js';
 import { compileMsp2_07 } from './msp2-07.js';
 import { compileMsp2_08 } from './msp2-08.js';
 import { compileMsp2_09 } from './msp2-09.js';
@@ -143,8 +144,48 @@ function consistentForms(): PortfolioForms {
     balanceSheet: msp2_01,
   });
 
-  return { msp2_01, msp2_02, msp2_03, msp2_04, msp2_05, msp2_07, msp2_08, msp2_09, msp2_10 };
+  // No complaints, which is a real quarter for a small institution and makes
+  // every line of MSP2-06 nil rather than absent.
+  const msp2_06 = compileMsp2_06(
+    { period: reportingPeriod(2026, 1), natureCodes: COMPLAINT_NATURES, complaints: [] },
+    MSP2_06_LINES,
+  );
+
+  return {
+    msp2_01,
+    msp2_02,
+    msp2_03,
+    msp2_04,
+    msp2_05,
+    msp2_06,
+    msp2_07,
+    msp2_08,
+    msp2_09,
+    msp2_10,
+  };
 }
+
+/** BOT's six nature columns, and the nine lines they split. */
+const COMPLAINT_NATURES = [
+  'interest_rate',
+  'agreements',
+  'repayments',
+  'loan_statement',
+  'loan_processing',
+  'others',
+];
+
+const MSP2_06_LINES: ComplaintLineLabel[] = [
+  { sno: 1, label: 'Opening', isComputed: false },
+  { sno: 2, label: 'Received', isComputed: false },
+  { sno: 3, label: 'Resolved by the institution', isComputed: false },
+  { sno: 4, label: 'Resolved by other parties', isComputed: false },
+  { sno: 5, label: 'Unresolved at the quarter end', isComputed: true },
+  { sno: 6, label: 'Referred to Bank of Tanzania', isComputed: false },
+  { sno: 7, label: 'Referred to Fair Competition Commission', isComputed: false },
+  { sno: 8, label: 'Referred to Courts', isComputed: false },
+  { sno: 9, label: 'Referred to Other Parties', isComputed: false },
+];
 
 const blocking = (result: { findings: readonly { severity: string }[] }): number =>
   result.findings.filter((finding) => finding.severity === 'blocking').length;
@@ -358,6 +399,37 @@ describe('validatePortfolioForms', () => {
     // A warning, not a block: an institution may genuinely hold none, and
     // refusing to file on that basis would be wrong.
     expect(result.submittable).toBe(true);
+  });
+
+  it('catches a complaint line whose nature split does not sum to its count', () => {
+    // Rule 7 holds by construction in the compiler, so breaking it means
+    // tampering with a compiled form — which is exactly the future change this
+    // check exists to catch.
+    const forms = consistentForms();
+    const [first, ...rest] = forms.msp2_06.rows;
+    const tampered = {
+      ...forms.msp2_06,
+      rows: [{ ...first!, count: 3 }, ...rest],
+    };
+
+    const result = validatePortfolioForms({ ...forms, msp2_06: tampered });
+
+    const finding = result.findings.find((candidate) => candidate.ruleId === 7);
+    expect(finding?.severity).toBe('blocking');
+    expect(result.submittable).toBe(false);
+  });
+
+  it('catches a closing complaint balance that does not roll forward', () => {
+    const forms = consistentForms();
+    const rows = forms.msp2_06.rows.map((row) =>
+      row.sno === 5 ? { ...row, count: 4, byNature: new Map([['others', 4]]) } : row,
+    );
+
+    const result = validatePortfolioForms({ ...forms, msp2_06: { ...forms.msp2_06, rows } });
+
+    const finding = result.findings.find((candidate) => candidate.ruleId === 8);
+    expect(finding?.severity).toBe('blocking');
+    expect(finding?.message).toContain('roll-forward');
   });
 
   it('reports every failure at once rather than stopping at the first', () => {

@@ -12,6 +12,7 @@ import { PostgresClientRepository } from './modules/clients/client-repository.js
 import { PostgresLoanRepository } from './modules/loans/loan-repository.js';
 import { PostgresFinanceRepository } from './modules/finance/finance-repository.js';
 import { PostgresPaymentRepository } from './modules/payments/payment-repository.js';
+import { PostgresComplaintRepository } from './modules/complaints/complaint-repository.js';
 import { PostgresFilingRepository } from './modules/filings/filing-repository.js';
 import { PostgresCellMapRepository } from './modules/exports/cell-map.js';
 import { PostgresExportRepository } from './modules/exports/export-repository.js';
@@ -64,6 +65,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const finance = new PostgresFinanceRepository(database);
   const statements = new PostgresStatementRepository(database);
   const filings = new PostgresFilingRepository(database);
+  const complaints = new PostgresComplaintRepository(database);
   const exports = new PostgresExportRepository(database);
   const cellMaps = new PostgresCellMapRepository(database);
 
@@ -79,6 +81,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     finance,
     statements,
     filings,
+    complaints,
     exports,
     cellMaps,
     tokens,

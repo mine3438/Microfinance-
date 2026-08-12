@@ -26,6 +26,7 @@ export interface ReferenceLabels {
   readonly loanTypes: ReadonlyMap<string, string>;
   readonly districts: ReadonlyMap<string, string>;
   readonly regions: ReadonlyMap<string, string>;
+  readonly complaintNatures: ReadonlyMap<string, string>;
 }
 
 export interface ExportRepository {
@@ -48,6 +49,7 @@ const SECTORS_SELECT = 'SELECT code, name FROM reference.sectors';
 const LOAN_TYPES_SELECT = 'SELECT code, name FROM reference.loan_types';
 const DISTRICTS_SELECT = 'SELECT code, name FROM reference.districts';
 const REGIONS_SELECT = 'SELECT code, name FROM reference.regions';
+const NATURES_SELECT = 'SELECT code, name FROM reference.complaint_natures';
 
 export class PostgresExportRepository implements ExportRepository {
   /**
@@ -80,12 +82,13 @@ export class PostgresExportRepository implements ExportRepository {
     // the export path that is not tenant-scoped. No institution's figures pass
     // through it.
     this.cached ??= await this.database.withTransaction(async (client) => {
-      const [institutions, sectors, loanTypes, districts, regions] = await Promise.all([
+      const [institutions, sectors, loanTypes, districts, regions, natures] = await Promise.all([
         client.query<NameRow>(INSTITUTIONS_SELECT),
         client.query<NameRow>(SECTORS_SELECT),
         client.query<NameRow>(LOAN_TYPES_SELECT),
         client.query<NameRow>(DISTRICTS_SELECT),
         client.query<NameRow>(REGIONS_SELECT),
+        client.query<NameRow>(NATURES_SELECT),
       ]);
 
       const byCode = (rows: { rows: NameRow[] }): ReadonlyMap<string, string> =>
@@ -97,6 +100,7 @@ export class PostgresExportRepository implements ExportRepository {
         loanTypes: byCode(loanTypes),
         districts: byCode(districts),
         regions: byCode(regions),
+        complaintNatures: byCode(natures),
       };
     });
     return this.cached;

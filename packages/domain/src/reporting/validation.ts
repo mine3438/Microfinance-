@@ -5,6 +5,7 @@ import { type Msp2_02 } from './msp2-02.js';
 import { type Msp2_03 } from './msp2-03.js';
 import { type Msp2_04 } from './msp2-04.js';
 import { type Msp2_05 } from './msp2-05.js';
+import { COMPLAINT_LINE, type Msp2_06 } from './msp2-06.js';
 import { type Msp2_07 } from './msp2-07.js';
 import { type Msp2_08 } from './msp2-08.js';
 import { type Msp2_09 } from './msp2-09.js';
@@ -56,6 +57,7 @@ export interface PortfolioForms {
   readonly msp2_03: Msp2_03;
   readonly msp2_04: Msp2_04;
   readonly msp2_05: Msp2_05;
+  readonly msp2_06: Msp2_06;
   readonly msp2_07: Msp2_07;
   readonly msp2_08: Msp2_08;
   readonly msp2_09: Msp2_09;
@@ -86,11 +88,12 @@ const NET_INCOME_AFTER_TAX_SNO = 42;
 /**
  * Check the forms this system compiles against each other.
  *
- * Only the rules whose *both* sides exist are checked. Six of BOT's eighteen
- * rules tie a portfolio form to MSP2-01 or MSP2-02, which are not built — those
- * are reported as warnings naming what is missing, rather than passed over in
- * silence. A validator that reports "no problems" while skipping half its rules
- * is worse than one that reports none at all, because it is believed.
+ * All eighteen of BOT's published rules are checked here, along with four
+ * warnings that are this system's own and are marked as such by carrying no
+ * rule id. Honesty about that matters: most of the eighteen hold *by
+ * construction* — their two sides are derived from the same figures — so this
+ * is not eighteen independent confirmations that a return is right. It is
+ * eighteen ways a future change could be caught breaking one.
  */
 export function validatePortfolioForms(forms: PortfolioForms): ValidationResult {
   const findings: ValidationFinding[] = [
@@ -106,6 +109,8 @@ export function validatePortfolioForms(forms: PortfolioForms): ValidationResult 
     ...checkBorrowerCountsAgree(forms.msp2_03, forms.msp2_04),
     ...checkNonPerformingRatio(forms.msp2_03),
     ...checkUnclassifiedExposures(forms.msp2_03),
+    ...checkComplaintNatureSplits(forms.msp2_06),
+    ...checkComplaintRollForward(forms.msp2_06),
     ...checkGenderSplitsSum(forms.msp2_09),
     ...checkGeographicSubtotals(forms.msp2_10),
   ];
@@ -114,6 +119,71 @@ export function validatePortfolioForms(forms: PortfolioForms): ValidationResult 
     findings,
     submittable: !findings.some((finding) => finding.severity === 'blocking'),
   };
+}
+
+/**
+ * Rule 7 — on every line, the count must equal the sum of the six nature
+ * columns.
+ *
+ * Holds by construction: the compiler derives both from one set of complaints,
+ * and a complaint carries exactly one nature. Checked anyway, because "holds by
+ * construction" is a statement about today's compiler and this is a statement
+ * about BOT's form.
+ */
+function checkComplaintNatureSplits(form: Msp2_06): ValidationFinding[] {
+  const findings: ValidationFinding[] = [];
+
+  for (const row of form.rows) {
+    const split = [...row.byNature.values()].reduce((sum, count) => sum + count, 0);
+    if (split !== row.count) {
+      findings.push({
+        ruleId: 7,
+        formCode: 'MSP2-06',
+        severity: 'blocking',
+        message:
+          `Sno${String(row.sno)} counts ${String(row.count)} complaints but its nature columns ` +
+          `sum to ${String(split)}. BOT validates this identity on every line.`,
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Rule 8 — the closing line must equal the roll-forward.
+ *
+ * The compiler derives the closing line from the records rather than from this
+ * arithmetic, so the two are independent statements that happen to agree. They
+ * agree because a complaint cannot be resolved before it was received, which is
+ * a database constraint rather than a property of this function — and a
+ * migration could weaken it without this file noticing. So it is checked.
+ */
+function checkComplaintRollForward(form: Msp2_06): ValidationFinding[] {
+  const countAt = (sno: number): number => form.rows.find((row) => row.sno === sno)?.count ?? 0;
+
+  const expected =
+    countAt(COMPLAINT_LINE.opening) +
+    countAt(COMPLAINT_LINE.received) -
+    countAt(COMPLAINT_LINE.resolvedByInstitution) -
+    countAt(COMPLAINT_LINE.resolvedByOtherParties);
+  const closing = countAt(COMPLAINT_LINE.unresolvedAtEnd);
+
+  if (closing === expected) {
+    return [];
+  }
+
+  return [
+    {
+      ruleId: 8,
+      formCode: 'MSP2-06',
+      severity: 'blocking',
+      message:
+        `Sno5 reports ${String(closing)} unresolved complaints at the quarter end, and the ` +
+        `roll-forward gives ${String(expected)}. BOT computes this line from the four above it, ` +
+        'so their template would show a different figure from the one compiled here.',
+    },
+  ];
 }
 
 /** Rule 17 — per sector, the class buckets must sum to the total outstanding. */

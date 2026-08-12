@@ -340,18 +340,19 @@ describe('financial institutions (MSP2-07, MSP2-08)', () => {
 });
 
 describe('financial statement lines (MSP2-01, MSP2-02)', () => {
-  it('seeds every line of the three Sno-keyed forms', async () => {
+  it('seeds every line of the four Sno-keyed forms', async () => {
     const result = await pool.query<{ form_code: string; count: string }>(
       'SELECT form_code, COUNT(*)::text AS count FROM reference.form_lines GROUP BY form_code ORDER BY form_code',
     );
 
-    // MSP2-05's thirteen lines arrive in migration 0015, read from the
-    // template's own sheet — the machine-readable taxonomy carries only the
-    // first two forms.
+    // MSP2-05's thirteen lines arrive in migration 0015 and MSP2-06's nine in
+    // 0018, both read from the template's own sheets — the machine-readable
+    // taxonomy carries only the first two forms.
     expect(result.rows).toEqual([
       { form_code: 'MSP2-01', count: '61' },
       { form_code: 'MSP2-02', count: '42' },
       { form_code: 'MSP2-05', count: '13' },
+      { form_code: 'MSP2-06', count: '9' },
     ]);
   });
 

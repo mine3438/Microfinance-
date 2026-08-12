@@ -306,6 +306,22 @@ describe('GET /filings/:id/workbook', () => {
     expect(partOf(response, 'xl/workbook.xml')).toContain('fullCalcOnLoad="1"');
   });
 
+  it('writes the complaints roll-forward and leaves BOT to close it', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    const filed = await fileBalancedQuarter();
+
+    const workbook = await openWorkbook(
+      await request('GET', `/filings/${filed.id}/workbook`, accountantToken),
+    );
+    const sheet = workbook.getWorksheet('MSP2-06');
+
+    // Sno1 is row 14: a count, written as a number even when it is nil.
+    expect(sheet?.getCell('C14').value).toBe(0);
+    // Sno5 is row 18, and BOT computes the whole of it — count and value alike.
+    // This system derives the same figure from the records and never writes it.
+    expect(sheet?.getCell('C18').value).toMatchObject({ formula: 'C14+C15-C16-C17' });
+  });
+
   it('prints the institution on every form, not the one BOT left in the template', async () => {
     await setMspCode(accountant.institutionId, MSP_CODE);
     const filed = await fileBalancedQuarter();

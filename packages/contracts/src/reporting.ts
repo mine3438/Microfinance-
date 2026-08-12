@@ -316,6 +316,31 @@ export const msp2_08Schema = z
 
 export type Msp2_08 = z.infer<typeof msp2_08Schema>;
 
+/** MSP2-06 — Complaints. A movement statement, not a snapshot. */
+export const msp2_06RowSchema = z
+  .object({
+    sno: z.number().int().positive(),
+    label: z.string(),
+    /** True where BOT's template computes the line rather than taking it. */
+    isComputed: z.boolean(),
+    count: z.number().int().nonnegative(),
+    /** The value in dispute across the same complaints the count counts. */
+    value: moneyAmountSchema,
+    /**
+     * Count by BOT's nature code, one entry per published category.
+     *
+     * An object rather than a list because the caller needs to look one up by
+     * code; the six keys are always present, including the empty ones, because
+     * BOT's sheet has a column per category and a blank is not a zero.
+     */
+    byNature: z.record(z.string(), z.number().int().nonnegative()),
+  })
+  .strict();
+
+export const msp2_06Schema = z.object({ rows: z.array(msp2_06RowSchema) }).strict();
+
+export type Msp2_06 = z.infer<typeof msp2_06Schema>;
+
 export const VALIDATION_SEVERITIES = ['blocking', 'warning'] as const;
 
 export type ValidationSeverity = (typeof VALIDATION_SEVERITIES)[number];
@@ -362,6 +387,7 @@ export const compiledReturnSchema = z
     msp2_03: msp2_03Schema,
     msp2_04: msp2_04Schema,
     msp2_05: msp2_05Schema,
+    msp2_06: msp2_06Schema,
     msp2_07: msp2_07Schema,
     msp2_08: msp2_08Schema,
     msp2_09: msp2_09Schema,
