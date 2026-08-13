@@ -19,7 +19,24 @@ const execFileAsync = promisify(execFile);
  * The library tests could not have caught that; only running the binary does.
  */
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
-const CLI_BIN = join(REPO_ROOT, 'node_modules/.bin/mfi-migrate');
+/**
+ * The CLI as a file, not as the `node_modules/.bin` symlink.
+ *
+ * pnpm creates that symlink at install time and skips it when the target does
+ * not exist yet — which is every fresh CI checkout, because install runs before
+ * build. Pointing at the link made this suite pass locally (where node_modules
+ * happened to be installed after a build) and fail anywhere else.
+ *
+ * Nothing is lost: `isDirectInvocation` compares `realpathSync` on both sides,
+ * so the entrypoint guard this suite exists to protect behaves identically
+ * whether it is reached through the link or through the file. `pretest` builds
+ * the package, so the file is always there.
+ *
+ * Run through `node` rather than executed directly, because the executable bit
+ * on the built file is something pnpm's bin linking sets rather than something
+ * the compiler emits — the same install-order dependency, one layer down.
+ */
+const CLI_BIN = join(REPO_ROOT, 'packages/migrator/dist/cli.js');
 const CONNECTION_STRING =
   process.env['DATABASE_URL'] ?? 'postgresql://postgres@localhost:5432/postgres';
 
@@ -36,7 +53,7 @@ interface CliResult {
 /** Run the CLI with the test schema on the search path. */
 async function runCli(args: readonly string[]): Promise<CliResult> {
   try {
-    const { stdout, stderr } = await execFileAsync(CLI_BIN, [...args], {
+    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI_BIN, ...args], {
       cwd: REPO_ROOT,
       env: {
         ...process.env,
@@ -91,7 +108,7 @@ describe('mfi-migrate CLI', () => {
   });
 
   it('exits non-zero and explains when DATABASE_URL is absent', async () => {
-    const { stdout, stderr } = await execFileAsync(CLI_BIN, ['status'], {
+    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI_BIN, 'status'], {
       cwd: REPO_ROOT,
       env: { ...process.env, DATABASE_URL: '' },
     }).catch((error: unknown) => error as { stdout: string; stderr: string });
