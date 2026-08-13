@@ -23,7 +23,6 @@ env:
   # Redis-backed rate limiter. Its limits are a security control, so the suite
   # exercises the shipped configuration rather than a loosened one.
   REDIS_URL: redis://localhost:6379
-  REDIS_URL: redis://localhost:6379
 
 jobs:
   verify:
