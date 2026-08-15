@@ -12,6 +12,7 @@ export { DomainError, DomainValidationError } from './errors.js';
 
 export {
   ALLOCATION_BUCKETS,
+  ALLOCATION_ORDER,
   DOCUMENTED_ALLOCATION_ORDER,
   allocatePayment,
   amountApplied,

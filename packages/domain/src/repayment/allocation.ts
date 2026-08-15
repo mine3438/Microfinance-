@@ -5,27 +5,41 @@ import { DomainValidationError } from '../errors.js';
 /**
  * What a payment can be applied to.
  *
- * Penalties and fees are named here although nothing accrues them yet — the
- * penalty engine is a later stage. Naming them now is what makes the open
- * question visible: `01-ARCHITECTURE.md` §13.2 asks where they sit in the
- * order, and a type that could not express them would make the question
- * invisible rather than answered.
+ * All four buckets were named in stage 8, before penalties existed, so that
+ * §13.2's open question had somewhere to be answered rather than being
+ * invisible in a type that could not express it. It has now been answered
+ * (`01-ARCHITECTURE.md` §24.3), and the answer cost one constant.
  */
 export const ALLOCATION_BUCKETS = ['penalty', 'fee', 'interest', 'principal'] as const;
 
 export type AllocationBucket = (typeof ALLOCATION_BUCKETS)[number];
 
 /**
- * The order the supplied documentation specifies.
+ * The order the institution confirmed: penalties → fees → interest → principal.
  *
- * TRD §4 describes the recorded behaviour as "interest-first, principal-second".
- * Those are the only two things a payment can currently be applied to, so this
- * order is documented rather than chosen.
+ * §13.2 is answered (§24.3). This replaces the documented build's
+ * interest-first, principal-second, which had no penalty concept at all — TRD §4
+ * described only those two because only those two existed.
  *
- * Where penalties and fees belong once they exist is **not** documented. The
- * conventional order is penalties → fees → interest → principal, and that is
- * what §13.2 proposes — but proposing is not deciding, so the order is a
- * parameter and this constant covers only what is known.
+ * Fees sit in the order without yet having a source: §13.8 has not settled what
+ * a loan fee is, when it is charged or whether it is refundable, so nothing
+ * accrues to that bucket and it allocates nothing. Its **position** is
+ * nonetheless decided, which is why it is here rather than waiting — adding it
+ * later would silently change how every earlier payment would have been split.
+ */
+export const ALLOCATION_ORDER: readonly AllocationBucket[] = Object.freeze([
+  'penalty',
+  'fee',
+  'interest',
+  'principal',
+]);
+
+/**
+ * The order the supplied documentation described, kept for the record.
+ *
+ * Not used to allocate anything. It is what the system being replaced did, and
+ * a reader comparing a historical split against this system's needs to be able
+ * to name the difference.
  */
 export const DOCUMENTED_ALLOCATION_ORDER: readonly AllocationBucket[] = Object.freeze([
   'interest',
@@ -56,7 +70,7 @@ export interface PaymentAllocation {
 export interface AllocationRequest {
   readonly amountPaid: Money;
   readonly outstanding: OutstandingAmounts;
-  /** Defaults to {@link DOCUMENTED_ALLOCATION_ORDER}. */
+  /** Defaults to {@link ALLOCATION_ORDER}. */
   readonly order?: readonly AllocationBucket[];
 }
 
@@ -76,7 +90,7 @@ export interface AllocationRequest {
  */
 export function allocatePayment(request: AllocationRequest): PaymentAllocation {
   const { amountPaid, outstanding } = request;
-  const order = request.order ?? DOCUMENTED_ALLOCATION_ORDER;
+  const order = request.order ?? ALLOCATION_ORDER;
 
   if (!amountPaid.isPositive()) {
     throw new DomainValidationError(

@@ -5,6 +5,7 @@ import { DomainValidationError } from '../errors.js';
 import { generateSchedule } from '../lending/schedule.js';
 import {
   ALLOCATION_BUCKETS,
+  ALLOCATION_ORDER,
   DOCUMENTED_ALLOCATION_ORDER,
   allocatePayment,
   amountApplied,
@@ -281,5 +282,62 @@ describe('the resulting balance', () => {
     expect(balance.isZero()).toBe(true);
     expect(interestPaid.toDatabaseValue()).toBe(schedule.totalInterest.toDatabaseValue());
     expect(interestPaid.toDatabaseValue()).toBe('353904.94');
+  });
+});
+
+describe('the confirmed order', () => {
+  it('is penalties, fees, interest, principal', () => {
+    // §13.2's answer (01-ARCHITECTURE.md §24.3), replacing the documented
+    // build's interest-first order, which had no penalty concept at all.
+    expect([...ALLOCATION_ORDER]).toEqual(['penalty', 'fee', 'interest', 'principal']);
+  });
+
+  it('splits exactly as the documented order did when nothing else is owed', () => {
+    // The property that makes this change safe to apply to a live book: with no
+    // penalty and no fee outstanding, every payment lands where it always did.
+    const outstanding = { interest: Money.of('12000.00'), principal: Money.of('88000.00') };
+    const amountPaid = Money.of('50000.00');
+
+    const confirmed = allocatePayment({ amountPaid, outstanding });
+    const documented = allocatePayment({
+      amountPaid,
+      outstanding,
+      order: DOCUMENTED_ALLOCATION_ORDER,
+    });
+
+    expect(confirmed.applied.get('interest')?.toString()).toBe(
+      documented.applied.get('interest')?.toString(),
+    );
+    expect(confirmed.applied.get('principal')?.toString()).toBe(
+      documented.applied.get('principal')?.toString(),
+    );
+    expect(confirmed.unallocated.toString()).toBe(documented.unallocated.toString());
+  });
+
+  it('takes penalties before interest', () => {
+    const allocation = allocatePayment({
+      amountPaid: Money.of('10000.00'),
+      outstanding: {
+        penalty: Money.of('3000.00'),
+        interest: Money.of('5000.00'),
+        principal: Money.of('90000.00'),
+      },
+    });
+
+    expect(allocation.applied.get('penalty')?.toString()).toBe('3000.00');
+    expect(allocation.applied.get('interest')?.toString()).toBe('5000.00');
+    expect(allocation.applied.get('principal')?.toString()).toBe('2000.00');
+  });
+
+  it('records the fee bucket as nil, because nothing accrues to it yet', () => {
+    // §13.8 has not settled what a loan fee is. Its position in the order is
+    // decided; its existence is not. Present and nil rather than absent, so a
+    // statement can show that the fee line took nothing.
+    const allocation = allocatePayment({
+      amountPaid: Money.of('1000.00'),
+      outstanding: { interest: Money.of('5000.00') },
+    });
+
+    expect(allocation.applied.get('fee')?.isZero()).toBe(true);
   });
 });

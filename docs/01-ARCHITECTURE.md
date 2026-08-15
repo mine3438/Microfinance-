@@ -1726,5 +1726,30 @@ this codebase means a *monthly* interest rate — it converts to monthly
 percentages and annualises for MSP2-04. A daily penalty rate borrowing the type
 would inherit arithmetic that means something else.
 
-Still to come: the penalty balance on a loan, the accrual job, and the
-allocation redesign to §24.3's order.
+Still to come: the penalty balance on a loan, and the accrual job.
+
+### 24.6 §13.2's answer cost one constant
+
+The allocation engine was built in stage 8 with all four buckets already named —
+penalty, fee, interest, principal — and with the order as a **parameter** rather
+than a constant, precisely because §13.2 was open. Applying the answer was
+therefore a one-line change to a default, not a redesign of the payment engine.
+
+`ALLOCATION_ORDER` is now penalties → fees → interest → principal and is the
+default. `DOCUMENTED_ALLOCATION_ORDER` stays exported and unused for allocation:
+it is what the system being replaced did, and a reader comparing a historical
+split against this system's needs to be able to name the difference.
+
+Two properties are pinned by tests rather than asserted in prose:
+
+- **With no penalty and no fee outstanding, the new order splits a payment
+  exactly as the old one did.** That is what makes the change safe to apply to a
+  live book — every existing payment would have landed where it did.
+- **The fee bucket is present and nil**, not absent. §13.8 has not settled what
+  a loan fee is, so nothing accrues to it; its *position* is nonetheless decided.
+  Fixing the position now matters: adding the bucket later would silently change
+  how every earlier payment would have been split.
+
+Penalties allocate nothing yet either, for a different reason — the terms exist
+(§24.5) but no balance accrues to a loan until the accrual job does. The order
+is ready for both.

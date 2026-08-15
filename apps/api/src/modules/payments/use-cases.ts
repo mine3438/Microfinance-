@@ -8,7 +8,7 @@ import {
   type ReversePaymentRequest,
 } from '@mfi/contracts';
 import {
-  DOCUMENTED_ALLOCATION_ORDER,
+  ALLOCATION_ORDER,
   allocatePayment,
   amountApplied,
   balanceAfter,
@@ -89,11 +89,12 @@ async function loadPayableLoan(
  * browser to preview it — and its own technical document warned the preview
  * would lie if the two drifted.
  *
- * The order is `DOCUMENTED_ALLOCATION_ORDER`: interest, then principal. Those
- * are the only two things a payment can currently be applied to, so the order
- * is documented rather than chosen. Where penalties and fees belong once they
- * exist is an open question (01-ARCHITECTURE.md §13.2), which is why the
- * allocator takes the order as a parameter rather than assuming one.
+ * The order is `ALLOCATION_ORDER` — penalties, fees, interest, principal —
+ * which §13.2 confirmed (01-ARCHITECTURE.md §24.3). Only interest and principal
+ * are passed as outstanding today: penalties have terms but no accrued balance
+ * yet, and §13.8 has not settled what a fee is. Both buckets therefore allocate
+ * nothing, and their *position* is already fixed, so adding their balances later
+ * cannot change how a payment would have been split against what it was told.
  */
 function allocate(loan: LoanBalance, amount: string): DomainAllocation {
   return allocatePayment({
@@ -102,7 +103,7 @@ function allocate(loan: LoanBalance, amount: string): DomainAllocation {
       interest: Money.fromDatabaseValue(loan.interestOutstanding),
       principal: Money.fromDatabaseValue(loan.outstandingBalance),
     },
-    order: DOCUMENTED_ALLOCATION_ORDER,
+    order: ALLOCATION_ORDER,
   });
 }
 
