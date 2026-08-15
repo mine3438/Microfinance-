@@ -1616,3 +1616,48 @@ has not misled its regulator in its own favour. Getting it wrong the other way
 would.
 
 The existing validator warning stays until it is answered.
+
+## 24. Answers to §13
+
+Recorded here as they arrive, because §13's questions are referenced from
+migrations and module headers throughout, and a decision that lives only in a
+conversation is one the next person cannot find.
+
+### 24.1 §11.7 — compulsory savings is a per-loan collateral amount
+
+**Answered: per-loan collateral amount.** Each loan carries how much compulsory
+savings secures it. The money still sits in a savings account — that is what
+MSP2-01 Sno46 and MSP2-10 report — but the amount securing a given loan is
+recorded against the loan.
+
+This makes MSP2-03's deduction exact rather than attributed: a loan belongs to
+one sector, so the per-sector "Cash Collateral / Insurance Guarantee /
+Compulsory Savings" figure is a sum, not a split. §23.5's nil placeholder and
+the validator warning that accompanies it can now be replaced with the real
+figure.
+
+The constraint that has to hold: the total secured across a client's loans
+cannot exceed their compulsory savings balance, or the return would deduct
+security the institution does not hold.
+
+### 24.2 §13.1 — penalties
+
+**Answered: the recommended shape.** Configured per loan product: a penalty
+rate, basis = **overdue instalment amount**, a grace period in days, accrual
+**daily, simple, non-compounding**, and an optional cap as a percentage of
+principal.
+
+**Still outstanding: the default values.** The shape can be built without them —
+the columns, the accrual, the allocation — but no product can be seeded and no
+penalty computed until the rate, the grace period and the cap are given. They
+are per-product configuration, so they can arrive after the mechanism.
+
+### 24.3 §13.2 — allocation order
+
+**Answered: penalties → fees → interest → principal.** This replaces the
+documented build's interest → principal, which had no penalty concept at all.
+
+The consequence for stage 8's allocation engine is that it gains two buckets
+ahead of the two it has, and that reversals have to unwind them in the same
+order. The existing allocation is exact-decimal and tested against golden
+vectors; the new buckets join that treatment rather than sitting beside it.
