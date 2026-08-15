@@ -90,16 +90,16 @@ async function loadPayableLoan(
  * would lie if the two drifted.
  *
  * The order is `ALLOCATION_ORDER` — penalties, fees, interest, principal —
- * which §13.2 confirmed (01-ARCHITECTURE.md §24.3). Only interest and principal
- * are passed as outstanding today: penalties have terms but no accrued balance
- * yet, and §13.8 has not settled what a fee is. Both buckets therefore allocate
- * nothing, and their *position* is already fixed, so adding their balances later
- * cannot change how a payment would have been split against what it was told.
+ * which §13.2 confirmed (01-ARCHITECTURE.md §24.3). Penalties are read from the
+ * loan's accrued balance; fees are not passed at all, because §13.8 has not
+ * settled what a loan fee is, so that bucket allocates nothing and its position
+ * is nonetheless fixed.
  */
 function allocate(loan: LoanBalance, amount: string): DomainAllocation {
   return allocatePayment({
     amountPaid: Money.fromDatabaseValue(amount),
     outstanding: {
+      penalty: Money.fromDatabaseValue(loan.penaltyOutstanding),
       interest: Money.fromDatabaseValue(loan.interestOutstanding),
       principal: Money.fromDatabaseValue(loan.outstandingBalance),
     },

@@ -86,6 +86,8 @@ export interface LoanBalance {
   readonly outstandingBalance: string;
   /** Interest still unpaid across the schedule. */
   readonly interestOutstanding: string;
+  /** Penalty accrued and unpaid. Allocated against first, per §24.3. */
+  readonly penaltyOutstanding: string;
 }
 
 export interface PaymentToRecord {
@@ -205,8 +207,9 @@ export class PostgresPaymentRepository implements PaymentRepository {
         status: string;
         outstanding_balance: string | null;
         interest_outstanding: string;
+        penalty_balance: string;
       }>(
-        `SELECT l.id, l.branch_id, l.status, l.outstanding_balance,
+        `SELECT l.id, l.branch_id, l.status, l.outstanding_balance, l.penalty_balance,
                 COALESCE(
                   (SELECT sum(s.interest_due) FROM repayment_schedules s WHERE s.loan_id = l.id), 0
                 )
@@ -229,6 +232,7 @@ export class PostgresPaymentRepository implements PaymentRepository {
         status: row.status,
         outstandingBalance: row.outstanding_balance ?? '0.00',
         interestOutstanding: row.interest_outstanding,
+        penaltyOutstanding: row.penalty_balance,
       };
     });
   }
@@ -277,7 +281,7 @@ export class PostgresPaymentRepository implements PaymentRepository {
         throw new Error('Insert returned no payment identifier.');
       }
 
-      await this.applyBalance(client, payment.loanId, payment.balanceAfter);
+      await this.applyBalance(client, payment.loanId, payment.balanceAfter, payment.penalty);
       await this.markInstalmentsPaid(client, payment.loanId);
 
       return this.requireById(client, id);
@@ -362,7 +366,10 @@ export class PostgresPaymentRepository implements PaymentRepository {
         throw new Error('Insert returned no reversal identifier.');
       }
 
-      await this.applyBalance(client, row.loan_id, row.balance_before);
+      // A reversal puts back what the payment took: the principal balance it
+      // reduced, and the penalty it settled. Negating the penalty portion is
+      // what makes `penalty_balance - $3` add it back.
+      await this.applyBalance(client, row.loan_id, row.balance_before, `-${row.penalty_portion}`);
       await this.markInstalmentsPaid(client, row.loan_id);
 
       return this.requireById(client, id);
@@ -380,17 +387,19 @@ export class PostgresPaymentRepository implements PaymentRepository {
     client: TransactionClient,
     loanId: string,
     balanceAfter: string,
+    penaltyApplied = '0.00',
   ): Promise<void> {
     await client.query(
       `UPDATE loans
           SET outstanding_balance = $1,
+              penalty_balance = penalty_balance - $3::numeric,
               status = CASE
                          WHEN $1::numeric = 0 AND status = 'active' THEN 'completed'
                          WHEN $1::numeric > 0 AND status = 'completed' THEN 'active'
                          ELSE status
                        END
         WHERE id = $2`,
-      [balanceAfter, loanId],
+      [balanceAfter, loanId, penaltyApplied],
     );
   }
 

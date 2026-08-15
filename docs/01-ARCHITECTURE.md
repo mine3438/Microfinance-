@@ -1753,3 +1753,35 @@ Two properties are pinned by tests rather than asserted in prose:
 Penalties allocate nothing yet either, for a different reason — the terms exist
 (§24.5) but no balance accrues to a loan until the accrual job does. The order
 is ready for both.
+
+### 24.7 The penalty balance, and the watermark that makes it trustworthy
+
+`loans.penalty_balance` carries what a loan has accrued and not yet paid, and
+the payment path now reads it into the allocation's first bucket and reduces it
+by what a payment settled. A reversal adds it back — the same amount, negated —
+so undoing a payment restores the penalty it cleared as well as the principal it
+reduced.
+
+`loans.penalty_accrued_to` is the date accrual has been computed to, and it is
+the column that makes the balance mean anything. Without a watermark, "accrue
+penalty" is a question about how many times the job has run rather than about
+the loan: run it twice on a Tuesday and the borrower owes twice as much. With
+one, the job charges the days between the watermark and the date it is asked
+about, and running it again the same day charges nothing.
+
+NULL until the first accrual, which is deliberately distinct from a watermark
+set to the disbursement date. A loan never accrued and a loan accrued to its
+first day are different states, and only the second means "the days before this
+were considered and charged nothing."
+
+Two constraints hold the pair together: a non-zero balance implies an accrual
+happened, and nothing accrues before money is lent. The first is
+one-directional, because accruing a loan that is not overdue correctly leaves
+the balance at nothing.
+
+The payments table already had `penalty_portion` and `fee_portion` columns from
+stage 8, for the same reason the allocator already had four buckets: the shape
+of the answer was anticipated even where the answer was not.
+
+**Still outstanding: the accrual job itself**, and §13.1's default values
+without which it would charge nothing anyway.
