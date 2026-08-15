@@ -94,6 +94,7 @@ export {
   previewScheduleRequestSchema,
   repaymentScheduleSchema,
   scheduleInstalmentSchema,
+  secureLoanRequestSchema,
   submitLoanRequestSchema,
   termMonthsSchema,
   type CreateLoanRequest,
@@ -108,6 +109,7 @@ export {
   type PreviewScheduleRequest,
   type RepaymentSchedule,
   type ScheduleInstalment,
+  type SecureLoanRequest,
 } from './loans.js';
 
 export {

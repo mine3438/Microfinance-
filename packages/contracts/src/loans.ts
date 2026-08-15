@@ -4,6 +4,7 @@ import { paginationQuerySchema } from './pagination.js';
 import {
   isoDateSchema,
   isoTimestampSchema,
+  nonNegativeMoneyAmountSchema,
   positiveMoneyAmountSchema,
   rateFractionSchema,
   requiredTextSchema,
@@ -116,6 +117,14 @@ export const loanSchema = z
 
     /** Null until disbursement. Moved only by recording a payment. */
     outstandingBalance: z.string().nullable(),
+    /**
+     * Compulsory savings held as security against this loan.
+     *
+     * Per loan rather than per client, which is §11.7's answer (§24.1): a loan
+     * is in one sector, so MSP2-03's per-sector provision deduction is a sum
+     * rather than a split this system would have had to invent.
+     */
+    compulsorySavingsSecured: nonNegativeMoneyAmountSchema,
 
     createdAt: isoTimestampSchema,
     updatedAt: isoTimestampSchema,
@@ -149,6 +158,13 @@ export const loanTermsSchema = z.object({
   monthlyRate: rateFractionSchema,
   termMonths: termMonthsSchema,
 });
+
+/** Setting the compulsory savings that secures a loan. */
+export const secureLoanRequestSchema = z
+  .object({ compulsorySavingsSecured: nonNegativeMoneyAmountSchema })
+  .strict();
+
+export type SecureLoanRequest = z.infer<typeof secureLoanRequestSchema>;
 
 export const createLoanRequestSchema = loanTermsSchema.strict();
 export type CreateLoanRequest = z.infer<typeof createLoanRequestSchema>;

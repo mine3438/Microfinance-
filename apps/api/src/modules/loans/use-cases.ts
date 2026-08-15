@@ -392,3 +392,24 @@ export async function disburseLoan(
 
   return { ...disbursed, schedule: toWireSchedule(schedule) };
 }
+
+/**
+ * Record the compulsory savings standing behind a loan.
+ *
+ * The cap — that a borrower cannot secure more than they hold — is enforced by
+ * a database trigger rather than here, because the question spans every loan
+ * the borrower has. Checking it in this function would be a read-then-write
+ * race, and two concurrent calls could each pass a check the pair then breaks.
+ */
+export async function secureLoan(
+  principal: Principal,
+  loanId: string,
+  amount: string,
+  loans: LoanRepository,
+): Promise<Loan> {
+  const loan = await loans.secure(principal.institutionId, principal.userId, loanId, amount);
+  if (loan === null) {
+    throw notFound('That loan does not exist.');
+  }
+  return loan;
+}

@@ -1617,6 +1617,11 @@ would.
 
 The existing validator warning stays until it is answered.
 
+**Superseded by §24.1.** The answer arrived in the same session: compulsory
+savings is a per-loan collateral amount, so the deduction is a sum over the
+loans in a sector and needs no attribution rule. It is wired, and the
+placeholder above is history rather than current behaviour.
+
 ## 24. Answers to §13
 
 Recorded here as they arrive, because §13's questions are referenced from
@@ -1661,3 +1666,23 @@ The consequence for stage 8's allocation engine is that it gains two buckets
 ahead of the two it has, and that reversals have to unwind them in the same
 order. The existing allocation is exact-decimal and tested against golden
 vectors; the new buckets join that treatment rather than sitting beside it.
+
+### 24.4 What §24.1 changed, concretely
+
+`loans.compulsory_savings_secured` records how much of a borrower's compulsory
+savings stands behind each loan, and MSP2-03's per-sector deduction is a sum
+over it — restricted to the loans that form actually reports, so a loan
+disbursed after the quarter end brings no security onto that return and a
+settled loan releases what secured it.
+
+One invariant needed a **trigger rather than a CHECK**, because it spans rows:
+the total secured across a borrower's loans may not exceed their compulsory
+savings balance. Without it two loans could each claim the same shilling and
+MSP2-03 would deduct it twice — reporting a smaller provision than the
+institution owes, which is the direction of error a regulator cares about. It
+is not checked in the use case, because a read-then-write check races: two
+concurrent calls could each pass it and the pair still break it.
+
+The savings balance itself is unchanged by any of this. The money is in the
+savings account, reported on MSP2-01 Sno46 and MSP2-10; the loan records only
+how much of it is pledged.

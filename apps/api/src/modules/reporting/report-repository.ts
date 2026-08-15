@@ -20,6 +20,7 @@ import {
   type ReferralDestination,
   type ReportingPeriod,
   type ResolutionRoute,
+  type SectorCollateral,
   type SectorWriteOff,
   classifyByDaysOverdue,
   type ProvisioningBand,
@@ -158,6 +159,8 @@ export interface PortfolioSnapshot {
   readonly geographic: readonly GeographicExposure[];
   readonly presence: readonly DistrictPresence[];
   readonly writeOffs: readonly SectorWriteOff[];
+  /** Compulsory savings secured against the loans outstanding at period end. */
+  readonly collateral: readonly SectorCollateral[];
   /** When classifications were last recomputed, for the freshness gate. */
   readonly classificationsUpdatedAt: Date | null;
   /** Active branches with no BOT district, which MSP2-10 cannot place. */
@@ -309,6 +312,7 @@ export class PostgresReportRepository implements ReportRepository {
         disbursed,
         presence,
         compulsorySavings,
+        collateral,
         writeOffs,
         health,
         unlocated,
@@ -356,6 +360,24 @@ export class PostgresReportRepository implements ReportRepository {
             WHERE p.is_compulsory
               AND t.transaction_date <= $1
             GROUP BY c.district_code`,
+          [period.endDate],
+        ),
+        // The security BOT deducts from the provision, by the sector of the
+        // loan it stands behind — which is what §24.1's answer makes a sum
+        // rather than an attribution.
+        //
+        // Restricted to the loans MSP2-03 actually reports: one disbursed after
+        // the quarter end is not on this return, and neither is its security. A
+        // settled loan releases what secured it.
+        client.query<{ sector_code: string; amount: string }>(
+          `SELECT c.sector_code, sum(l.compulsory_savings_secured) AS amount
+             FROM loans l
+             JOIN clients c ON c.id = l.client_id
+            WHERE l.compulsory_savings_secured > 0
+              AND l.disbursement_date IS NOT NULL
+              AND l.disbursement_date <= $1
+              AND l.status NOT IN ('completed', 'written_off', 'rejected')
+            GROUP BY c.sector_code`,
           [period.endDate],
         ),
         client.query<{ sector_code: string; amount: string }>(
@@ -508,6 +530,10 @@ export class PostgresReportRepository implements ReportRepository {
         geographic: [...geographic.values()],
         presence: districtPresence(presence.rows, compulsorySavings.rows),
         writeOffs: writeOffs.rows.map((row) => ({
+          sectorCode: row.sector_code,
+          amount: Money.fromDatabaseValue(row.amount),
+        })),
+        collateral: collateral.rows.map((row) => ({
           sectorCode: row.sector_code,
           amount: Money.fromDatabaseValue(row.amount),
         })),

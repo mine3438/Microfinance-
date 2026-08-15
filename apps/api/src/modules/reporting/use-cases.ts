@@ -195,9 +195,7 @@ export function compileForms(
     sectorCodes: snapshot.sectorCodes,
     exposures: snapshot.classifiedExposures,
     writeOffs: snapshot.writeOffs,
-    // Nil until savings exist (stage 15). The validator warns rather than
-    // assuming an institution holds no security.
-    collateral: [],
+    collateral: snapshot.collateral,
   });
 
   const msp2_04 = compileMsp2_04({

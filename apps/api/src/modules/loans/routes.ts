@@ -6,6 +6,7 @@ import {
   loanProductSchema,
   loanSchema,
   loanWithScheduleSchema,
+  secureLoanRequestSchema,
   pageSchema,
   previewScheduleRequestSchema,
   repaymentScheduleSchema,
@@ -25,6 +26,7 @@ import {
   getLoan,
   listLoans,
   previewSchedule,
+  secureLoan,
   submitLoan,
 } from './use-cases.js';
 
@@ -161,6 +163,33 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
 
       return loanWithScheduleSchema.parse(
         await disburseLoan(principalOf(request), loanIdOf(request), body.data, loans),
+      );
+    },
+  );
+
+  /**
+   * Record the compulsory savings standing behind a loan.
+   *
+   * `loan.create` rather than `savings.manage`: this says what secures a loan,
+   * not what a client holds. The money itself moves through the savings ledger,
+   * and the database refuses more security than the borrower actually has.
+   */
+  app.put(
+    '/loans/:id/collateral',
+    { preHandler: [authenticated, requirePermission('loan.create')] },
+    async (request): Promise<unknown> => {
+      const body = secureLoanRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That security cannot be recorded as entered.');
+      }
+
+      return loanSchema.parse(
+        await secureLoan(
+          principalOf(request),
+          loanIdOf(request),
+          body.data.compulsorySavingsSecured,
+          loans,
+        ),
       );
     },
   );

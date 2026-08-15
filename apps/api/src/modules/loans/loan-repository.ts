@@ -35,6 +35,7 @@ interface LoanRow {
   disbursed_by: string | null;
   disbursement_date: Date | null;
   outstanding_balance: string | null;
+  compulsory_savings_secured: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -63,7 +64,7 @@ const LOAN_PROJECTION = `
          l.principal, l.monthly_rate, l.interest_method, l.term_months,
          l.status, l.submitted_by, l.submitted_at, l.decided_by, l.decided_at,
          l.rejection_reason, l.disbursed_by, l.disbursement_date,
-         l.outstanding_balance, l.created_at, l.updated_at
+         l.outstanding_balance, l.compulsory_savings_secured, l.created_at, l.updated_at
     FROM loans l
     JOIN branches b ON b.id = l.branch_id
     JOIN clients  c ON c.id = l.client_id
@@ -100,6 +101,7 @@ function toLoan(row: LoanRow): Loan {
     disbursedBy: row.disbursed_by,
     disbursementDate: row.disbursement_date === null ? null : formatDateOnly(row.disbursement_date),
     outstandingBalance: row.outstanding_balance,
+    compulsorySavingsSecured: row.compulsory_savings_secured,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -146,6 +148,13 @@ export interface LoanRepository {
     productId: string,
   ): Promise<ApplicationContext | null>;
   create(institutionId: string, userId: string, loan: NewLoan): Promise<Loan>;
+  /** Record the compulsory savings standing behind a loan (§24.1). */
+  secure(
+    institutionId: string,
+    userId: string,
+    loanId: string,
+    amount: string,
+  ): Promise<Loan | null>;
   submit(institutionId: string, userId: string, loanId: string): Promise<Loan | null>;
   approve(institutionId: string, userId: string, loanId: string): Promise<Loan | null>;
   reject(
@@ -401,6 +410,29 @@ export class PostgresLoanRepository implements LoanRepository {
    * standing in for a transaction (analysis R3). A loan active with no schedule
    * is a borrower with no instalments to pay and a balance nobody can reconcile.
    */
+  /**
+   * Record the security held against a loan.
+   *
+   * The amount is not validated here beyond its sign: a database trigger
+   * refuses more than the borrower actually holds in compulsory savings, and it
+   * has to, because the question spans every loan the borrower has and two of
+   * them claiming the same shilling would make MSP2-03 deduct it twice.
+   */
+  public async secure(
+    institutionId: string,
+    userId: string,
+    loanId: string,
+    amount: string,
+  ): Promise<Loan | null> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const updated = await client.query(
+        'UPDATE loans SET compulsory_savings_secured = $2 WHERE id = $1',
+        [loanId, amount],
+      );
+      return updated.rowCount === 0 ? null : this.findWithin(client, loanId);
+    });
+  }
+
   public async disburse(
     institutionId: string,
     userId: string,

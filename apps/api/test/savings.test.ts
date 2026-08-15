@@ -146,7 +146,7 @@ async function tokenFor(user: SeededUser): Promise<string> {
 }
 
 const request = async (
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   url: string,
   token: string,
   payload?: Record<string, unknown>,
@@ -371,6 +371,107 @@ describe('compulsory savings on the return', () => {
     // BOT asks for compulsory savings specifically. Voluntary balances are a
     // liability the institution has, but not this line of the form.
     expect(after).toBe(before);
+  });
+});
+
+describe('compulsory savings as security', () => {
+  /**
+   * A sanctioning limit for the branch manager.
+   *
+   * `approval_thresholds` is seeded empty on purpose — §13.3's figures belong to
+   * the institution and inventing a default would be inventing a lending policy
+   * — and the absence of a row means no authority rather than unlimited
+   * authority. So a suite that needs a loan approved has to state a limit.
+   */
+  async function allowApprovalsUpTo(amount: string): Promise<void> {
+    await harness.database.withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO approval_thresholds (institution_id, role_code, max_principal)
+         VALUES ($1, 'branch_manager', $2)
+         ON CONFLICT (institution_id, role_code)
+         DO UPDATE SET max_principal = EXCLUDED.max_principal`,
+        [officer.institutionId, amount],
+      );
+    });
+  }
+
+  /** A disbursed loan for the seeded client, so MSP2-03 has something to net. */
+  async function disbursedLoan(principal: string): Promise<string> {
+    await allowApprovalsUpTo('10000000.00');
+
+    const productId = await harness.database.withTransaction(async (client) => {
+      const row = await client.query<{ id: string }>(
+        `INSERT INTO loan_products
+           (institution_id, code, name, bot_loan_type, interest_method,
+            min_monthly_rate, max_monthly_rate, min_term_months, max_term_months,
+            min_principal, max_principal)
+         VALUES ($1, $2, 'Savings Suite Product', 'agriculture_loans', 'flat',
+                 0.0100, 0.1000, 1, 60, 100000.00, 5000000.00)
+         RETURNING id`,
+        [officer.institutionId, `SAV${randomUUID().slice(0, 5)}`],
+      );
+      return row.rows[0]!.id;
+    });
+
+    const loan = (
+      await request('POST', '/loans', officerToken, {
+        clientId,
+        productId,
+        principal,
+        monthlyRate: '0.0200',
+        termMonths: 6,
+      })
+    ).json<{ id: string }>();
+
+    await request('POST', `/loans/${loan.id}/submit`, officerToken);
+    await request('POST', `/loans/${loan.id}/decision`, managerToken, { decision: 'approve' });
+    await request('POST', `/loans/${loan.id}/disbursement`, adminToken, {
+      disbursementDate: '2026-02-02',
+    });
+
+    return loan.id;
+  }
+
+  it('refuses to secure more than the borrower actually holds', async () => {
+    const account = await openAccount(compulsory.id, '2026-02-01');
+    await deposit(account.id, '30000.00', '2026-02-01');
+    const loanId = await disbursedLoan('500000.00');
+
+    const response = await request('PUT', `/loans/${loanId}/collateral`, officerToken, {
+      compulsorySavingsSecured: '5000000.00',
+    });
+
+    // A cross-row invariant, so a database trigger rather than a check in a use
+    // case: two loans claiming the same shilling would make MSP2-03 deduct it
+    // twice, and a read-then-write check would race.
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+  });
+
+  it('deducts the security from the sector’s provision on MSP2-03', async () => {
+    const account = await openAccount(compulsory.id, '2026-02-01');
+    await deposit(account.id, '900000.00', '2026-02-01');
+    const loanId = await disbursedLoan('600000.00');
+
+    const secured = await request('PUT', `/loans/${loanId}/collateral`, officerToken, {
+      compulsorySavingsSecured: '20000.00',
+    });
+    expect(secured.statusCode).toBe(200);
+
+    const compiled = (
+      await request('GET', '/reports/msp2/2026/1', accountantToken)
+    ).json<CompiledReturn>();
+
+    const agriculture = compiled.msp2_03.rows.find((row) => row.sectorCode === 'agriculture');
+    expect(agriculture?.collateral).toBe('20000.00');
+    // Net provision is the gross less the security, floored at zero — the
+    // deduction BOT's form asks for, which was nil before §24.1 settled where
+    // compulsory savings attaches.
+    expect(Money.of(agriculture?.netProvision ?? '0').toString()).toBe(
+      Money.max(
+        Money.of(agriculture?.grossProvision ?? '0').minus(Money.of('20000.00')),
+        Money.zero(),
+      ).toString(),
+    );
   });
 });
 
