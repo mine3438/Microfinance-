@@ -210,6 +210,9 @@ export type {
   Msp2_10Row,
 } from './reporting/msp2-10.js';
 
+export { accruePenalty } from './lending/penalty.js';
+export type { OverdueInstalment, PenaltyAccrual, PenaltyTerms } from './lending/penalty.js';
+
 export {
   SAVINGS_DIRECTIONS,
   applyEntry,

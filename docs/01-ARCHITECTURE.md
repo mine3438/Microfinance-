@@ -1686,3 +1686,45 @@ concurrent calls could each pass it and the pair still break it.
 The savings balance itself is unchanged by any of this. The money is in the
 savings account, reported on MSP2-01 Sno46 and MSP2-10; the loan records only
 how much of it is pledged.
+
+### 24.5 The penalty mechanism, without the figures
+
+§13.1's shape is built; §13.1's **values are still outstanding**, and the split
+between those two is the point of this increment.
+
+`loan_products` gains `penalty_daily_rate`, `penalty_grace_days` and
+`penalty_cap_fraction`, all **nullable, all unseeded**. A product with no terms
+charges nothing. Inventing a plausible rate would put a fabricated charge on a
+borrower's account, which is the failure §13 exists to prevent — so the columns
+wait for the institution to fill them.
+
+Two constraints keep a half-configured product from looking configured: terms
+are whole or absent (`(rate IS NULL) = (grace IS NULL)`), and a cap without
+terms to cap is refused. A grace period with no rate would charge nothing while
+reading on screen as a deliberate policy, which is worse than an empty field.
+
+**The basis and the accrual method are not columns.** Overdue-instalment basis
+and simple daily non-compounding accrual are §13.1's answer, not a per-product
+choice, and a column would invite a second answer to a question that has one.
+Changing either is a migration and a domain change together.
+
+`accruePenalty` in the domain does the arithmetic, and three properties are
+worth naming because each is a decision:
+
+- **The base is the overdue instalment**, so two missed instalments accrue
+  separately from when each fell due, rather than as one arrears figure from the
+  earliest date.
+- **Rounded once over the whole period**, not once per day. A daily charge of a
+  third of a cent rounds to nothing per day and to three cents over ten days;
+  rounding per day would bill a cent a day and drift from the agreement's own
+  arithmetic in the institution's favour.
+- **As at a date**, like every other figure here. Re-running the accrual cannot
+  change a figure already reported.
+
+The rate is a plain decimal fraction rather than a `Rate`, because `Rate` in
+this codebase means a *monthly* interest rate — it converts to monthly
+percentages and annualises for MSP2-04. A daily penalty rate borrowing the type
+would inherit arithmetic that means something else.
+
+Still to come: the penalty balance on a loan, the accrual job, and the
+allocation redesign to §24.3's order.
