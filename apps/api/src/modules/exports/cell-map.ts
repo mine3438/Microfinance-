@@ -117,13 +117,16 @@ export class PostgresCellMapRepository implements CellMapRepository {
     // Reference data, identical for every tenant, so this is the one read in
     // the reporting path that is not tenant-scoped. No institution's figures
     // pass through it.
-    const [sheets, columns, rows, sections] = await this.database.withTransaction(async (client) =>
-      Promise.all([
-        client.query<SheetRow>(SHEETS_SELECT),
-        client.query<ColumnRow>(COLUMNS_SELECT),
-        client.query<RowRow>(ROWS_SELECT),
-        client.query<SectionRow>(SECTIONS_SELECT),
-      ]),
+    // Sequential, not `Promise.all`: a pooled client is one connection and
+    // cannot run two statements at once. The driver serialises them anyway and
+    // warns that it will stop doing so, so the parallelism was never real.
+    const [sheets, columns, rows, sections] = await this.database.withTransaction(
+      async (client) => [
+        await client.query<SheetRow>(SHEETS_SELECT),
+        await client.query<ColumnRow>(COLUMNS_SELECT),
+        await client.query<RowRow>(ROWS_SELECT),
+        await client.query<SectionRow>(SECTIONS_SELECT),
+      ],
     );
 
     const byForm = new Map<string, MutableSheet>();

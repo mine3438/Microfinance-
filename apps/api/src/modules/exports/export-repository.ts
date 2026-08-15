@@ -82,14 +82,17 @@ export class PostgresExportRepository implements ExportRepository {
     // the export path that is not tenant-scoped. No institution's figures pass
     // through it.
     this.cached ??= await this.database.withTransaction(async (client) => {
-      const [institutions, sectors, loanTypes, districts, regions, natures] = await Promise.all([
-        client.query<NameRow>(INSTITUTIONS_SELECT),
-        client.query<NameRow>(SECTORS_SELECT),
-        client.query<NameRow>(LOAN_TYPES_SELECT),
-        client.query<NameRow>(DISTRICTS_SELECT),
-        client.query<NameRow>(REGIONS_SELECT),
-        client.query<NameRow>(NATURES_SELECT),
-      ]);
+      // Sequential, not `Promise.all`. A pooled client is a single connection
+      // and cannot run two statements at once: the driver serialises them and
+      // warns that doing so is deprecated, so the parallelism was never real
+      // and would break on the next major version. Six small reference reads,
+      // once per process.
+      const institutions = await client.query<NameRow>(INSTITUTIONS_SELECT);
+      const sectors = await client.query<NameRow>(SECTORS_SELECT);
+      const loanTypes = await client.query<NameRow>(LOAN_TYPES_SELECT);
+      const districts = await client.query<NameRow>(DISTRICTS_SELECT);
+      const regions = await client.query<NameRow>(REGIONS_SELECT);
+      const natures = await client.query<NameRow>(NATURES_SELECT);
 
       const byCode = (rows: { rows: NameRow[] }): ReadonlyMap<string, string> =>
         new Map(rows.rows.map((row) => [row.code, row.name]));

@@ -1810,3 +1810,24 @@ overdue, from the same dates.
 
 What remains is the job that walks the book and persists the result — repository
 work rather than a decision, and idle until §13.1's values arrive.
+
+## 25. Hardening notes
+
+### 25.1 A pooled client cannot run two queries at once
+
+Several repositories issued their reads through `Promise.all` on a single
+transaction client. That parallelism was never real: a `pg.PoolClient` is one
+connection, the driver serialises concurrent statements on it, and it warns —
+loudly, across every test run — that it will stop doing so in `pg@9`. The
+results were correct; the shape was a latent break on the next major version and
+a misleading claim about what the code does.
+
+The two reference-data reads that ran once per process are now sequential — six
+small lookups on process start, where the notional saving was nothing at all.
+
+**Three sites in `report-repository.ts` are not yet converted.** They are the
+snapshot's own reads, and each `Promise.all` argument carries load-bearing
+comments between its elements, so the transformation is a careful manual edit
+rather than a mechanical one. They behave correctly today, and are recorded here
+rather than half-done: a partially converted file would leave a reader unsure
+whether the remaining ones were deliberate.
