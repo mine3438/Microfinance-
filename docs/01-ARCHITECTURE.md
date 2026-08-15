@@ -1785,3 +1785,28 @@ of the answer was anticipated even where the answer was not.
 
 **Still outstanding: the accrual job itself**, and §13.1's default values
 without which it would charge nothing anyway.
+
+### 24.8 Which instalments are overdue is derived, not stored
+
+A repayment in this system settles penalty, then interest, then principal
+*across the loan* — it is not applied to a named instalment. So "which
+instalment is unpaid" is not a stored fact, and the penalty engine needs it.
+
+`overdueInstalments` derives it the way arrears always are: run the schedule
+forward, run the receipts against it, and the shortfall lands on the oldest
+instalments first. That is the **same** cumulative-schedule-versus-receipts
+method the reporting layer already uses to derive days overdue for MSP2-03's
+classification, and reusing it rather than writing a second one is deliberate.
+Two ways of deciding what is overdue would eventually disagree, and one of them
+would be charging a borrower.
+
+Instalments not yet due are excluded, so a borrower who has paid nothing owes
+penalty on what has fallen due rather than on the whole schedule — and paying
+ahead settles what is due without making a future instalment overdue.
+
+A test runs the two functions together and pins the property that matters end to
+end: penalty is charged on the same instalments the arrears calculation calls
+overdue, from the same dates.
+
+What remains is the job that walks the book and persists the result — repository
+work rather than a decision, and idle until §13.1's values arrive.

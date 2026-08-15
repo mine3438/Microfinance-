@@ -141,3 +141,57 @@ export function accruePenalty(
 
   return { total: ceiling, capped: uncapped.minus(ceiling), chargeableDays };
 }
+
+/** One scheduled instalment, reduced to what arrears arithmetic needs. */
+export interface ScheduledAmount {
+  /** `YYYY-MM-DD`. */
+  readonly dueDate: string;
+  readonly totalDue: Money;
+}
+
+/**
+ * Which instalments are overdue, and by how much, as at a date.
+ *
+ * Payments are not applied to particular instalments in this system — a
+ * repayment settles penalty, then interest, then principal across the loan —
+ * so "which instalment is unpaid" is not a stored fact. It is derived the way
+ * arrears always are: run the schedule forward, run the receipts against it,
+ * and the shortfall lands on the oldest instalments first.
+ *
+ * That is the same cumulative-schedule-versus-receipts method the reporting
+ * layer uses to derive days overdue, and using it here rather than a second
+ * method is deliberate. Two ways of deciding what is overdue would eventually
+ * disagree, and one of them would be charging a borrower.
+ *
+ * Instalments not yet due are excluded, so a borrower who has paid nothing owes
+ * penalty on what has fallen due rather than on the whole schedule.
+ */
+export function overdueInstalments(
+  schedule: readonly ScheduledAmount[],
+  totalReceived: Money,
+  asAt: string,
+): OverdueInstalment[] {
+  const due = schedule
+    .filter((instalment) => instalment.dueDate <= asAt)
+    .slice()
+    .sort((left, right) => left.dueDate.localeCompare(right.dueDate));
+
+  let remaining = totalReceived;
+  const overdue: OverdueInstalment[] = [];
+
+  for (const instalment of due) {
+    if (remaining.greaterThanOrEqual(instalment.totalDue)) {
+      // Fully covered by receipts so far; nothing of it is outstanding.
+      remaining = remaining.minus(instalment.totalDue);
+      continue;
+    }
+
+    overdue.push({
+      outstanding: instalment.totalDue.minus(remaining),
+      dueDate: instalment.dueDate,
+    });
+    remaining = Money.zero();
+  }
+
+  return overdue;
+}

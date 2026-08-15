@@ -2,7 +2,13 @@ import { Money } from '@mfi/money';
 import { describe, expect, it } from 'vitest';
 
 import { DomainValidationError } from '../errors.js';
-import { accruePenalty, type OverdueInstalment, type PenaltyTerms } from './penalty.js';
+import {
+  accruePenalty,
+  overdueInstalments,
+  type OverdueInstalment,
+  type PenaltyTerms,
+  type ScheduledAmount,
+} from './penalty.js';
 
 /**
  * Penalty accrual, in §13.1's confirmed shape.
@@ -180,5 +186,67 @@ describe('accruePenalty', () => {
         '2026-04-01',
       ),
     ).toThrow(DomainValidationError);
+  });
+});
+
+describe('overdueInstalments', () => {
+  const monthly = (dueDate: string, totalDue = '50000.00'): ScheduledAmount => ({
+    dueDate,
+    totalDue: Money.of(totalDue),
+  });
+
+  const schedule = [monthly('2026-01-31'), monthly('2026-02-28'), monthly('2026-03-31')];
+
+  it('excludes instalments that have not fallen due', () => {
+    // A borrower who has paid nothing owes penalty on what has fallen due, not
+    // on the whole schedule.
+    const overdue = overdueInstalments(schedule, Money.zero(), '2026-02-15');
+
+    expect(overdue.map((instalment) => instalment.dueDate)).toEqual(['2026-01-31']);
+  });
+
+  it('applies receipts to the oldest instalment first', () => {
+    // Payments settle penalty, interest and principal across the loan rather
+    // than against a named instalment, so which instalment is unpaid is derived
+    // — schedule forward, receipts against it, shortfall on the oldest.
+    const overdue = overdueInstalments(schedule, Money.of('50000.00'), '2026-03-31');
+
+    expect(overdue.map((instalment) => instalment.dueDate)).toEqual(['2026-02-28', '2026-03-31']);
+  });
+
+  it('reports a part-paid instalment as owing the remainder', () => {
+    const overdue = overdueInstalments(schedule, Money.of('70000.00'), '2026-02-28');
+
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0]?.dueDate).toBe('2026-02-28');
+    expect(overdue[0]?.outstanding.toString()).toBe('30000.00');
+  });
+
+  it('reports nothing overdue when receipts cover everything due', () => {
+    expect(overdueInstalments(schedule, Money.of('100000.00'), '2026-02-28')).toEqual([]);
+  });
+
+  it('does not let an overpayment reach an instalment that is not yet due', () => {
+    // Paying ahead settles what is due; it does not make a future instalment
+    // overdue, and it does not make the loan owe a negative amount.
+    const overdue = overdueInstalments(schedule, Money.of('500000.00'), '2026-02-28');
+
+    expect(overdue).toEqual([]);
+  });
+
+  it('feeds the accrual, so an arrears figure and a penalty agree', () => {
+    // The property that matters end to end: penalty is charged on the same
+    // instalments the arrears calculation calls overdue, from the same dates.
+    const overdue = overdueInstalments(schedule, Money.zero(), '2026-03-31');
+    const accrual = accruePenalty(
+      overdue,
+      { dailyRate: '0.0010', graceDays: 0, capFraction: null },
+      Money.of('150000.00'),
+      '2026-03-31',
+    );
+
+    // 59, 31 and 0 chargeable days on 50,000 each.
+    expect(accrual.chargeableDays).toEqual([59, 31, 0]);
+    expect(accrual.total.toString()).toBe('4500.00');
   });
 });
