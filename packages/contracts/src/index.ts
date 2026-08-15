@@ -175,6 +175,29 @@ export {
 } from './statements.js';
 
 export {
+  SAVINGS_ACCOUNT_STATUSES,
+  SAVINGS_DIRECTIONS,
+  createSavingsProductRequestSchema,
+  openSavingsAccountRequestSchema,
+  recordSavingsEntryRequestSchema,
+  reverseSavingsEntryRequestSchema,
+  savingsAccountListQuerySchema,
+  savingsAccountSchema,
+  savingsProductSchema,
+  savingsTransactionSchema,
+  type CreateSavingsProductRequest,
+  type OpenSavingsAccountRequest,
+  type RecordSavingsEntryRequest,
+  type ReverseSavingsEntryRequest,
+  type SavingsAccount,
+  type SavingsAccountListQuery,
+  type SavingsAccountStatus,
+  type SavingsDirection,
+  type SavingsProduct,
+  type SavingsTransaction,
+} from './savings.js';
+
+export {
   COMPLAINT_STATES,
   REFERRAL_DESTINATIONS,
   RESOLUTION_ROUTES,

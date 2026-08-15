@@ -1532,3 +1532,87 @@ being deleted. A client that stopped reading it would present a partial return
 as a complete one the next time a form went missing, and the institution would
 find out at the filing desk — which is the failure §11 introduced the field to
 prevent.
+
+## 23. Amendments — Savings Stage
+
+### 23.1 Less than a savings subsystem, on purpose
+
+§13.4 asks for the interest rate basis, the accrual frequency, the minimum
+balance, the withdrawal rules and whether savings can secure a loan. None of
+those are answered, so **none of them are built**. There is no interest anywhere
+in this stage: a balance is what was paid in less what was taken out.
+
+What is built is what BOT's return could not be filed without. Compulsory
+savings appears on three forms — MSP2-01 Sno46, MSP2-03's provision deduction,
+and MSP2-10's per-district column — and until now all three reported nil with a
+validator warning saying so.
+
+Two rules are enforced that §13.4 does not cover, and neither is a product
+decision:
+
+- **A balance cannot go negative.** A negative savings balance is an overdraft,
+  which is a lending product this institution does not offer, and one would turn
+  money owed *to* a client into money owed *by* them — the wrong side of
+  MSP2-01. Whether a client may draw their compulsory savings to nothing *while
+  a loan is outstanding* is a different question, and that one is §13.4's.
+- **An entry cannot be dated in the future.** MSP2-10 reports the balance as at
+  a quarter end; a figure dated next month would appear on no return until that
+  month arrives, and then on one that may already have been filed.
+
+### 23.2 Compulsory is a flag, because it decides what gets reported
+
+`savings_products.is_compulsory` is a column rather than a naming convention. It
+decides whether a balance appears on three BOT forms or on none, so a product
+misfiled as voluntary silently removes money from a regulatory return. Defining
+a product is therefore `settings.manage`, not `savings.manage` — an
+institution-level decision rather than something done between transactions.
+
+### 23.3 Two opposite groupings on the same form
+
+MSP2-10 groups branches and employees by **where the branch is**, and compulsory
+savings by **where the saver is**. That is deliberate, not an inconsistency:
+counting branches by the districts their clients live in would file four
+branches where there is one (§18 recorded that), while counting savings by the
+branch's district would report a Karatu farmer's savings in Arusha City.
+
+A district can have one and not the other — an institution lends into districts
+it has no office in — so the two are merged as a **union of both key sets**.
+Looking savings up from the branch list would drop a district that has savings
+and no branch, and the money with it.
+
+### 23.4 As at the quarter end, from the ledger
+
+The per-district figure is summed from the dated ledger, not read from
+`savings_accounts.balance`. That column is as at *today*; the return needs as at
+*the quarter end*, and restating a filed quarter has to give the figure that
+quarter had. It is the same discipline MSP2-06's roll-forward follows and the
+same one the loan book's point-in-time restatement uses.
+
+The balance column still exists, and is authoritative for the overdraft check —
+because that check has to be atomic with the withdrawal that would breach it. A
+`SUM` taken before the write is a race; a column with a `CHECK` is not. The
+account row is locked with `FOR UPDATE` before its balance is read, so two
+tellers emptying the same account serialise instead of both seeing the balance
+that existed before either of them.
+
+Three layers hold one rule — the domain states it, the lock makes it meaningful
+under concurrency, the constraint catches a future path that forgets both — and
+that is not duplication so much as defence in depth around the only figure in
+this module a client would notice being wrong.
+
+### 23.5 MSP2-03's collateral deduction is still nil, and that is a decision
+
+BOT deducts "Cash Collateral / Insurance Guarantee / Compulsory Savings" from
+the provision on MSP2-03, **per sector**. This stage does not wire it, and the
+reason is §11.7: whether compulsory savings is a savings-product attribute, a
+per-loan collateral amount, or both, has not been settled. Under the first
+reading a client with two loans in different sectors has no defined split of
+their savings between them, and any split this system chose would be invented.
+
+Leaving it nil **over-provisions**, which is the safe direction to be wrong on a
+regulatory return: it overstates the allowance for probable losses rather than
+understating it, and an institution that reports a larger provision than it owes
+has not misled its regulator in its own favour. Getting it wrong the other way
+would.
+
+The existing validator warning stays until it is answered.

@@ -305,20 +305,29 @@ export class PostgresReportRepository implements ReportRepository {
         );
       }
 
-      const [disbursed, presence, writeOffs, health, unlocated, lines, entries, balances] =
-        await Promise.all([
-          client.query<{ sector_code: string; gender: Gender; principal: string }>(
-            `SELECT c.sector_code, c.gender, l.principal
+      const [
+        disbursed,
+        presence,
+        compulsorySavings,
+        writeOffs,
+        health,
+        unlocated,
+        lines,
+        entries,
+        balances,
+      ] = await Promise.all([
+        client.query<{ sector_code: string; gender: Gender; principal: string }>(
+          `SELECT c.sector_code, c.gender, l.principal
              FROM loans l JOIN clients c ON c.id = l.client_id
             WHERE l.disbursement_date BETWEEN $1 AND $2`,
-            [period.startDate, period.endDate],
-          ),
-          // Branches counted where the branch is, and staff counted where their
-          // branch is. Grouping by the districts a branch's *clients* live in
-          // would count one Arusha branch four times over — once per district it
-          // lends into — and file four branches where there is one.
-          client.query<{ district_code: string; branch_count: string; employee_count: string }>(
-            `SELECT b.district_code,
+          [period.startDate, period.endDate],
+        ),
+        // Branches counted where the branch is, and staff counted where their
+        // branch is. Grouping by the districts a branch's *clients* live in
+        // would count one Arusha branch four times over — once per district it
+        // lends into — and file four branches where there is one.
+        client.query<{ district_code: string; branch_count: string; employee_count: string }>(
+          `SELECT b.district_code,
                   count(DISTINCT b.id)::text AS branch_count,
                   count(DISTINCT u.id)::text AS employee_count
              FROM branches b
@@ -326,62 +335,84 @@ export class PostgresReportRepository implements ReportRepository {
             WHERE b.status = 'active'
               AND b.district_code IS NOT NULL
             GROUP BY b.district_code`,
-          ),
-          client.query<{ sector_code: string; amount: string }>(
-            // The only record of what a write-off was worth and when it happened.
-            // The domain-event seam was built in stage 8 for a ledger that does
-            // not exist yet; this is its first real consumer.
-            `SELECT c.sector_code, sum((e.payload->>'outstanding')::numeric) AS amount
+        ),
+        // Compulsory savings, by the *client's* district and as at the quarter
+        // end — the opposite grouping from branches above, and deliberately.
+        // BOT's column E is money the institution holds for savers, so it
+        // belongs where the saver is, not where the branch is.
+        //
+        // Summed from the dated ledger rather than read from
+        // `savings_accounts.balance`, because that column is as at today and
+        // this figure is as at the quarter end. Restating an old quarter has
+        // to give the answer that quarter had.
+        client.query<{ district_code: string; amount: string }>(
+          `SELECT c.district_code,
+                  sum(CASE t.direction WHEN 'deposit' THEN t.amount ELSE -t.amount END)
+                    AS amount
+             FROM savings_transactions t
+             JOIN savings_accounts a ON a.id = t.savings_account_id
+             JOIN savings_products p ON p.id = a.product_id
+             JOIN clients c ON c.id = a.client_id
+            WHERE p.is_compulsory
+              AND t.transaction_date <= $1
+            GROUP BY c.district_code`,
+          [period.endDate],
+        ),
+        client.query<{ sector_code: string; amount: string }>(
+          // The only record of what a write-off was worth and when it happened.
+          // The domain-event seam was built in stage 8 for a ledger that does
+          // not exist yet; this is its first real consumer.
+          `SELECT c.sector_code, sum((e.payload->>'outstanding')::numeric) AS amount
              FROM domain_events e
              JOIN loans l ON l.id = e.aggregate_id
              JOIN clients c ON c.id = l.client_id
             WHERE e.event_type = 'loan.written_off'
               AND e.occurred_at::date BETWEEN $1 AND $2
             GROUP BY c.sector_code`,
-            [period.startDate, period.endDate],
-          ),
-          client.query<{ classifications_updated_at: Date | null }>(
-            `SELECT classifications_updated_at FROM system_health WHERE institution_id = $1`,
-            [institutionId],
-          ),
-          client.query<{ count: string }>(
-            `SELECT count(*)::text AS count
+          [period.startDate, period.endDate],
+        ),
+        client.query<{ classifications_updated_at: Date | null }>(
+          `SELECT classifications_updated_at FROM system_health WHERE institution_id = $1`,
+          [institutionId],
+        ),
+        client.query<{ count: string }>(
+          `SELECT count(*)::text AS count
              FROM branches
             WHERE status = 'active' AND district_code IS NULL`,
-          ),
-          client.query<{
-            sno: number;
-            label: string;
-            is_computed: boolean;
-            entry_direction: 'income' | 'expense' | null;
-          }>(
-            `SELECT sno, label, is_computed, entry_direction
+        ),
+        client.query<{
+          sno: number;
+          label: string;
+          is_computed: boolean;
+          entry_direction: 'income' | 'expense' | null;
+        }>(
+          `SELECT sno, label, is_computed, entry_direction
              FROM reference.form_lines WHERE form_code = 'MSP2-02' ORDER BY sno`,
-          ),
-          // From the start of the fiscal year, because MSP2-02's second column
-          // is year-to-date. The quarter column is cut from the same rows by the
-          // compiler, which is only possible because entries carry a date.
-          client.query<{
-            sno: number;
-            direction: 'income' | 'expense';
-            amount: string;
-            entry_date: Date;
-          }>(
-            `SELECT sno, direction, amount, entry_date
+        ),
+        // From the start of the fiscal year, because MSP2-02's second column
+        // is year-to-date. The quarter column is cut from the same rows by the
+        // compiler, which is only possible because entries carry a date.
+        client.query<{
+          sno: number;
+          direction: 'income' | 'expense';
+          amount: string;
+          entry_date: Date;
+        }>(
+          `SELECT sno, direction, amount, entry_date
              FROM finance_entries
             WHERE entry_date BETWEEN $1 AND $2`,
-            [fiscalYearStart, period.endDate],
-          ),
-          client.query<{
-            holding_kind: HoldingKind;
-            counterparty: string;
-            institution_code: string | null;
-            currency_code: string;
-            deposit_balance_tzs: string;
-            borrowing_balance_tzs: string;
-            agent_banking_balance: string;
-          }>(
-            `SELECT a.holding_kind,
+          [fiscalYearStart, period.endDate],
+        ),
+        client.query<{
+          holding_kind: HoldingKind;
+          counterparty: string;
+          institution_code: string | null;
+          currency_code: string;
+          deposit_balance_tzs: string;
+          borrowing_balance_tzs: string;
+          agent_banking_balance: string;
+        }>(
+          `SELECT a.holding_kind,
                   COALESCE(f.name, a.counterparty_name) AS counterparty,
                   a.institution_code,
                   a.currency_code,
@@ -392,9 +423,9 @@ export class PostgresReportRepository implements ReportRepository {
              JOIN bank_accounts a ON a.id = v.bank_account_id
              LEFT JOIN reference.financial_institutions f ON f.code = a.institution_code
             WHERE v.year = $1 AND v.quarter = $2`,
-            [period.year, period.quarter],
-          ),
-        ]);
+          [period.year, period.quarter],
+        ),
+      ]);
 
       const [agentBankingCodes, statementLines, enteredLines, natures, complaints] =
         await Promise.all([
@@ -475,14 +506,7 @@ export class PostgresReportRepository implements ReportRepository {
           principal: Money.fromDatabaseValue(row.principal),
         })),
         geographic: [...geographic.values()],
-        presence: presence.rows.map((row) => ({
-          districtCode: row.district_code,
-          branchCount: Number(row.branch_count),
-          employeeCount: Number(row.employee_count),
-          // Zero until savings exist (stage 15). Explicitly zero rather than
-          // absent, so the validator can warn that BOT ties this to MSP2-01.
-          compulsorySavings: Money.zero(),
-        })),
+        presence: districtPresence(presence.rows, compulsorySavings.rows),
         writeOffs: writeOffs.rows.map((row) => ({
           sectorCode: row.sector_code,
           amount: Money.fromDatabaseValue(row.amount),
@@ -546,6 +570,42 @@ export class PostgresReportRepository implements ReportRepository {
       };
     });
   }
+}
+
+/**
+ * Merge what is where, from two different questions about a district.
+ *
+ * Branches and staff are counted where the branch is; compulsory savings is
+ * counted where the saver is. A district can have one and not the other — an
+ * institution lends into districts it has no office in, and BOT's form has a
+ * row for every district either way — so this is a union of both key sets
+ * rather than a lookup from one into the other. Dropping a district that has
+ * savings but no branch would lose the money from the return entirely.
+ */
+function districtPresence(
+  branches: readonly { district_code: string; branch_count: string; employee_count: string }[],
+  savings: readonly { district_code: string; amount: string }[],
+): DistrictPresence[] {
+  const byDistrict = new Map<string, { branchCount: number; employeeCount: number }>();
+  for (const row of branches) {
+    byDistrict.set(row.district_code, {
+      branchCount: Number(row.branch_count),
+      employeeCount: Number(row.employee_count),
+    });
+  }
+
+  const savingsByDistrict = new Map<string, Money>(
+    savings.map((row) => [row.district_code, Money.fromDatabaseValue(row.amount)]),
+  );
+
+  const districts = new Set([...byDistrict.keys(), ...savingsByDistrict.keys()]);
+
+  return [...districts].map((districtCode) => ({
+    districtCode,
+    branchCount: byDistrict.get(districtCode)?.branchCount ?? 0,
+    employeeCount: byDistrict.get(districtCode)?.employeeCount ?? 0,
+    compulsorySavings: savingsByDistrict.get(districtCode) ?? Money.zero(),
+  }));
 }
 
 function formatDateOnly(value: Date): string {

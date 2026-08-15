@@ -210,6 +210,15 @@ export type {
   Msp2_10Row,
 } from './reporting/msp2-10.js';
 
+export {
+  SAVINGS_DIRECTIONS,
+  applyEntry,
+  balanceAsAt,
+  reversalOf,
+  signedAmount,
+} from './savings/ledger.js';
+export type { SavingsDirection, SavingsEntry } from './savings/ledger.js';
+
 export { validatePortfolioForms } from './reporting/validation.js';
 export type {
   PortfolioForms,

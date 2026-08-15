@@ -22,6 +22,8 @@ import { type FilingRepository } from '../modules/filings/filing-repository.js';
 import { registerFilingRoutes } from '../modules/filings/routes.js';
 import { type ComplaintRepository } from '../modules/complaints/complaint-repository.js';
 import { registerComplaintRoutes } from '../modules/complaints/routes.js';
+import { type SavingsRepository } from '../modules/savings/savings-repository.js';
+import { registerSavingsRoutes } from '../modules/savings/routes.js';
 import { type CellMapRepository } from '../modules/exports/cell-map.js';
 import { type ExportRepository } from '../modules/exports/export-repository.js';
 import { registerExportRoutes } from '../modules/exports/routes.js';
@@ -57,6 +59,7 @@ export interface ServerDependencies {
   readonly statements: StatementRepository;
   readonly filings: FilingRepository;
   readonly complaints: ComplaintRepository;
+  readonly savings: SavingsRepository;
   readonly exports: ExportRepository;
   readonly cellMaps: CellMapRepository;
   readonly tokens: AccessTokenService;
@@ -89,6 +92,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     statements,
     filings,
     complaints,
+    savings,
     exports,
     cellMaps,
     tokens,
@@ -247,6 +251,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerReportRoutes(app, { reports, tokens, now });
   registerFilingRoutes(app, { filings, reports, tokens, now });
   registerComplaintRoutes(app, { complaints, tokens, now });
+  registerSavingsRoutes(app, { savings, tokens, now });
   registerExportRoutes(app, { filings, exports, cellMaps, tokens });
 
   return app;
