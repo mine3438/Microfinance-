@@ -1861,3 +1861,31 @@ Receipts are netted of reversals, so "what has been received" means money the
 institution still holds. That matters here because arrears drive the charge: a
 reversed payment must put the borrower back into arrears, and a penalty computed
 against a payment that was undone would be a charge for a debt that existed.
+
+### 24.10 An approximation in the accrual, and which way it errs
+
+Re-reading the accrual after writing it, there is an imprecision worth stating
+rather than leaving for someone to find in a borrower's statement.
+
+The job computes the arrears position **as at the date being accrued to**, then
+charges the difference between the accrual to that date and the accrual to the
+watermark — using that same arrears position for both. So the whole window is
+charged against the arrears that exist at its end, not against the arrears that
+existed on each day of it.
+
+Where a new instalment falls due inside the window, this is exact: that
+instalment's days-to-watermark clamp to zero, so it is charged from its own due
+date and grace period, not from the watermark.
+
+Where a borrower **reduces** their arrears inside the window, it is not exact.
+The smaller closing position is applied across the whole window, so the borrower
+is charged less than a day-by-day replay would produce. That is the direction to
+be wrong in — a penalty is a charge against a customer, and an approximation
+that favours the institution would be a defect rather than a rounding.
+
+Making it exact needs the receipt timeline replayed day by day, which is a
+larger change and a real cost on a book of any size. It is recorded here as a
+known approximation with its direction of error stated, and the daily run that
+the design assumes shrinks the window to a single day, where the two methods
+agree exactly. The imprecision only appears when the job has not run for a while
+and a borrower paid during the gap.
