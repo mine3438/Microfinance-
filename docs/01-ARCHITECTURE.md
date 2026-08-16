@@ -1831,3 +1831,33 @@ comments between its elements, so the transformation is a careful manual edit
 rather than a mechanical one. They behave correctly today, and are recorded here
 rather than half-done: a partially converted file would leave a reader unsure
 whether the remaining ones were deliberate.
+
+### 24.9 The accrual job, and why it charges an increment
+
+`POST /penalties/accrual` walks the book to a date. It is an endpoint rather
+than a timer: a scheduled job would still call it, and having the operation
+reachable means it can be re-run after a failure or caught up after an outage
+without waiting for a timer to come round. It is guarded by `loan.write_off` —
+the only seeded permission that represents authority to change what a borrower
+owes without a payment behind it.
+
+**It charges an increment, not a total.** For each loan it computes the accrual
+to the requested date and the accrual to the existing watermark, and adds the
+difference. Writing the total instead would be simpler and wrong: the balance
+already holds what earlier runs charged, and a payment may since have reduced
+it — overwriting would silently undo that payment.
+
+That is what makes the operation idempotent, and a test asserts it directly:
+running the accrual twice for the same date leaves the balance untouched.
+Another moves the date forward ten days on the same arrears and checks the
+charge doubles rather than being recomputed from scratch.
+
+A loan never accrued starts from its disbursement date, so its first run covers
+its whole life. A loan whose product has no penalty terms is not selected at
+all — which today is every loan in every institution, and the job correctly
+reports considering none of them.
+
+Receipts are netted of reversals, so "what has been received" means money the
+institution still holds. That matters here because arrears drive the charge: a
+reversed payment must put the borrower back into arrears, and a penalty computed
+against a payment that was undone would be a charge for a debt that existed.
