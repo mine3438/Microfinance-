@@ -206,14 +206,14 @@ export class PostgresReportRepository implements ReportRepository {
     fiscalYearStart: string,
   ): Promise<PortfolioSnapshot> {
     return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
-      const [sectors, loanTypes, districts, bands] = await Promise.all([
+      const [sectors, loanTypes, districts, bands] = [
         // Ordered by BOT's own serial number, not alphabetically. Every MSP2
         // form has a fixed number of rows in a fixed order and the EDI
         // validator reads them by position, so the taxonomy order *is* the form
         // layout — sorting by code would file every figure one row out.
-        client.query<{ code: string }>('SELECT code FROM reference.sectors ORDER BY sno'),
-        client.query<{ code: string }>('SELECT code FROM reference.loan_types ORDER BY sno'),
-        client.query<{ code: string; region_code: string }>(
+        await client.query<{ code: string }>('SELECT code FROM reference.sectors ORDER BY sno'),
+        await client.query<{ code: string }>('SELECT code FROM reference.loan_types ORDER BY sno'),
+        await client.query<{ code: string; region_code: string }>(
           `SELECT d.code, d.region_code
              FROM reference.districts d
              JOIN reference.regions r ON r.code = d.region_code
@@ -226,7 +226,7 @@ export class PostgresReportRepository implements ReportRepository {
         // applied then (§11.1). A loan whose schedule was not in force on the
         // reporting date comes back with no band, which the readiness gate
         // refuses — rather than being provisioned at a rate BOT had withdrawn.
-        client.query<BandRow>(
+        await client.query<BandRow>(
           `SELECT b.schedule_code, b.classification, b.min_days_overdue,
                   b.max_days_overdue, b.provision_rate
              FROM reference.provisioning_bands b
@@ -235,7 +235,7 @@ export class PostgresReportRepository implements ReportRepository {
               AND (s.effective_to IS NULL OR s.effective_to > $1)`,
           [period.endDate],
         ),
-      ]);
+      ];
 
       const bandsBySchedule = new Map<string, ProvisioningBand[]>();
       for (const row of bands.rows) {
@@ -319,8 +319,8 @@ export class PostgresReportRepository implements ReportRepository {
         lines,
         entries,
         balances,
-      ] = await Promise.all([
-        client.query<{ sector_code: string; gender: Gender; principal: string }>(
+      ] = [
+        await client.query<{ sector_code: string; gender: Gender; principal: string }>(
           `SELECT c.sector_code, c.gender, l.principal
              FROM loans l JOIN clients c ON c.id = l.client_id
             WHERE l.disbursement_date BETWEEN $1 AND $2`,
@@ -330,7 +330,7 @@ export class PostgresReportRepository implements ReportRepository {
         // branch is. Grouping by the districts a branch's *clients* live in
         // would count one Arusha branch four times over — once per district it
         // lends into — and file four branches where there is one.
-        client.query<{ district_code: string; branch_count: string; employee_count: string }>(
+        await client.query<{ district_code: string; branch_count: string; employee_count: string }>(
           `SELECT b.district_code,
                   count(DISTINCT b.id)::text AS branch_count,
                   count(DISTINCT u.id)::text AS employee_count
@@ -349,7 +349,7 @@ export class PostgresReportRepository implements ReportRepository {
         // `savings_accounts.balance`, because that column is as at today and
         // this figure is as at the quarter end. Restating an old quarter has
         // to give the answer that quarter had.
-        client.query<{ district_code: string; amount: string }>(
+        await client.query<{ district_code: string; amount: string }>(
           `SELECT c.district_code,
                   sum(CASE t.direction WHEN 'deposit' THEN t.amount ELSE -t.amount END)
                     AS amount
@@ -369,7 +369,7 @@ export class PostgresReportRepository implements ReportRepository {
         // Restricted to the loans MSP2-03 actually reports: one disbursed after
         // the quarter end is not on this return, and neither is its security. A
         // settled loan releases what secured it.
-        client.query<{ sector_code: string; amount: string }>(
+        await client.query<{ sector_code: string; amount: string }>(
           `SELECT c.sector_code, sum(l.compulsory_savings_secured) AS amount
              FROM loans l
              JOIN clients c ON c.id = l.client_id
@@ -380,7 +380,7 @@ export class PostgresReportRepository implements ReportRepository {
             GROUP BY c.sector_code`,
           [period.endDate],
         ),
-        client.query<{ sector_code: string; amount: string }>(
+        await client.query<{ sector_code: string; amount: string }>(
           // The only record of what a write-off was worth and when it happened.
           // The domain-event seam was built in stage 8 for a ledger that does
           // not exist yet; this is its first real consumer.
@@ -393,16 +393,16 @@ export class PostgresReportRepository implements ReportRepository {
             GROUP BY c.sector_code`,
           [period.startDate, period.endDate],
         ),
-        client.query<{ classifications_updated_at: Date | null }>(
+        await client.query<{ classifications_updated_at: Date | null }>(
           `SELECT classifications_updated_at FROM system_health WHERE institution_id = $1`,
           [institutionId],
         ),
-        client.query<{ count: string }>(
+        await client.query<{ count: string }>(
           `SELECT count(*)::text AS count
              FROM branches
             WHERE status = 'active' AND district_code IS NULL`,
         ),
-        client.query<{
+        await client.query<{
           sno: number;
           label: string;
           is_computed: boolean;
@@ -414,7 +414,7 @@ export class PostgresReportRepository implements ReportRepository {
         // From the start of the fiscal year, because MSP2-02's second column
         // is year-to-date. The quarter column is cut from the same rows by the
         // compiler, which is only possible because entries carry a date.
-        client.query<{
+        await client.query<{
           sno: number;
           direction: 'income' | 'expense';
           amount: string;
@@ -425,7 +425,7 @@ export class PostgresReportRepository implements ReportRepository {
             WHERE entry_date BETWEEN $1 AND $2`,
           [fiscalYearStart, period.endDate],
         ),
-        client.query<{
+        await client.query<{
           holding_kind: HoldingKind;
           counterparty: string;
           institution_code: string | null;
@@ -447,57 +447,56 @@ export class PostgresReportRepository implements ReportRepository {
             WHERE v.year = $1 AND v.quarter = $2`,
           [period.year, period.quarter],
         ),
-      ]);
+      ];
 
-      const [agentBankingCodes, statementLines, enteredLines, natures, complaints] =
-        await Promise.all([
-          client.query<{ code: string }>(
-            `SELECT code FROM reference.financial_institutions
+      const [agentBankingCodes, statementLines, enteredLines, natures, complaints] = [
+        await client.query<{ code: string }>(
+          `SELECT code FROM reference.financial_institutions
             WHERE in_agent_banking_list ORDER BY sort_order`,
-          ),
-          client.query<{
-            form_code: string;
-            sno: number;
-            label: string;
-            is_computed: boolean;
-            accepts_statement_entry: boolean | null;
-          }>(
-            `SELECT form_code, sno, label, is_computed, accepts_statement_entry
+        ),
+        await client.query<{
+          form_code: string;
+          sno: number;
+          label: string;
+          is_computed: boolean;
+          accepts_statement_entry: boolean | null;
+        }>(
+          `SELECT form_code, sno, label, is_computed, accepts_statement_entry
              FROM reference.form_lines
             WHERE form_code IN ('MSP2-01', 'MSP2-05', 'MSP2-06')
             ORDER BY form_code, sno`,
-          ),
-          client.query<{ form_code: string; sno: number; amount: string }>(
-            `SELECT form_code, sno, amount
+        ),
+        await client.query<{ form_code: string; sno: number; amount: string }>(
+          `SELECT form_code, sno, amount
              FROM financial_statement_lines
             WHERE year = $1 AND quarter = $2`,
-            [period.year, period.quarter],
-          ),
-          client.query<{ code: string }>(
-            'SELECT code FROM reference.complaint_natures ORDER BY sno',
-          ),
-          // Every complaint that could touch this quarter, which is wider than
-          // the ones received in it: one raised two years ago and still open
-          // counts on the opening line, and one resolved this quarter counts on
-          // line 3 or 4 whenever it arrived. Complaints closed before the quarter
-          // began belong to an earlier return and are not read at all.
-          client.query<{
-            nature_code: string;
-            amount: string;
-            received_on: Date;
-            resolved_on: Date | null;
-            resolved_by: ResolutionRoute | null;
-            referred_to: ReferralDestination | null;
-            referred_on: Date | null;
-          }>(
-            `SELECT nature_code, amount, received_on, resolved_on, resolved_by,
+          [period.year, period.quarter],
+        ),
+        await client.query<{ code: string }>(
+          'SELECT code FROM reference.complaint_natures ORDER BY sno',
+        ),
+        // Every complaint that could touch this quarter, which is wider than
+        // the ones received in it: one raised two years ago and still open
+        // counts on the opening line, and one resolved this quarter counts on
+        // line 3 or 4 whenever it arrived. Complaints closed before the quarter
+        // began belong to an earlier return and are not read at all.
+        await client.query<{
+          nature_code: string;
+          amount: string;
+          received_on: Date;
+          resolved_on: Date | null;
+          resolved_by: ResolutionRoute | null;
+          referred_to: ReferralDestination | null;
+          referred_on: Date | null;
+        }>(
+          `SELECT nature_code, amount, received_on, resolved_on, resolved_by,
                   referred_to, referred_on
              FROM complaints
             WHERE received_on <= $2
               AND (resolved_on IS NULL OR resolved_on >= $1)`,
-            [period.startDate, period.endDate],
-          ),
-        ]);
+          [period.startDate, period.endDate],
+        ),
+      ];
 
       const linesFor = (formCode: string): StatementLine[] =>
         statementLines.rows

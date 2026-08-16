@@ -1825,12 +1825,15 @@ a misleading claim about what the code does.
 The two reference-data reads that ran once per process are now sequential — six
 small lookups on process start, where the notional saving was nothing at all.
 
-**Three sites in `report-repository.ts` are not yet converted.** They are the
-snapshot's own reads, and each `Promise.all` argument carries load-bearing
-comments between its elements, so the transformation is a careful manual edit
-rather than a mechanical one. They behave correctly today, and are recorded here
-rather than half-done: a partially converted file would leave a reader unsure
-whether the remaining ones were deliberate.
+The three sites in `report-repository.ts` are converted too, and the way they
+were is worth a line. Splitting each `Promise.all` argument on commas mangled
+the comments between its elements — the ones recording that BOT's taxonomy order
+*is* the form layout, and that sorting by code would file every figure one row
+out. The transformation that worked left the array literal exactly as it was and
+only awaited each element in place: nineteen call sites, three wrappers, and not
+a comment moved.
+
+No `Promise.all` on a transaction client remains anywhere in the API.
 
 ### 24.9 The accrual job, and why it charges an increment
 
