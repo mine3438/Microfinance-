@@ -542,8 +542,28 @@ describe('the approval workflow', () => {
       })
     ).json<Loan>();
 
-    expect(rejected.status).toBe('rejected');
+    // Back to the officer as a draft, with the reason attached (§13.3). A
+    // rejection is usually a missing document or a term to change, not a
+    // judgement that the borrower should never be lent to — so the officer
+    // revises and resubmits rather than rekeying the application.
+    expect(rejected.status).toBe('draft');
     expect(rejected.rejectionReason).toBe('Existing arrears on a previous facility.');
+    expect(rejected.decidedBy).not.toBeNull();
+  });
+
+  it('lets the officer revise a rejected application and resubmit it', async () => {
+    await setApprovalLimit('branch_manager', '10000000.00');
+    const created = (await request('POST', '/loans', officerToken, application())).json<Loan>();
+    await request('POST', `/loans/${created.id}/submit`, officerToken);
+    await request('POST', `/loans/${created.id}/decision`, managerToken, {
+      decision: 'reject',
+      reason: 'Term too long for this borrower.',
+    });
+
+    const resubmitted = await request('POST', `/loans/${created.id}/submit`, officerToken);
+
+    expect(resubmitted.statusCode).toBe(200);
+    expect(resubmitted.json<Loan>().status).toBe('pending_approval');
   });
 
   it('refuses a rejection with no reason', async () => {

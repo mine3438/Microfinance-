@@ -1892,3 +1892,32 @@ known approximation with its direction of error stated, and the daily run that
 the design assumes shrinks the window to a single day, where the two methods
 agree exactly. The imprecision only appears when the job has not run for a while
 and a borrower paid during the gap.
+
+### 24.11 §13.3 — rejection returns an application to the officer
+
+**Answered: a rejected application goes back to the officer as a draft.**
+
+Rejection is not terminal. The reasons a decision comes back are usually a
+missing document or a term that needs changing, not a judgement that the
+borrower should never be lent to, so the officer revises and resubmits rather
+than rekeying the whole application.
+
+The rejection is still recorded. The decision path moves the loan through
+`rejected` — capturing the decider, the timestamp and the required reason, and
+firing the audit trigger — and then on to `draft` in the same transaction. The
+history says "rejected by X on Y because Z"; the officer's queue says "draft,
+needs work", with the reason attached. `submitted_by` and `submitted_at` are
+cleared, because the application will be submitted again and those fields
+describe the submission that is now undone.
+
+The status machine gains one transition, `rejected → draft`. Without it the
+second step would be refused and the loan would sit in a state nothing could
+move it out of — which is what "rejection is terminal" meant in practice.
+
+**The threshold figures themselves are still outstanding, but they are no longer
+a question for anyone to answer in the abstract.** `approval_thresholds` is read
+by the approval check and written by nothing: there is no endpoint and no
+screen, so even an answer had nowhere to go. The same is true of penalty terms —
+`loan_products` carries the columns and `/loan-products` is GET-only, so a
+product cannot be created through the API at all. That is a missing settings
+surface rather than a missing decision, and it is the next piece of work.

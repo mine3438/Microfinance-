@@ -387,6 +387,13 @@ export class PostgresLoanRepository implements LoanRepository {
     reason: string,
   ): Promise<Loan | null> {
     return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      // Through `rejected` and on to `draft`, in one transaction.
+      //
+      // The intermediate state is not decoration: it is what records the
+      // decider, the timestamp and the required reason, and it is what the
+      // audit trigger captures. The officer's queue then shows a draft with the
+      // reason attached, rather than a dead application they would have to
+      // rekey (§13.3).
       const updated = await client.query<{ id: string }>(
         `UPDATE loans
             SET status = 'rejected', decided_by = $1, decided_at = now(), rejection_reason = $2
@@ -396,7 +403,18 @@ export class PostgresLoanRepository implements LoanRepository {
       );
 
       const id = updated.rows[0]?.id;
-      return id === undefined ? null : this.requireById(client, id);
+      if (id === undefined) {
+        return null;
+      }
+
+      await client.query(
+        `UPDATE loans
+            SET status = 'draft', submitted_by = NULL, submitted_at = NULL
+          WHERE id = $1`,
+        [id],
+      );
+
+      return this.requireById(client, id);
     });
   }
 
