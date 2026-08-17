@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  compareDecimalStrings,
   emailSchema,
   isoDateSchema,
   isoTimestampSchema,
@@ -201,5 +202,50 @@ describe('requiredTextSchema', () => {
 
   it('enforces the maximum it was given', () => {
     expect(requiredTextSchema(5).safeParse('123456').success).toBe(false);
+  });
+});
+
+describe('compareDecimalStrings', () => {
+  const ordering = (left: string, right: string): number =>
+    Math.sign(compareDecimalStrings(left, right));
+
+  it.each([
+    ['2', '1', 'a larger whole part'],
+    ['10', '9', 'a longer whole part, which lexicographic order would get wrong'],
+    ['1.50', '1.05', 'a larger fraction under an equal whole part'],
+    ['0.1', '0.09', 'a shorter fraction that is nonetheless larger'],
+    ['1500000.50', '1500000.49', 'a difference of one cent'],
+    ['0', '-1', 'zero against a negative'],
+    ['-1', '-2', 'the less negative of two negatives'],
+  ])('orders %s above %s (%s)', (larger, smaller) => {
+    expect(ordering(larger, smaller)).toBe(1);
+    expect(ordering(smaller, larger)).toBe(-1);
+  });
+
+  it.each([
+    ['1', '1', 'the same spelling'],
+    ['1.5', '1.50', 'a trailing zero, which does not change the value'],
+    ['1', '1.00', 'a fraction present on one side only'],
+    ['0', '0.00', 'zero written two ways'],
+  ])('calls %s equal to %s (%s)', (left, right) => {
+    expect(ordering(left, right)).toBe(0);
+  });
+
+  it('holds across the whole width of a stored amount', () => {
+    // Thirteen digits before the point and two after — the widest value
+    // `NUMERIC(15,2)` accepts — differing only in the last cent.
+    expect(ordering('9999999999999.99', '9999999999999.98')).toBe(1);
+  });
+
+  it('separates values that differ beyond a double, where the pattern one day might not', () => {
+    // Not a value `moneyAmountSchema` accepts today, and that is what this test
+    // is for. `Number` collapses these two onto one; the comparator does not.
+    // If the money pattern ever widens, the range checks built on this keep
+    // working rather than quietly starting to admit a nonsensical product.
+    const left = '9007199254740993';
+    const right = '9007199254740992';
+
+    expect(Number(left) === Number(right)).toBe(true);
+    expect(ordering(left, right)).toBe(1);
   });
 });

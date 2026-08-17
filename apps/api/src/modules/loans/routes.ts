@@ -1,4 +1,5 @@
 import {
+  createLoanProductRequestSchema,
   createLoanRequestSchema,
   decideLoanRequestSchema,
   disburseLoanRequestSchema,
@@ -66,6 +67,40 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
       const principal = principalOf(request);
       const products = await loans.listProducts(principal.institutionId, principal.userId);
       return productListSchema.parse(products);
+    },
+  );
+
+  /**
+   * Define a product.
+   *
+   * `settings.manage` rather than `loan.create`, on the same reasoning as
+   * savings products: a product fixes the rate band, the term band, the
+   * principal band, the BOT loan type every loan of it reports under and the
+   * penalty terms every borrower on it is charged. That is institution policy,
+   * not something an officer settles while entering an application.
+   *
+   * This is where §13.1's figures enter the system. They are the institution's
+   * to state — nothing here supplies a default, and a product created without
+   * them charges no penalty.
+   */
+  app.post(
+    '/loan-products',
+    { preHandler: [authenticated, requirePermission('settings.manage')] },
+    async (request, reply): Promise<unknown> => {
+      const body = createLoanProductRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That loan product cannot be created as entered.');
+      }
+
+      const principal = principalOf(request);
+      const product = await loans.createProduct(
+        principal.institutionId,
+        principal.userId,
+        body.data,
+      );
+
+      void reply.status(201).header('location', `/loan-products/${product.id}`);
+      return loanProductSchema.parse(product);
     },
   );
 

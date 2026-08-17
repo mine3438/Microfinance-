@@ -1961,6 +1961,66 @@ role that could raise its own limit would not be a limit. Reading is `loan.read`
 because an officer needs to know what can be sanctioned before submitting an
 application that would be refused.
 
-Still to come on this surface: creating loan products, which is where §13.1's
-penalty figures belong — `/loan-products` is GET-only today, so a product cannot
-be created through the API at all.
+### 26.1 Loan products — the second half of the same surface
+
+`/loan-products` was GET-only, and the omission had gone unnoticed for the same
+reason the thresholds gap had: the tests inserted products with raw SQL, so
+every lending path worked without anyone needing the endpoint that did not
+exist. An institution could not define a single product through the API.
+
+`POST /loan-products` closes it, and it is where §13.1's penalty figures enter
+the system. Migration 0021 gave penalty terms a shape and deliberately no
+values; this gives the institution somewhere to state them. Nothing here
+supplies a default. A product created without penalty terms charges no penalty
+and is a complete product, not an unfinished one.
+
+Writing is `settings.manage` rather than `loan.create`, on the same reasoning as
+savings products: a product fixes the rate band, the term band, the principal
+band, the BOT loan type every loan of it reports under, and the penalty terms
+every borrower on it is charged. That is institution policy, not something an
+officer settles while entering an application.
+
+Every rule the request schema enforces is also a constraint in migration 0008 or
+0021, and both copies earn their place. The database's is what holds — it cannot
+be bypassed by a future write path. The schema's is what the person filling in
+the form reads: `loan_products_penalty_terms_are_whole` names a constraint,
+while "penalty terms need both a daily rate and a grace period" names the field
+they left empty. One rule is enforced only in the schema, because the database
+cannot see it: a penalty cap of zero passes `penalty_cap_fraction > 0`'s sibling
+checks in spirit but would silently make the terms beside it charge nothing.
+
+### 26.2 A floating-point comparison that was correct, and still removed
+
+The product schema has to compare two amounts — the maximum principal against
+the minimum — and the first draft did it as `Number(a) >= Number(b)`.
+
+That is correct today, and the honesty matters: `MONEY_PATTERN` admits at most
+thirteen digits before the point and two after, so every amount this system
+accepts is under 10^13 while doubles are exact to about 9 × 10^15. No two
+distinct amounts collapse onto one double. There was no bug.
+
+It was correct *by accident of the current column width*, which is the reason it
+went anyway. Nothing recorded the dependency, and the day `NUMERIC(15,2)` widens
+— or the comparison is copied somewhere a value is not so bounded — it becomes
+wrong silently, admitting a product whose maximum principal is below its
+minimum because two different figures compared equal. A rule that money never
+passes through a binary double is not a rule anyone can apply if it carries a
+case-by-case exemption for "this width happens to be safe".
+
+`compareDecimalStrings` in `@mfi/contracts` compares the digits instead. It is
+not arithmetic and does not import `@mfi/money` — §2 keeps that package out of
+the browser bundle, and a comparison of two strings already validated as
+canonical decimals needs none of it.
+
+### 26.3 What this surface still lacks
+
+There is no web screen for either half. `apps/web` has no settings feature at
+all, so approval thresholds and loan products are both API-only — reachable by
+an integration, not by the administrator who is meant to set them. That is the
+next increment on this surface, not a permanent shape.
+
+Amending or retiring a product is also absent. `loan_products.status` carries
+`'retired'` and nothing sets it, so a product defined in error stays on the
+officer's list. Loans copy their terms from the product at creation rather than
+referencing it (§9), so retiring one is safe to add and does not disturb loans
+already written against it.

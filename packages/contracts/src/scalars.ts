@@ -152,3 +152,76 @@ export const isoTimestampSchema = z.iso.datetime({
 /** Free text that must contain something other than whitespace. */
 export const requiredTextSchema = (maximumLength: number): z.ZodString =>
   z.string().trim().min(1, 'Must not be blank.').max(maximumLength);
+
+/**
+ * Order two decimal strings exactly.
+ *
+ * A range check — "the maximum principal cannot be below the minimum" — needs
+ * to compare two amounts, and the obvious spelling is
+ * `Number(a) >= Number(b)`.
+ *
+ * That spelling happens to be correct today, and the honesty is the point:
+ * {@link MONEY_PATTERN} admits at most thirteen digits before the point and two
+ * after, so every amount this system accepts is under 10^13 while doubles are
+ * exact to 2^53 ≈ 9 × 10^15 — no two distinct amounts collapse onto one double,
+ * and no two rates do either. It is not a latent bug being fixed here.
+ *
+ * It is correct *by accident of the current column width*, which is the problem.
+ * Nothing records the dependency, and the day `NUMERIC(15,2)` widens — or this
+ * comparison is copied somewhere a value is not so bounded — it becomes wrong
+ * silently, admitting a product whose maximum principal is below its minimum
+ * because two different figures compared equal. The standing rule is that money
+ * does not pass through a binary double, and a rule with a case-by-case
+ * exemption for "this width is safe" is not a rule anyone can apply.
+ *
+ * So the comparison is done on the digits. This is not arithmetic and does not
+ * reach for `@mfi/money` — the module comment above explains why that import
+ * must not appear here — it is two strings that {@link MONEY_PATTERN} or
+ * {@link RATE_PATTERN} has already shown to be canonical decimals, compared
+ * place by place.
+ *
+ * @returns a negative number if `left` sorts before `right`, zero if they are
+ *   the same value, a positive number otherwise.
+ */
+export function compareDecimalStrings(left: string, right: string): number {
+  const leftNegative = left.startsWith('-');
+  const rightNegative = right.startsWith('-');
+
+  if (leftNegative !== rightNegative) {
+    return leftNegative ? -1 : 1;
+  }
+
+  const magnitude = compareMagnitudes(
+    leftNegative ? left.slice(1) : left,
+    rightNegative ? right.slice(1) : right,
+  );
+
+  // Both negative reverses the order: -2 sorts before -1 while 2 sorts after 1.
+  return leftNegative ? -magnitude : magnitude;
+}
+
+/** Compare two unsigned canonical decimals, integer part first. */
+function compareMagnitudes(left: string, right: string): number {
+  const [leftWhole = '', leftFraction = ''] = left.split('.');
+  const [rightWhole = '', rightFraction = ''] = right.split('.');
+
+  // Canonical form carries no leading zeros, so a longer integer part is a
+  // larger number and only equal lengths need comparing digit by digit.
+  if (leftWhole.length !== rightWhole.length) {
+    return leftWhole.length - rightWhole.length;
+  }
+  if (leftWhole !== rightWhole) {
+    return leftWhole < rightWhole ? -1 : 1;
+  }
+
+  // Trailing zeros are significant to string comparison but not to value, so
+  // both fractions are padded to the same width before being compared.
+  const width = Math.max(leftFraction.length, rightFraction.length);
+  const paddedLeft = leftFraction.padEnd(width, '0');
+  const paddedRight = rightFraction.padEnd(width, '0');
+
+  if (paddedLeft === paddedRight) {
+    return 0;
+  }
+  return paddedLeft < paddedRight ? -1 : 1;
+}

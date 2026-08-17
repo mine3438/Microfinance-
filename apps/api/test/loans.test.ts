@@ -4,6 +4,7 @@ import {
   type Client,
   type ErrorResponse,
   type Loan,
+  type LoanProduct,
   type LoanWithSchedule,
   type Page,
   type RepaymentSchedule,
@@ -34,6 +35,8 @@ let disburserToken: string;
 let productId: string;
 let flatProductId: string;
 let clientId: string;
+/** A published `reference.loan_types` code, which every product must name. */
+let loanTypeCode: string;
 
 const PRINCIPAL = '1200000.00';
 const MONTHLY_RATE = '0.0300';
@@ -94,6 +97,7 @@ beforeAll(async () => {
   );
   productId = products.reducing;
   flatProductId = products.flat;
+  loanTypeCode = reference.loanType;
 
   const created = await request('POST', '/clients', officerToken, {
     fullName: 'Neema Kimaro',
@@ -763,5 +767,214 @@ describe('GET /loan-products', () => {
     expect(products.map((product) => product.id)).toContain(flatProductId);
     // Bounds as strings, since a client renders them beside monetary inputs.
     expect(products[0]?.minPrincipal).toMatch(/^\d+\.\d{2}$/);
+  });
+});
+
+/**
+ * Defining a product.
+ *
+ * This is the surface §13.1's figures arrive through. No test below asserts a
+ * default rate or grace period, because there is none to assert — every figure
+ * here is the test's own, chosen to be legible rather than plausible.
+ *
+ * `disburserToken` belongs to the seeded institution administrator, who holds
+ * every permission including `settings.manage`.
+ */
+describe('POST /loan-products', () => {
+  const definition = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    code: `P${randomUUID().slice(0, 8)}`,
+    name: 'Business Working Capital',
+    botLoanType: loanTypeCode,
+    interestMethod: 'reducing_balance',
+    minMonthlyRate: '0.0100',
+    maxMonthlyRate: '0.0500',
+    minTermMonths: 3,
+    maxTermMonths: 36,
+    minPrincipal: '100000.00',
+    maxPrincipal: '5000000.00',
+    ...overrides,
+  });
+
+  it('creates a product that charges no penalty, which is a complete product', async () => {
+    const response = await request('POST', '/loan-products', disburserToken, definition());
+
+    expect(response.statusCode).toBe(201);
+    const product = response.json<LoanProduct>();
+    expect(product.penaltyDailyRate).toBeNull();
+    expect(product.penaltyGraceDays).toBeNull();
+    expect(product.penaltyCapFraction).toBeNull();
+    expect(product.status).toBe('active');
+  });
+
+  it('stores the penalty terms the institution states, unrounded', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({
+        penaltyDailyRate: '0.0015',
+        penaltyGraceDays: 5,
+        penaltyCapFraction: '0.2000',
+      }),
+    );
+
+    expect(response.statusCode).toBe(201);
+    const product = response.json<LoanProduct>();
+    // Four decimal places kept exactly: 0.0015 is what the accrual will charge,
+    // and a rate that arrived as 0.0015 must not read back as 0.002.
+    expect(product.penaltyDailyRate).toBe('0.0015');
+    expect(product.penaltyGraceDays).toBe(5);
+    expect(product.penaltyCapFraction).toBe('0.2000');
+  });
+
+  it('accepts a grace period of zero, which means penalty from the first day late', async () => {
+    // Distinct from omitting the terms: zero is a real answer, null is no
+    // penalty at all, and a schema treating them alike would lose the
+    // difference.
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ penaltyDailyRate: '0.0010', penaltyGraceDays: 0 }),
+    );
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json<LoanProduct>().penaltyGraceDays).toBe(0);
+  });
+
+  it('refuses a rate with no grace period, rather than guessing when to start', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ penaltyDailyRate: '0.0010' }),
+    );
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json<ErrorResponse>().error.message).toContain('cannot be created');
+  });
+
+  it('refuses a grace period with no rate, which would look configured and charge nothing', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ penaltyGraceDays: 7 }),
+    );
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a cap with no terms to cap', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ penaltyCapFraction: '0.1000' }),
+    );
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a cap of zero, which would silently disable the terms beside it', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({
+        penaltyDailyRate: '0.0010',
+        penaltyGraceDays: 7,
+        penaltyCapFraction: '0',
+      }),
+    );
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a principal range that admits no loan', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ minPrincipal: '5000000.00', maxPrincipal: '100000.00' }),
+    );
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a term range that admits no loan', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ minTermMonths: 36, maxTermMonths: 3 }),
+    );
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a rate range that admits no loan', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ minMonthlyRate: '0.0500', maxMonthlyRate: '0.0100' }),
+    );
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses a BOT loan type that is not published', async () => {
+    // The foreign key catches this, not the schema — a product reporting under
+    // a type BOT does not publish would put loans on an MSP2-04 line that does
+    // not exist.
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ botLoanType: 'not_a_bot_loan_type' }),
+    );
+
+    expect(response.statusCode).toBe(400);
+    // The refusal names nothing about the constraint or the table it guards.
+    expect(JSON.stringify(response.json())).not.toContain('loan_types');
+  });
+
+  it('refuses a code already in use in this institution', async () => {
+    const code = `DUP${randomUUID().slice(0, 8)}`;
+
+    expect(
+      (await request('POST', '/loan-products', disburserToken, definition({ code }))).statusCode,
+    ).toBe(201);
+
+    const second = await request('POST', '/loan-products', disburserToken, definition({ code }));
+    expect(second.statusCode).toBe(409);
+  });
+
+  it('refuses a principal sent as a JSON number rather than a string', async () => {
+    const response = await request(
+      'POST',
+      '/loan-products',
+      disburserToken,
+      definition({ maxPrincipal: 5000000 }),
+    );
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses an officer, who may create loans but not set the terms of them', async () => {
+    const response = await request('POST', '/loan-products', officerToken, definition());
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json<ErrorResponse>().error.message).toContain('settings.manage');
+  });
+
+  it('makes the new product available to the officer who will lend on it', async () => {
+    const code = `VIS${randomUUID().slice(0, 8)}`;
+    const created = await request('POST', '/loan-products', disburserToken, definition({ code }));
+
+    const listed = (await request('GET', '/loan-products', officerToken)).json<LoanProduct[]>();
+
+    expect(listed.map((product) => product.id)).toContain(created.json<LoanProduct>().id);
   });
 });

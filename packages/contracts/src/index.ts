@@ -41,6 +41,7 @@ export {
 export {
   MONEY_PATTERN,
   RATE_PATTERN,
+  compareDecimalStrings,
   emailSchema,
   isoDateSchema,
   isoTimestampSchema,
@@ -83,6 +84,7 @@ export {
   INTEREST_METHODS,
   LOAN_STATUSES,
   MAXIMUM_TERM_MONTHS,
+  createLoanProductRequestSchema,
   createLoanRequestSchema,
   decideLoanRequestSchema,
   disburseLoanRequestSchema,
@@ -97,6 +99,7 @@ export {
   secureLoanRequestSchema,
   submitLoanRequestSchema,
   termMonthsSchema,
+  type CreateLoanProductRequest,
   type CreateLoanRequest,
   type DecideLoanRequest,
   type DisburseLoanRequest,

@@ -1,4 +1,5 @@
 import {
+  type CreateLoanProductRequest,
   type InterestMethod,
   type Loan,
   type LoanProduct,
@@ -11,6 +12,7 @@ import { type RepaymentSchedule as DomainSchedule } from '@mfi/domain';
 import { Money } from '@mfi/money';
 
 import { decodeCursor, toPage, type PagedRows } from '../../http/cursor.js';
+import { notFound } from '../../http/errors.js';
 
 interface LoanRow {
   id: string;
@@ -178,6 +180,66 @@ export interface LoanRepository {
     roleCodes: readonly string[],
   ): Promise<string | null>;
   listProducts(institutionId: string, userId: string): Promise<LoanProduct[]>;
+  createProduct(
+    institutionId: string,
+    userId: string,
+    product: CreateLoanProductRequest,
+  ): Promise<LoanProduct>;
+}
+
+interface ProductRow {
+  id: string;
+  code: string;
+  name: string;
+  bot_loan_type: string;
+  interest_method: InterestMethod;
+  min_monthly_rate: string;
+  max_monthly_rate: string;
+  min_term_months: number;
+  max_term_months: number;
+  min_principal: string;
+  max_principal: string;
+  status: 'active' | 'retired';
+  penalty_daily_rate: string | null;
+  penalty_grace_days: number | null;
+  penalty_cap_fraction: string | null;
+}
+
+/**
+ * A product's columns, listed here and again in `createProduct`'s `RETURNING`.
+ *
+ * Naming them once and interpolating would be tidier, and the SQL lint rule
+ * (§10.5) refuses it: a template holding a SQL keyword may carry no expressions
+ * at all. That rule is worth more than the duplication it costs here — it is
+ * what makes an interpolated query visible on sight rather than something a
+ * reviewer has to trace to a constant — and `toProduct` is the shared piece
+ * that actually matters, since a column added to one list and forgotten in the
+ * other fails to typecheck against `ProductRow` rather than passing silently.
+ */
+const PRODUCT_SELECT = `SELECT id, code, name, bot_loan_type, interest_method,
+                min_monthly_rate, max_monthly_rate, min_term_months, max_term_months,
+                min_principal, max_principal, status,
+                penalty_daily_rate, penalty_grace_days, penalty_cap_fraction
+           FROM loan_products`;
+
+function toProduct(row: ProductRow): LoanProduct {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    botLoanType: row.bot_loan_type,
+    interestMethod: row.interest_method,
+    minMonthlyRate: row.min_monthly_rate,
+    maxMonthlyRate: row.max_monthly_rate,
+    minTermMonths: row.min_term_months,
+    maxTermMonths: row.max_term_months,
+    minPrincipal: row.min_principal,
+    maxPrincipal: row.max_principal,
+    status: row.status,
+    penaltyDailyRate: row.penalty_daily_rate,
+    penaltyGraceDays: row.penalty_grace_days,
+    penaltyCapFraction: row.penalty_cap_fraction,
+  };
 }
 
 export class PostgresLoanRepository implements LoanRepository {
@@ -271,13 +333,17 @@ export class PostgresLoanRepository implements LoanRepository {
         min_principal: string;
         max_principal: string;
         product_status: 'active' | 'retired';
+        penalty_daily_rate: string | null;
+        penalty_grace_days: number | null;
+        penalty_cap_fraction: string | null;
       }>(
         `SELECT c.branch_id, c.status AS client_status,
                 p.id AS product_id, p.code, p.name, p.bot_loan_type, p.interest_method,
                 p.min_monthly_rate, p.max_monthly_rate,
                 p.min_term_months, p.max_term_months,
                 p.min_principal, p.max_principal,
-                p.status AS product_status
+                p.status AS product_status,
+                p.penalty_daily_rate, p.penalty_grace_days, p.penalty_cap_fraction
            FROM clients c
            CROSS JOIN loan_products p
           WHERE c.id = $1 AND p.id = $2`,
@@ -305,6 +371,9 @@ export class PostgresLoanRepository implements LoanRepository {
           minPrincipal: row.min_principal,
           maxPrincipal: row.max_principal,
           status: row.product_status,
+          penaltyDailyRate: row.penalty_daily_rate,
+          penaltyGraceDays: row.penalty_grace_days,
+          penaltyCapFraction: row.penalty_cap_fraction,
         },
       };
     });
@@ -528,40 +597,66 @@ export class PostgresLoanRepository implements LoanRepository {
 
   public async listProducts(institutionId: string, userId: string): Promise<LoanProduct[]> {
     return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
-      const rows = await client.query<{
-        id: string;
-        code: string;
-        name: string;
-        bot_loan_type: string;
-        interest_method: InterestMethod;
-        min_monthly_rate: string;
-        max_monthly_rate: string;
-        min_term_months: number;
-        max_term_months: number;
-        min_principal: string;
-        max_principal: string;
-        status: 'active' | 'retired';
-      }>(
-        `SELECT id, code, name, bot_loan_type, interest_method,
-                min_monthly_rate, max_monthly_rate, min_term_months, max_term_months,
-                min_principal, max_principal, status
-           FROM loan_products ORDER BY code`,
+      const rows = await client.query<ProductRow>(`${PRODUCT_SELECT} ORDER BY code`);
+
+      return rows.rows.map(toProduct);
+    });
+  }
+
+  /**
+   * Define a product.
+   *
+   * The penalty figures arrive here rather than in a migration, which is
+   * §13.1's answer put where it belongs: the shape is this system's, the values
+   * are the institution's. A product created without them charges no penalty,
+   * and that is a legitimate product rather than an unfinished one.
+   *
+   * Nothing is validated here that the contract has not already checked, with
+   * one exception this layer cannot check at all: `bot_loan_type` must name a
+   * row in `reference.loan_types`, and its foreign key is what enforces that.
+   * A product reporting under a type BOT does not publish would put loans on a
+   * return line that does not exist.
+   */
+  public async createProduct(
+    institutionId: string,
+    userId: string,
+    product: CreateLoanProductRequest,
+  ): Promise<LoanProduct> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const inserted = await client.query<ProductRow>(
+        `INSERT INTO loan_products
+           (institution_id, code, name, bot_loan_type, interest_method,
+            min_monthly_rate, max_monthly_rate, min_term_months, max_term_months,
+            min_principal, max_principal,
+            penalty_daily_rate, penalty_grace_days, penalty_cap_fraction)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         RETURNING id, code, name, bot_loan_type, interest_method,
+                   min_monthly_rate, max_monthly_rate, min_term_months, max_term_months,
+                   min_principal, max_principal, status,
+                   penalty_daily_rate, penalty_grace_days, penalty_cap_fraction`,
+        [
+          institutionId,
+          product.code,
+          product.name,
+          product.botLoanType,
+          product.interestMethod,
+          product.minMonthlyRate,
+          product.maxMonthlyRate,
+          product.minTermMonths,
+          product.maxTermMonths,
+          product.minPrincipal,
+          product.maxPrincipal,
+          product.penaltyDailyRate ?? null,
+          product.penaltyGraceDays ?? null,
+          product.penaltyCapFraction ?? null,
+        ],
       );
 
-      return rows.rows.map((row) => ({
-        id: row.id,
-        code: row.code,
-        name: row.name,
-        botLoanType: row.bot_loan_type,
-        interestMethod: row.interest_method,
-        minMonthlyRate: row.min_monthly_rate,
-        maxMonthlyRate: row.max_monthly_rate,
-        minTermMonths: row.min_term_months,
-        maxTermMonths: row.max_term_months,
-        minPrincipal: row.min_principal,
-        maxPrincipal: row.max_principal,
-        status: row.status,
-      }));
+      const row = inserted.rows[0];
+      if (row === undefined) {
+        throw notFound('The loan product could not be read back after being created.');
+      }
+      return toProduct(row);
     });
   }
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { paginationQuerySchema } from './pagination.js';
 import {
+  compareDecimalStrings,
   isoDateSchema,
   isoTimestampSchema,
   nonNegativeMoneyAmountSchema,
@@ -248,7 +249,84 @@ export const loanProductSchema = z
     minPrincipal: z.string(),
     maxPrincipal: z.string(),
     status: z.enum(['active', 'retired']),
+    /**
+     * Penalty terms, or `null` where this product charges none.
+     *
+     * §13.1 settled the shape — daily rate on the overdue instalment, a grace
+     * period, simple non-compounding accrual, an optional cap — and left the
+     * figures to the institution. They belong here, per product, rather than in
+     * a migration this system ships.
+     */
+    penaltyDailyRate: rateFractionSchema.nullable(),
+    penaltyGraceDays: z.number().int().nonnegative().nullable(),
+    penaltyCapFraction: rateFractionSchema.nullable(),
   })
   .strict();
 
 export type LoanProduct = z.infer<typeof loanProductSchema>;
+
+/**
+ * Defining a product.
+ *
+ * Every rule below is also a constraint in migration 0008 or 0021, and neither
+ * copy is redundant. The database's is what holds — it cannot be bypassed by a
+ * future write path — while this one is what the person filling in the form
+ * reads: `loan_products_penalty_terms_are_whole` names a constraint, and
+ * "penalty terms need both a daily rate and a grace period" names the field
+ * they left empty.
+ *
+ * Penalty terms are whole or absent: a rate with no grace period leaves the
+ * accrual guessing when to start, and a grace period with no rate charges
+ * nothing while reading on screen as deliberate policy.
+ */
+export const createLoanProductRequestSchema = z
+  .object({
+    code: requiredTextSchema(40),
+    name: requiredTextSchema(120),
+    /** A `reference.loan_types` code. Unknown values are refused by its foreign key. */
+    botLoanType: requiredTextSchema(80),
+    interestMethod: z.enum(INTEREST_METHODS),
+    minMonthlyRate: rateFractionSchema,
+    maxMonthlyRate: rateFractionSchema,
+    minTermMonths: termMonthsSchema,
+    maxTermMonths: termMonthsSchema,
+    minPrincipal: positiveMoneyAmountSchema,
+    maxPrincipal: positiveMoneyAmountSchema,
+    /**
+     * Omitted together, or given together. §13.1 settled the shape and left the
+     * figures to the institution, so a product created without them charges no
+     * penalty — a complete product, not an unfinished one.
+     */
+    penaltyDailyRate: rateFractionSchema.optional(),
+    penaltyGraceDays: z.number().int().nonnegative().optional(),
+    penaltyCapFraction: rateFractionSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (product) =>
+      (product.penaltyDailyRate === undefined) === (product.penaltyGraceDays === undefined),
+    { error: 'Penalty terms need both a daily rate and a grace period, or neither.' },
+  )
+  .refine(
+    (product) => product.penaltyCapFraction === undefined || product.penaltyDailyRate !== undefined,
+    { error: 'A penalty cap needs penalty terms to cap.' },
+  )
+  .refine(
+    (product) =>
+      product.penaltyCapFraction === undefined ||
+      compareDecimalStrings(product.penaltyCapFraction, '0') > 0,
+    // A cap of nothing is not "no ceiling", it is a ceiling of zero, which
+    // silently makes the terms beside it charge nothing at all.
+    { error: 'A penalty cap of zero would charge no penalty. Omit the cap to leave it uncapped.' },
+  )
+  .refine((product) => compareDecimalStrings(product.maxMonthlyRate, product.minMonthlyRate) >= 0, {
+    error: 'The maximum interest rate cannot be below the minimum.',
+  })
+  .refine((product) => compareDecimalStrings(product.maxPrincipal, product.minPrincipal) >= 0, {
+    error: 'The maximum principal cannot be below the minimum.',
+  })
+  .refine((product) => product.maxTermMonths >= product.minTermMonths, {
+    error: 'The maximum term cannot be below the minimum.',
+  });
+
+export type CreateLoanProductRequest = z.infer<typeof createLoanProductRequestSchema>;
