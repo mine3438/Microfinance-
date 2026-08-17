@@ -2012,14 +2012,47 @@ not arithmetic and does not import `@mfi/money` — §2 keeps that package out o
 the browser bundle, and a comparison of two strings already validated as
 canonical decimals needs none of it.
 
-### 26.3 What this surface still lacks
+### 26.3 The screen
 
-There is no web screen for either half. `apps/web` has no settings feature at
-all, so approval thresholds and loan products are both API-only — reachable by
-an integration, not by the administrator who is meant to set them. That is the
-next increment on this surface, not a permanent shape.
+`/settings`, guarded by `settings.manage` — not by a read permission, because
+every control on it writes and a read-only view would be a page whose only
+buttons all fail.
 
-Amending or retiring a product is also absent. `loan_products.status` carries
+Two panels, matching the two halves. Approval limits list every role, with an
+unset one shown as **"No authority"** rather than as `0.00` or as blank: zero
+reads as a limit somebody chose, blank reads as still loading, and the truth is
+neither. Clearing a limit is a separate button labelled "Remove authority",
+because the destructive reading is the correct one and the label should say so.
+
+The product form has no default in it. The penalty fields appear behind a
+checkbox and are sent as one group or omitted entirely — never as empty strings
+the server would have to interpret — and the cap is dropped from the request
+when left blank rather than sent as `''`. Nothing on the screen computes: every
+amount and rate travels as the string that was typed, and the bounds the form
+implies are checked again by the server and by a database constraint beneath it.
+
+`GET /reference/loan-types` was added for the type selector, on the same
+reasoning as the finance module's reference endpoints: a second copy of BOT's
+list is a list that can disagree with BOT's, and this one decides which MSP2-04
+row every loan of a product reports on. It carries `parentCode`, so the two
+Salaried sub-types render indented under their parent — BOT's template gives the
+parent an input row of its own at row 23 as well as its children at 24 and 25,
+so all three are choosable and the screen shows the structure rather than
+fourteen flat options.
+
+One implementation note worth keeping. The forms use the shared `Field`
+primitive rather than the hand-rolled `<label><span/>…</label>` that
+`bank-balances-page.tsx` uses. The difference is not cosmetic: with the hint
+inside the `<label>`, a control's accessible name becomes its label *plus* its
+hint, so a screen reader announces the whole paragraph as the field's name. The
+tests found it immediately — `getByLabelText('BOT loan type')` matched nothing.
+`Field` puts the hint outside the label and ties it with `aria-describedby`,
+which is what that component exists for. The older screen has the same defect
+and no test that would notice.
+
+### 26.4 What this surface still lacks
+
+Amending or retiring a product is absent. `loan_products.status` carries
 `'retired'` and nothing sets it, so a product defined in error stays on the
 officer's list. Loans copy their terms from the product at creation rather than
 referencing it (§9), so retiring one is safe to add and does not disturb loans

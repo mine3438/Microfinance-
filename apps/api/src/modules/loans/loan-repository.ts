@@ -1,4 +1,5 @@
 import {
+  type BotLoanType,
   type CreateLoanProductRequest,
   type InterestMethod,
   type Loan,
@@ -185,6 +186,7 @@ export interface LoanRepository {
     userId: string,
     product: CreateLoanProductRequest,
   ): Promise<LoanProduct>;
+  listBotLoanTypes(): Promise<BotLoanType[]>;
 }
 
 interface ProductRow {
@@ -657,6 +659,38 @@ export class PostgresLoanRepository implements LoanRepository {
         throw notFound('The loan product could not be read back after being created.');
       }
       return toProduct(row);
+    });
+  }
+
+  /**
+   * BOT's loan type taxonomy.
+   *
+   * Reference data, identical for every tenant and holding no institution's
+   * figures, so this is not tenant-scoped. Ordered by BOT's own `sno`, which is
+   * the order their form lists the rows in — a screen showing them in any other
+   * order is showing a different list from the one being filed.
+   */
+  public async listBotLoanTypes(): Promise<BotLoanType[]> {
+    return this.database.withTransaction(async (client) => {
+      const rows = await client.query<{
+        code: string;
+        name: string;
+        sno: number;
+        parent_code: string | null;
+        provisioning_schedule: 'standard' | 'housing';
+      }>(
+        `SELECT code, name, sno, parent_code, provisioning_schedule
+           FROM reference.loan_types
+          ORDER BY sno`,
+      );
+
+      return rows.rows.map((row) => ({
+        code: row.code,
+        name: row.name,
+        sno: row.sno,
+        parentCode: row.parent_code,
+        provisioningSchedule: row.provisioning_schedule,
+      }));
     });
   }
 

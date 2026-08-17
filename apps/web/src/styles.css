@@ -610,3 +610,23 @@ code,
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Defining a loan product.
+ *
+ * A two-column grid rather than the flex row `.report-controls` uses. This form
+ * has fourteen controls and several carry a hint of two lines, which in a flex
+ * row leaves each field a different height and the labels no longer line up
+ * across the form. A grid keeps the columns aligned however long the hints run.
+ */
+.product-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0 var(--gap);
+  align-items: start;
+}
+
+/* The submit row spans the grid rather than sitting in the last cell. */
+.product-form .form-actions {
+  grid-column: 1 / -1;
+}

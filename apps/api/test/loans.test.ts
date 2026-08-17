@@ -770,6 +770,47 @@ describe('GET /loan-products', () => {
   });
 });
 
+describe('GET /reference/loan-types', () => {
+  it('returns BOT’s taxonomy in BOT’s own order', async () => {
+    const types = (await request('GET', '/reference/loan-types', officerToken)).json<
+      { code: string; sno: number; parentCode: string | null }[]
+    >();
+
+    // Ordered by sno, because that is the order the form lists the rows in —
+    // a screen showing any other order shows a different list from the filing.
+    expect(types.map((type) => type.sno)).toEqual(
+      [...types.map((type) => type.sno)].sort((a, b) => a - b),
+    );
+    expect(types.map((type) => type.code)).toContain('housing_microfinance_loans');
+  });
+
+  it('marks the Salaried sub-types as children of their parent', async () => {
+    // BOT's template gives the parent an input row of its own as well as its
+    // two children, so all three are choosable. The relationship is served so
+    // a screen can show it rather than presenting a flat list.
+    const types = (await request('GET', '/reference/loan-types', officerToken)).json<
+      { code: string; parentCode: string | null }[]
+    >();
+
+    const child = types.find((type) => type.code === 'government_employees');
+    expect(child?.parentCode).toBe('salaried_loans');
+    expect(types.find((type) => type.code === 'salaried_loans')?.parentCode).toBeNull();
+  });
+
+  it('says which types provision on BOT’s longer housing schedule', async () => {
+    const types = (await request('GET', '/reference/loan-types', officerToken)).json<
+      { code: string; provisioningSchedule: string }[]
+    >();
+
+    expect(
+      types.find((type) => type.code === 'housing_microfinance_loans')?.provisioningSchedule,
+    ).toBe('housing');
+    expect(types.find((type) => type.code === 'agriculture_loans')?.provisioningSchedule).toBe(
+      'standard',
+    );
+  });
+});
+
 /**
  * Defining a product.
  *

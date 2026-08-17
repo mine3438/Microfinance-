@@ -24,6 +24,7 @@ export function Shell(): ReactNode {
           {session.can('expense.read') && <NavLink to="/finance/banks">Banks</NavLink>}
           {session.can('expense.read') && <NavLink to="/statements">Statements</NavLink>}
           {session.can('report.generate') && <NavLink to="/reports">BOT return</NavLink>}
+          {session.can('settings.manage') && <NavLink to="/settings">Settings</NavLink>}
         </nav>
 
         <div className="shell__account">

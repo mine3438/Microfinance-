@@ -1,4 +1,5 @@
 import {
+  botLoanTypeSchema,
   createLoanProductRequestSchema,
   createLoanRequestSchema,
   decideLoanRequestSchema,
@@ -33,6 +34,7 @@ import {
 
 const loanPageSchema = pageSchema(loanSchema);
 const productListSchema = z.array(loanProductSchema);
+const botLoanTypeListSchema = z.array(botLoanTypeSchema);
 
 export interface LoanRouteOptions {
   readonly loans: LoanRepository;
@@ -59,6 +61,20 @@ function loanIdOf(request: FastifyRequest): string {
 export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptions): void {
   const { loans, tokens } = options;
   const authenticated = authenticate(tokens);
+
+  /**
+   * BOT's loan type taxonomy.
+   *
+   * Served rather than embedded in the client, for the reason the finance
+   * module's reference endpoints exist: a second copy of BOT's list is a list
+   * that can disagree with BOT's, and this one decides which MSP2-04 row every
+   * loan of a product reports on.
+   */
+  app.get(
+    '/reference/loan-types',
+    { preHandler: [authenticated, requirePermission('loan.read')] },
+    async (): Promise<unknown> => botLoanTypeListSchema.parse(await loans.listBotLoanTypes()),
+  );
 
   app.get(
     '/loan-products',

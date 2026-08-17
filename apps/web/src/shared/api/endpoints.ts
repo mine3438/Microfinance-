@@ -1,6 +1,8 @@
 import {
   acknowledgementSchema,
   allocationPreviewSchema,
+  approvalThresholdSchema,
+  botLoanTypeSchema,
   bankAccountBalanceSchema,
   bankAccountSchema,
   clientSchema,
@@ -11,6 +13,7 @@ import {
   msp2_02LineSchema,
   msp2_05Schema,
   type AnnualisationConvention,
+  type ApprovalThreshold,
   type BankAccount,
   type BankAccountBalance,
   type CompiledReturn,
@@ -33,8 +36,10 @@ import {
   repaymentScheduleSchema,
   sessionUserSchema,
   type AllocationPreview,
+  type BotLoanType,
   type Client,
   type CreateClientRequest,
+  type CreateLoanProductRequest,
   type CreateLoanRequest,
   type DecideLoanRequest,
   type DisburseLoanRequest,
@@ -49,6 +54,7 @@ import {
   type RecordPaymentRequest,
   type RepaymentSchedule,
   type ReversePaymentRequest,
+  type RoleCode,
   type SessionUser,
 } from '@mfi/contracts';
 import { z } from 'zod';
@@ -68,6 +74,8 @@ const clientPageSchema = pageSchema(clientSchema);
 const loanPageSchema = pageSchema(loanSchema);
 const paymentPageSchema = pageSchema(paymentSchema);
 const productListSchema = z.array(loanProductSchema);
+const botLoanTypeListSchema = z.array(botLoanTypeSchema);
+const approvalThresholdListSchema = z.array(approvalThresholdSchema);
 const financeEntryPageSchema = pageSchema(financeEntrySchema);
 const lineListSchema = z.array(msp2_02LineSchema);
 const institutionListSchema = z.array(financialInstitutionSchema);
@@ -150,6 +158,16 @@ export const clients = {
 export const loans = {
   async products(): Promise<LoanProduct[]> {
     return apiRequest('/loan-products', productListSchema);
+  },
+
+  /**
+   * Define a product.
+   *
+   * The penalty terms are omitted together or sent together; the server refuses
+   * a half-set, and a product without them charges no penalty.
+   */
+  async createProduct(request: CreateLoanProductRequest): Promise<LoanProduct> {
+    return apiRequest('/loan-products', loanProductSchema, { method: 'POST', body: request });
   },
 
   async list(
@@ -245,6 +263,17 @@ export const payments = {
  * database enforces.
  */
 export const reference = {
+  /**
+   * BOT's loan type taxonomy, in BOT's own order.
+   *
+   * Fetched rather than embedded: a second copy of BOT's list is a list that
+   * can disagree with BOT's. It changes only by migration, so it is cached for
+   * the life of the page.
+   */
+  async loanTypes(): Promise<BotLoanType[]> {
+    return apiRequest('/reference/loan-types', botLoanTypeListSchema);
+  },
+
   async msp2_02Lines(): Promise<Msp2_02Line[]> {
     return apiRequest('/reference/msp2-02-lines', lineListSchema);
   },
@@ -355,5 +384,29 @@ export const reports = {
       `/reports/msp2/${String(year)}/${String(quarter)}${query({ annualisation })}`,
       compiledReturnSchema,
     );
+  },
+};
+
+export const settings = {
+  /**
+   * Every role's approval limit, including the roles that have none.
+   *
+   * The server lists all of them rather than only those with a row, because a
+   * screen has to be able to show "no authority" as a state. An absent limit
+   * means a role may sanction nothing — never that it may sanction anything.
+   */
+  async approvalThresholds(): Promise<ApprovalThreshold[]> {
+    return apiRequest('/settings/approval-thresholds', approvalThresholdListSchema);
+  },
+
+  /** Set one role's limit, or pass `null` to remove the authority entirely. */
+  async setApprovalThreshold(
+    roleCode: RoleCode,
+    maxPrincipal: string | null,
+  ): Promise<ApprovalThreshold[]> {
+    return apiRequest(`/settings/approval-thresholds/${roleCode}`, approvalThresholdListSchema, {
+      method: 'PUT',
+      body: { maxPrincipal },
+    });
   },
 };

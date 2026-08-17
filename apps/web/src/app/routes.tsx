@@ -10,6 +10,7 @@ import { NewLoanPage } from '../features/loans/new-loan-page.js';
 import { BankBalancesPage } from '../features/finance/bank-balances-page.js';
 import { FinancePage } from '../features/finance/finance-page.js';
 import { ReportsPage } from '../features/reports/reports-page.js';
+import { SettingsPage } from '../features/settings/settings-page.js';
 import { StatementsPage } from '../features/statements/statements-page.js';
 import { RequirePermission, RequireSession } from './guards.js';
 import { Shell } from './shell.js';
@@ -110,6 +111,18 @@ export function AppRoutes(): ReactNode {
           element={
             <RequirePermission permission="report.generate">
               <ReportsPage />
+            </RequirePermission>
+          }
+        />
+
+        {/* `settings.manage` rather than a read permission: every control on
+            this screen writes, and a read-only view of it would be a page whose
+            only two buttons both fail. */}
+        <Route
+          path="/settings"
+          element={
+            <RequirePermission permission="settings.manage">
+              <SettingsPage />
             </RequirePermission>
           }
         />

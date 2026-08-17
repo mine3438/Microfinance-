@@ -234,6 +234,36 @@ export const loanListQuerySchema = paginationQuerySchema.extend({
 
 export type LoanListQuery = z.infer<typeof loanListQuerySchema>;
 
+/**
+ * BOT's loan type taxonomy, as a client needs it to define a product.
+ *
+ * Served rather than embedded. A second copy of BOT's list is a list that can
+ * disagree with BOT's, and every product's `botLoanType` decides which MSP2-04
+ * row its loans report on.
+ *
+ * `parentCode` is set on the two Salaried sub-types. BOT's template gives the
+ * parent an input row of its own at row 23 as well as its children at 24 and
+ * 25, so all three are choosable; the field is here so a screen can show the
+ * relationship rather than presenting fourteen flat options.
+ */
+export const botLoanTypeSchema = z
+  .object({
+    code: z.string(),
+    name: z.string(),
+    /** BOT's own line number, which is the order their form lists them in. */
+    sno: z.number().int().positive(),
+    parentCode: z.string().nullable(),
+    /**
+     * Which provisioning schedule loans of this type classify on. Housing
+     * microfinance provisions on BOT's longer bands — see 02-BOT-REPORTING-SPEC
+     * §4.1 — so this is a consequence of the choice, not decoration.
+     */
+    provisioningSchedule: z.enum(['standard', 'housing']),
+  })
+  .strict();
+
+export type BotLoanType = z.infer<typeof botLoanTypeSchema>;
+
 /** Loan products, as a client needs them to fill in an application. */
 export const loanProductSchema = z
   .object({
