@@ -26,6 +26,8 @@ import { type SavingsRepository } from '../modules/savings/savings-repository.js
 import { registerSavingsRoutes } from '../modules/savings/routes.js';
 import { type PenaltyRepository } from '../modules/penalties/penalty-repository.js';
 import { registerPenaltyRoutes } from '../modules/penalties/routes.js';
+import { type SettingsRepository } from '../modules/settings/settings-repository.js';
+import { registerSettingsRoutes } from '../modules/settings/routes.js';
 import { type CellMapRepository } from '../modules/exports/cell-map.js';
 import { type ExportRepository } from '../modules/exports/export-repository.js';
 import { registerExportRoutes } from '../modules/exports/routes.js';
@@ -63,6 +65,7 @@ export interface ServerDependencies {
   readonly complaints: ComplaintRepository;
   readonly savings: SavingsRepository;
   readonly penalties: PenaltyRepository;
+  readonly settings: SettingsRepository;
   readonly exports: ExportRepository;
   readonly cellMaps: CellMapRepository;
   readonly tokens: AccessTokenService;
@@ -97,6 +100,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     complaints,
     savings,
     penalties,
+    settings,
     exports,
     cellMaps,
     tokens,
@@ -156,7 +160,11 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     // origin list may not be a wildcard: browsers refuse `*` with credentials,
     // and reflecting arbitrary origins would leave no boundary.
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    // PUT belongs here and was missing. The statements screen has issued PUT
+    // since it was built, and the suites never caught it because Fastify's
+    // `inject` bypasses CORS entirely — a browser would have failed the
+    // preflight while every test passed.
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Correlation-Id'],
     maxAge: 600,
   });
@@ -257,6 +265,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerComplaintRoutes(app, { complaints, tokens, now });
   registerSavingsRoutes(app, { savings, tokens, now });
   registerPenaltyRoutes(app, { penalties, tokens, now });
+  registerSettingsRoutes(app, { settings, tokens });
   registerExportRoutes(app, { filings, exports, cellMaps, tokens });
 
   return app;

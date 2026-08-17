@@ -177,6 +177,13 @@ export {
 } from './statements.js';
 
 export {
+  approvalThresholdSchema,
+  setApprovalThresholdRequestSchema,
+  type ApprovalThreshold,
+  type SetApprovalThresholdRequest,
+} from './settings.js';
+
+export {
   SAVINGS_ACCOUNT_STATUSES,
   SAVINGS_DIRECTIONS,
   createSavingsProductRequestSchema,

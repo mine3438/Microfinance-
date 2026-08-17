@@ -1921,3 +1921,46 @@ screen, so even an answer had nowhere to go. The same is true of penalty terms �
 `loan_products` carries the columns and `/loan-products` is GET-only, so a
 product cannot be created through the API at all. That is a missing settings
 surface rather than a missing decision, and it is the next piece of work.
+
+### 25.2 CORS was missing PUT, and the suites could not see it
+
+The web client has issued `PUT` since the statements screen was built —
+`/statements/:form/:year/:quarter` is how a balance sheet is saved. The server's
+CORS configuration listed `GET, POST, PATCH, DELETE`.
+
+A browser preflighting that request would have been refused, and every test
+passed regardless, because Fastify's `inject` addresses the router directly and
+never goes through CORS. So the statements screen worked in 1,400 tests and
+would have failed the first time a person opened it.
+
+`PUT` is now in the list. The general lesson is the one this session keeps
+teaching: a suite that bypasses a layer cannot test that layer, and the gap is
+invisible precisely where the tests are greenest.
+
+## 26. Settings — where an institution's own figures go
+
+§13.3 asked an institution for its approval thresholds as though they were a
+decision somebody could give once. They are not. Two providers will set them
+differently, both will change them next year, and no answer belongs in a
+migration this system ships.
+
+The deeper problem was that there was nowhere to put an answer. `approval_thresholds`
+was read by the approval check and written by nothing — no endpoint, no screen —
+so the lending workflow was inert and the fix was not a decision but a missing
+surface.
+
+`GET /settings/approval-thresholds` lists **every role**, including those with no
+limit, because a screen has to show "no authority" as a state rather than as an
+absent row. `PUT /settings/approval-thresholds/:role` sets one, and passing
+`null` clears it — which *removes* the authority rather than making it
+unlimited. That is the same reading the table was seeded empty for: a missing
+row means a role may sanction nothing.
+
+Writing is `settings.manage`, held by the institution administrator alone. A
+role that could raise its own limit would not be a limit. Reading is `loan.read`,
+because an officer needs to know what can be sanctioned before submitting an
+application that would be refused.
+
+Still to come on this surface: creating loan products, which is where §13.1's
+penalty figures belong — `/loan-products` is GET-only today, so a product cannot
+be created through the API at all.
