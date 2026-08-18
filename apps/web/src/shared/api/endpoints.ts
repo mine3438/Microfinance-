@@ -6,6 +6,9 @@ import {
   branchSchema,
   complaintNatureSchema,
   complaintSchema,
+  savingsAccountSchema,
+  savingsProductSchema,
+  savingsTransactionSchema,
   bankAccountBalanceSchema,
   bankAccountSchema,
   clientSchema,
@@ -61,9 +64,16 @@ import {
   type RecordPaymentRequest,
   type LogComplaintRequest,
   type ReferComplaintRequest,
+  type OpenSavingsAccountRequest,
+  type RecordSavingsEntryRequest,
   type RepaymentSchedule,
   type ResolveComplaintRequest,
   type ReversePaymentRequest,
+  type ReverseSavingsEntryRequest,
+  type SavingsAccount,
+  type SavingsAccountListQuery,
+  type SavingsProduct,
+  type SavingsTransaction,
   type RoleCode,
   type SessionUser,
 } from '@mfi/contracts';
@@ -89,6 +99,9 @@ const approvalThresholdListSchema = z.array(approvalThresholdSchema);
 const branchListSchema = z.array(branchSchema);
 const complaintNatureListSchema = z.array(complaintNatureSchema);
 const complaintPageSchema = pageSchema(complaintSchema);
+const savingsProductListSchema = z.array(savingsProductSchema);
+const savingsAccountPageSchema = pageSchema(savingsAccountSchema);
+const savingsTransactionListSchema = z.array(savingsTransactionSchema);
 const financeEntryPageSchema = pageSchema(financeEntrySchema);
 const lineListSchema = z.array(msp2_02LineSchema);
 const institutionListSchema = z.array(financialInstitutionSchema);
@@ -322,6 +335,75 @@ export const complaints = {
   /** Refer one onward. Dated, because MSP2-06 counts referrals as at a date. */
   async refer(id: string, request: ReferComplaintRequest): Promise<Complaint> {
     return apiRequest(`/complaints/${id}/referral`, complaintSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+};
+
+export const savings = {
+  async products(): Promise<SavingsProduct[]> {
+    return apiRequest('/savings/products', savingsProductListSchema);
+  },
+
+  /**
+   * Define a savings product.
+   *
+   * `settings.manage`, not `savings.manage`: whether a product is compulsory
+   * decides whether its balances appear on three BOT forms or on none.
+   */
+  async createProduct(request: {
+    code: string;
+    name: string;
+    isCompulsory: boolean;
+  }): Promise<SavingsProduct> {
+    return apiRequest('/savings/products', savingsProductSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  async listAccounts(
+    parameters: Partial<SavingsAccountListQuery> = {},
+  ): Promise<Page<SavingsAccount>> {
+    return apiRequest(`/savings/accounts${query({ ...parameters })}`, savingsAccountPageSchema);
+  },
+
+  async openAccount(request: OpenSavingsAccountRequest): Promise<SavingsAccount> {
+    return apiRequest('/savings/accounts', savingsAccountSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  async transactions(accountId: string): Promise<SavingsTransaction[]> {
+    return apiRequest(`/savings/accounts/${accountId}/transactions`, savingsTransactionListSchema);
+  },
+
+  /**
+   * Record a deposit or a withdrawal.
+   *
+   * The balance is never sent. The server locks the account row, reads the
+   * balance, refuses an overdraft and writes both the entry and the new
+   * balance in one transaction — a browser computing the result would be
+   * computing it from a figure that may already be stale.
+   */
+  async recordEntry(
+    accountId: string,
+    request: RecordSavingsEntryRequest,
+  ): Promise<SavingsTransaction> {
+    return apiRequest(`/savings/accounts/${accountId}/transactions`, savingsTransactionSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /** Reverse an entry. A mistake is corrected by a reversing entry, never by an edit. */
+  async reverseEntry(
+    transactionId: string,
+    request: ReverseSavingsEntryRequest,
+  ): Promise<SavingsTransaction> {
+    return apiRequest(`/savings/transactions/${transactionId}/reversal`, savingsTransactionSchema, {
       method: 'POST',
       body: request,
     });

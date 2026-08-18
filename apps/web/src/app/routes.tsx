@@ -11,6 +11,7 @@ import { NewLoanPage } from '../features/loans/new-loan-page.js';
 import { BankBalancesPage } from '../features/finance/bank-balances-page.js';
 import { FinancePage } from '../features/finance/finance-page.js';
 import { ReportsPage } from '../features/reports/reports-page.js';
+import { SavingsPage } from '../features/savings/savings-page.js';
 import { SettingsPage } from '../features/settings/settings-page.js';
 import { StatementsPage } from '../features/statements/statements-page.js';
 import { RequirePermission, RequireSession } from './guards.js';
@@ -112,6 +113,15 @@ export function AppRoutes(): ReactNode {
           element={
             <RequirePermission permission="report.generate">
               <ReportsPage />
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="/savings"
+          element={
+            <RequirePermission permission="savings.read">
+              <SavingsPage />
             </RequirePermission>
           }
         />

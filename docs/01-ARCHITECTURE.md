@@ -2128,3 +2128,47 @@ shared idea.
 expressed in terms of it — so a status is never two colours in two places, and
 the rule that a badge always renders text rather than colour alone lives in one
 component instead of in a convention.
+
+## 28. Savings, on screen
+
+The same gap as complaints, on a larger surface: savings had a ledger, a
+repository, an API and no way for a teller to record a shilling. MSP2-01 Sno46,
+MSP2-03's provision deduction and MSP2-10's per-district column would all have
+reported zero.
+
+`/savings` is deliberately **less than a savings subsystem**, and the omissions
+are the design. §13.4 asks for the interest rate basis, the accrual frequency,
+the minimum balance and the withdrawal rules, and none of those are answered —
+so there is no interest control anywhere on the screen and a balance is what was
+paid in less what was taken out. A rate here would be a fabricated credit on a
+saver's account, which is exactly what §13 exists to prevent. A test asserts the
+absence, because an omission nothing checks is an omission that gets filled in
+later by someone who assumes it was an oversight.
+
+**No balance is ever sent.** A deposit sends the amount and the date; the server
+locks the account row, refuses an overdraft, and writes the entry and the new
+balance in one transaction. The figure shown afterwards is the server's. A
+browser computing it would be computing from a balance that may already be stale
+by the time the request lands.
+
+A product's compulsory flag is rendered on every account and on every option in
+the product picker. It is not a naming convention: it decides whether those
+balances appear on three BOT forms or on none, with validation rule 16 tying
+MSP2-10's district column back to MSP2-01 Sno46.
+
+The statement marks reversing entries. There is no edit and no delete on this
+screen because the database grants neither privilege — a mistake is corrected by
+a reversing entry that leaves both the error and the correction visible.
+
+### 28.1 A limitation stated rather than hidden
+
+The saver picker lists the first hundred active borrowers. An institution with
+more has savers it cannot select, and the field says so when the list is
+truncated rather than silently ending at a hundred. The fix is a
+search-as-you-type picker against `GET /clients`, which already takes a `search`
+parameter; it is a piece of work in its own right and is not smuggled into this
+one.
+
+`Field`'s `hint` now accepts `string | undefined`, matching `error`. Under
+`exactOptionalPropertyTypes` a conditionally-present hint could not otherwise be
+passed without a spread at every call site.
