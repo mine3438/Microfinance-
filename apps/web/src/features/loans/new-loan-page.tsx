@@ -1,10 +1,10 @@
-import { type Client, type LoanProduct, type RepaymentSchedule } from '@mfi/contracts';
+import { type LoanProduct, type RepaymentSchedule } from '@mfi/contracts';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ApiRequestError } from '../../shared/api/client.js';
-import { clients as clientsApi, loans as loansApi } from '../../shared/api/endpoints.js';
+import { loans as loansApi } from '../../shared/api/endpoints.js';
 import {
   formatDate,
   formatMoney,
@@ -12,6 +12,7 @@ import {
   formatMonthlyRate,
 } from '../../shared/lib/format.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
+import { ClientPicker } from '../../shared/ui/client-picker.js';
 import { Field } from '../../shared/ui/field.js';
 import { Panel } from '../../shared/ui/panel.js';
 import { Spinner } from '../../shared/ui/spinner.js';
@@ -40,11 +41,6 @@ export function NewLoanPage(): ReactNode {
   const [principal, setPrincipal] = useState('');
   const [monthlyRate, setMonthlyRate] = useState('');
   const [termMonths, setTermMonths] = useState('');
-
-  const clientList = useQuery({
-    queryKey: ['clients', { limit: 100, status: 'active' }],
-    queryFn: () => clientsApi.list({ limit: 100, status: 'active' }),
-  });
 
   const productList = useQuery({ queryKey: ['loan-products'], queryFn: () => loansApi.products() });
 
@@ -125,25 +121,13 @@ export function NewLoanPage(): ReactNode {
         <Panel title="Terms">
           {create.error !== null && <ErrorNotice error={create.error} />}
 
-          <Field id="client" label="Borrower" error={fieldError('clientId')}>
-            {(props) => (
-              <select
-                {...props}
-                className="input"
-                value={clientId}
-                onChange={(event) => {
-                  setClientId(event.target.value);
-                }}
-              >
-                <option value="">Choose a borrower…</option>
-                {clientList.data?.items.map((client: Client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.fullName} — {client.clientCode}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+          <ClientPicker
+            id="client"
+            label="Borrower"
+            value={clientId}
+            onChange={setClientId}
+            error={fieldError('clientId')}
+          />
 
           <Field id="product" label="Product" error={fieldError('productId')}>
             {(props) => (

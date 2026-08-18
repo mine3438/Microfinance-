@@ -2160,14 +2160,37 @@ The statement marks reversing entries. There is no edit and no delete on this
 screen because the database grants neither privilege — a mistake is corrected by
 a reversing entry that leaves both the error and the correction visible.
 
-### 28.1 A limitation stated rather than hidden
+### 28.1 The borrower picker, and a defect it uncovered
 
-The saver picker lists the first hundred active borrowers. An institution with
-more has savers it cannot select, and the field says so when the list is
-truncated rather than silently ending at a hundred. The fix is a
-search-as-you-type picker against `GET /clients`, which already takes a `search`
-parameter; it is a piece of work in its own right and is not smuggled into this
-one.
+The saver picker first listed the first hundred active borrowers, with the field
+saying so when truncated. Looking for the same pattern elsewhere found it on the
+**new-loan screen**, where it was worse: the same hundred-row `<select>`, and no
+mention of the limit at all. An institution with more than a hundred active
+borrowers could not originate a loan for the hundred-and-first, and nothing on
+screen said why.
+
+That is not a scaling nicety deferred to later. It is a borrower the system
+refuses to serve, silently, on the screen that exists to serve them.
+
+`ClientPicker` in `shared/ui` replaces both. The search runs on the server —
+`GET /clients?search=` already matched name or client code — and returns at most
+twenty-five, which is a number a teller can read where two hundred is a list
+they scroll past. When more match, the field says so and asks for a narrower
+search rather than quietly cutting the list off.
+
+Two native controls, a search input and a `<select>`, rather than a combobox.
+Both are keyboard-operable and announced correctly by every screen reader
+without a single `aria-activedescendant`; a hand-rolled combobox is where
+accessibility quietly breaks, and §26.4 is a fresh reminder of how long such a
+break can go unnoticed.
+
+`useDebounced` keeps a name typed at speed to one request instead of one per
+keystroke. That matters beyond politeness: eleven discarded answers are wasteful,
+but on a branch connection the last request sent is not reliably the last to
+return, so an undebounced picker can settle on the results for "Amin" while the
+box reads "Amina". The debounce is tested against the hook rather than through
+the component — driving fake timers through `userEvent.type` deadlocks, and a
+real-timer race would be flaky rather than informative.
 
 `Field`'s `hint` now accepts `string | undefined`, matching `error`. Under
 `exactOptionalPropertyTypes` a conditionally-present hint could not otherwise be

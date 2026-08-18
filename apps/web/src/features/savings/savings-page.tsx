@@ -9,13 +9,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
 import { ApiRequestError } from '../../shared/api/client.js';
-import {
-  branches as branchesApi,
-  clients as clientsApi,
-  savings as savingsApi,
-} from '../../shared/api/endpoints.js';
+import { branches as branchesApi, savings as savingsApi } from '../../shared/api/endpoints.js';
 import { formatDate, formatMoney, today } from '../../shared/lib/format.js';
 import { Badge } from '../../shared/ui/badge.js';
+import { ClientPicker } from '../../shared/ui/client-picker.js';
 import { EmptyState } from '../../shared/ui/empty-state.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
 import { Field } from '../../shared/ui/field.js';
@@ -443,11 +440,6 @@ function OpenAccountForm({
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-  const clientList = useQuery({
-    queryKey: ['clients', 'for-savings'],
-    queryFn: () => clientsApi.list({ status: 'active', limit: 100 }),
-  });
-
   const [clientId, setClientId] = useState('');
   const [branchId, setBranchId] = useState(session.user?.branch?.id ?? '');
   const [productId, setProductId] = useState('');
@@ -479,35 +471,13 @@ function OpenAccountForm({
           open.mutate();
         }}
       >
-        <Field
+        <ClientPicker
           id="savings-client"
           label="Saver"
-          hint={
-            clientList.data?.nextCursor === null || clientList.data === undefined
-              ? undefined
-              : 'Showing the first 100 active borrowers. A saver beyond them cannot be chosen here yet.'
-          }
+          value={clientId}
+          onChange={setClientId}
           error={fieldError('clientId')}
-        >
-          {(props) => (
-            <select
-              {...props}
-              className="input"
-              value={clientId}
-              required
-              onChange={(event) => {
-                setClientId(event.target.value);
-              }}
-            >
-              <option value="">Choose a borrower…</option>
-              {(clientList.data?.items ?? []).map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.fullName} · {client.clientCode}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
+        />
 
         <Field id="savings-branch" label="Branch" error={fieldError('branchId')}>
           {(props) => (
