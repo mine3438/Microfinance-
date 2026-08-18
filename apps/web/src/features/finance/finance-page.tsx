@@ -7,6 +7,7 @@ import { finance as financeApi, reference } from '../../shared/api/endpoints.js'
 import { formatDate, formatMoney, today } from '../../shared/lib/format.js';
 import { EmptyState } from '../../shared/ui/empty-state.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
+import { Field } from '../../shared/ui/field.js';
 import { Panel } from '../../shared/ui/panel.js';
 import { Spinner } from '../../shared/ui/spinner.js';
 import { useSession } from '../auth/session.js';
@@ -172,22 +173,25 @@ export function FinancePage(): ReactNode {
               )}
             </label>
 
-            <label className="field" htmlFor="entry-date">
-              <span className="field__label">Date</span>
-              <input
-                id="entry-date"
-                className="input"
-                type="date"
-                value={form.entryDate}
-                required
-                onChange={(event) => {
-                  setForm((current) => ({ ...current, entryDate: event.target.value }));
-                }}
-              />
-              <span className="field__hint">
-                The quarter is taken from this date, never typed separately.
-              </span>
-            </label>
+            <Field
+              id="entry-date"
+              label="Date"
+              hint="The quarter is taken from this date, never typed separately."
+              error={fieldError('entryDate')}
+            >
+              {(props) => (
+                <input
+                  {...props}
+                  className="input"
+                  type="date"
+                  value={form.entryDate}
+                  required
+                  onChange={(event) => {
+                    setForm((current) => ({ ...current, entryDate: event.target.value }));
+                  }}
+                />
+              )}
+            </Field>
 
             <label className="field field--wide" htmlFor="entry-description">
               <span className="field__label">Description</span>

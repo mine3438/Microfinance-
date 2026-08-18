@@ -2040,17 +2040,37 @@ parent an input row of its own at row 23 as well as its children at 24 and 25,
 so all three are choosable and the screen shows the structure rather than
 fourteen flat options.
 
-One implementation note worth keeping. The forms use the shared `Field`
-primitive rather than the hand-rolled `<label><span/>…</label>` that
-`bank-balances-page.tsx` uses. The difference is not cosmetic: with the hint
-inside the `<label>`, a control's accessible name becomes its label *plus* its
-hint, so a screen reader announces the whole paragraph as the field's name. The
-tests found it immediately — `getByLabelText('BOT loan type')` matched nothing.
-`Field` puts the hint outside the label and ties it with `aria-describedby`,
-which is what that component exists for. The older screen has the same defect
-and no test that would notice.
+### 26.4 A labelling defect the settings screen exposed
 
-### 26.4 What this surface still lacks
+The settings forms use the shared `Field` primitive rather than the hand-rolled
+`<label><span/>…</label>` several older screens used. The difference is not
+cosmetic: with the hint rendered *inside* the `<label>`, a control's accessible
+name becomes its label **plus** its hint, so a screen reader announces
+
+> "Currency Anything but TZS needs a rate and rate date on every balance"
+
+where it should announce "Currency". The same happens when a field error is
+rendered inside the label — the error text joins the field's name too, so the
+name changes the moment the field is wrong.
+
+The settings tests found it immediately, because `getByLabelText` looks up a
+control by its accessible name and `getByLabelText('BOT loan type')` matched
+nothing. That is the whole reason the defect had survived elsewhere:
+`bank-balances-page.tsx` had **no test file at all**, and the two screens that
+did have tests had never queried these particular fields by label.
+
+Five sites are converted — one on the finance page, one on the reports page,
+three on the bank-balances page — and `Field` now supplies the label, ties the
+hint and the error with `aria-describedby`, and sets `aria-invalid`. Three new
+tests assert each control's accessible name is the label alone and that the hint
+is still reachable as a description, so the regression cannot return quietly.
+
+`bank-balances-page.tsx` also gained the test file it never had, covering the
+labelling and the property that matters most on that screen: a foreign balance
+is sent in its own currency with the rate it was taken at, and no TZS equivalent
+is computed in the browser.
+
+### 26.5 What this surface still lacks
 
 Amending or retiring a product is absent. `loan_products.status` carries
 `'retired'` and nothing sets it, so a product defined in error stays on the

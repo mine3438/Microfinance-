@@ -149,3 +149,19 @@ describe('FinancePage', () => {
     expect(within(table).getByText('2,400,000.00')).toBeInTheDocument();
   });
 });
+
+describe('field labelling', () => {
+  it('names the date field by its label alone, not by its label and its hint', async () => {
+    // A hint rendered *inside* the `<label>` becomes part of the control's
+    // accessible name, so a screen reader announces the whole explanatory
+    // paragraph where it should announce "Date". The shared `Field` primitive
+    // puts the hint outside the label and ties it with `aria-describedby`.
+    renderPage();
+
+    const date = await screen.findByLabelText('Date');
+    expect(date.getAttribute('type')).toBe('date');
+    // The hint is still reachable — as a description, which is what it is.
+    expect(date.getAttribute('aria-describedby')).toBe('entry-date-hint');
+    expect(screen.getByText(/quarter is taken from this date/)).toBeInTheDocument();
+  });
+});

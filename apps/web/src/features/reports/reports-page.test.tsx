@@ -606,3 +606,16 @@ describe('ReportsPage', () => {
     expect(within(panel).getByText('Referred to Courts')).toBeTruthy();
   });
 });
+
+describe('field labelling', () => {
+  it('names the rate-conversion field by its label alone, not by its label and its hint', async () => {
+    // See the same test in finance-page.test.tsx: a hint inside the `<label>`
+    // is read as part of the field's name rather than as its description.
+    quarterlyReturn.mockResolvedValue(compiledReturn());
+    renderPage();
+
+    const conversion = await screen.findByLabelText('Rate conversion');
+    expect(conversion.getAttribute('aria-describedby')).toBe('report-annualisation-hint');
+    expect(screen.getByText(/simple or compounded is unconfirmed/)).toBeInTheDocument();
+  });
+});

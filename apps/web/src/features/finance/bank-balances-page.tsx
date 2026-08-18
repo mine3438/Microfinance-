@@ -7,6 +7,7 @@ import { finance as financeApi, reference } from '../../shared/api/endpoints.js'
 import { formatDate, formatMoney, formatQuarter } from '../../shared/lib/format.js';
 import { EmptyState } from '../../shared/ui/empty-state.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
+import { Field } from '../../shared/ui/field.js';
 import { Panel } from '../../shared/ui/panel.js';
 import { Spinner } from '../../shared/ui/spinner.js';
 import { useSession } from '../auth/session.js';
@@ -126,62 +127,69 @@ export function BankBalancesPage(): ReactNode {
             </label>
 
             {listed ? (
-              <label className="field field--wide" htmlFor="institution-code">
-                <span className="field__label">Institution</span>
-                <select
-                  id="institution-code"
-                  className="input"
-                  value={institutionCode}
-                  required
-                  onChange={(event) => {
-                    setInstitutionCode(event.target.value);
-                  }}
-                >
-                  <option value="">Choose from BOT&rsquo;s list…</option>
-                  {choices.map((institution) => (
-                    <option key={institution.code} value={institution.code}>
-                      {institution.name}
-                    </option>
-                  ))}
-                </select>
-                {fieldError('institutionCode') !== undefined && (
-                  <span className="field__error">{fieldError('institutionCode')}</span>
+              <Field
+                id="institution-code"
+                label="Institution"
+                error={fieldError('institutionCode')}
+              >
+                {(props) => (
+                  <select
+                    {...props}
+                    className="input"
+                    value={institutionCode}
+                    required
+                    onChange={(event) => {
+                      setInstitutionCode(event.target.value);
+                    }}
+                  >
+                    <option value="">Choose from BOT&rsquo;s list…</option>
+                    {choices.map((institution) => (
+                      <option key={institution.code} value={institution.code}>
+                        {institution.name}
+                      </option>
+                    ))}
+                  </select>
                 )}
-              </label>
+              </Field>
             ) : (
-              <label className="field field--wide" htmlFor="counterparty-name">
-                <span className="field__label">Counterparty</span>
-                <input
-                  id="counterparty-name"
-                  className="input"
-                  value={counterpartyName}
-                  required
-                  onChange={(event) => {
-                    setCounterpartyName(event.target.value);
-                  }}
-                />
-                <span className="field__hint">BOT publishes no list for this section.</span>
-                {fieldError('counterpartyName') !== undefined && (
-                  <span className="field__error">{fieldError('counterpartyName')}</span>
+              <Field
+                id="counterparty-name"
+                label="Counterparty"
+                hint="BOT publishes no list for this section."
+                error={fieldError('counterpartyName')}
+              >
+                {(props) => (
+                  <input
+                    {...props}
+                    className="input"
+                    value={counterpartyName}
+                    required
+                    onChange={(event) => {
+                      setCounterpartyName(event.target.value);
+                    }}
+                  />
                 )}
-              </label>
+              </Field>
             )}
 
-            <label className="field" htmlFor="currency-code">
-              <span className="field__label">Currency</span>
-              <input
-                id="currency-code"
-                className="input"
-                value={currencyCode}
-                maxLength={3}
-                onChange={(event) => {
-                  setCurrencyCode(event.target.value.toUpperCase());
-                }}
-              />
-              <span className="field__hint">
-                Anything but TZS needs a rate and rate date on every balance.
-              </span>
-            </label>
+            <Field
+              id="currency-code"
+              label="Currency"
+              hint="Anything but TZS needs a rate and rate date on every balance."
+              error={fieldError('currencyCode')}
+            >
+              {(props) => (
+                <input
+                  {...props}
+                  className="input"
+                  value={currencyCode}
+                  maxLength={3}
+                  onChange={(event) => {
+                    setCurrencyCode(event.target.value.toUpperCase());
+                  }}
+                />
+              )}
+            </Field>
 
             <div className="report-controls__action">
               <button className="button button--primary" type="submit" disabled={open.isPending}>
@@ -430,22 +438,24 @@ function BalanceRow({
 
               {!inTzs && (
                 <>
-                  <label className="field" htmlFor={`rate-${account.id}`}>
-                    <span className="field__label">Rate to TZS</span>
-                    <input
-                      id={`rate-${account.id}`}
-                      className="input"
-                      inputMode="decimal"
-                      value={rate}
-                      required
-                      onChange={(event) => {
-                        setRate(event.target.value);
-                      }}
-                    />
-                    <span className="field__hint">
-                      Which rate BOT expects is unconfirmed (§11.6); the one used is recorded.
-                    </span>
-                  </label>
+                  <Field
+                    id={`rate-${account.id}`}
+                    label="Rate to TZS"
+                    hint="Which rate BOT expects is unconfirmed (§11.6); the one used is recorded."
+                  >
+                    {(props) => (
+                      <input
+                        {...props}
+                        className="input"
+                        inputMode="decimal"
+                        value={rate}
+                        required
+                        onChange={(event) => {
+                          setRate(event.target.value);
+                        }}
+                      />
+                    )}
+                  </Field>
 
                   <label className="field" htmlFor={`rate-date-${account.id}`}>
                     <span className="field__label">Rate date</span>

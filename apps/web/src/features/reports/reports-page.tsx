@@ -10,6 +10,7 @@ import { ApiRequestError } from '../../shared/api/client.js';
 import { reports as reportsApi } from '../../shared/api/endpoints.js';
 import { formatDate, formatQuarter } from '../../shared/lib/format.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
+import { Field } from '../../shared/ui/field.js';
 import { Panel } from '../../shared/ui/panel.js';
 import { Spinner } from '../../shared/ui/spinner.js';
 import { ReturnForms } from './return-forms.js';
@@ -132,29 +133,31 @@ export function ReportsPage(): ReactNode {
             </select>
           </label>
 
-          <label className="field" htmlFor="report-annualisation">
-            <span className="field__label">Rate conversion</span>
-            <select
-              id="report-annualisation"
-              className="input"
-              value={draft.annualisation}
-              onChange={(event) => {
-                setDraft((current) => ({
-                  ...current,
-                  annualisation: event.target.value as AnnualisationConvention,
-                }));
-              }}
-            >
-              {ANNUALISATION_CONVENTIONS.map((convention) => (
-                <option key={convention} value={convention}>
-                  {convention === 'simple' ? 'Simple (×12)' : 'Effective (compounded)'}
-                </option>
-              ))}
-            </select>
-            <span className="field__hint">
-              Whether BOT reads a monthly rate as simple or compounded is unconfirmed (§11.2).
-            </span>
-          </label>
+          <Field
+            id="report-annualisation"
+            label="Rate conversion"
+            hint="Whether BOT reads a monthly rate as simple or compounded is unconfirmed (§11.2)."
+          >
+            {(props) => (
+              <select
+                {...props}
+                className="input"
+                value={draft.annualisation}
+                onChange={(event) => {
+                  setDraft((current) => ({
+                    ...current,
+                    annualisation: event.target.value as AnnualisationConvention,
+                  }));
+                }}
+              >
+                {ANNUALISATION_CONVENTIONS.map((convention) => (
+                  <option key={convention} value={convention}>
+                    {convention === 'simple' ? 'Simple (×12)' : 'Effective (compounded)'}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
 
           <div className="report-controls__action">
             <button className="button button--primary" type="submit" disabled={query.isFetching}>
