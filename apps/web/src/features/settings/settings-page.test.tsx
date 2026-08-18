@@ -19,6 +19,7 @@ const setApprovalThreshold = vi.fn<(...args: unknown[]) => Promise<ApprovalThres
 const products = vi.fn<() => Promise<LoanProduct[]>>();
 const createProduct = vi.fn<(...args: unknown[]) => Promise<LoanProduct>>();
 const loanTypes = vi.fn<() => Promise<BotLoanType[]>>();
+const setProductStatus = vi.fn<(...args: unknown[]) => Promise<LoanProduct>>();
 
 vi.mock('../../shared/api/endpoints.js', () => ({
   settings: {
@@ -29,6 +30,7 @@ vi.mock('../../shared/api/endpoints.js', () => ({
   loans: {
     products: (): Promise<LoanProduct[]> => products(),
     createProduct: (...args: unknown[]): Promise<LoanProduct> => createProduct(...args),
+    setProductStatus: (...args: unknown[]): Promise<LoanProduct> => setProductStatus(...args),
   },
   reference: {
     loanTypes: (): Promise<BotLoanType[]> => loanTypes(),
@@ -122,6 +124,7 @@ beforeEach(() => {
   loanTypes.mockResolvedValue(LOAN_TYPES);
   products.mockResolvedValue([product()]);
   createProduct.mockResolvedValue(product());
+  setProductStatus.mockResolvedValue(product({ status: 'retired' }));
 });
 
 describe('approval limits', () => {
@@ -287,3 +290,37 @@ async function fillRequiredFields(
   );
   await userEvent.type(screen.getByLabelText('Largest principal'), '5000000.00');
 }
+
+describe('retiring a product', () => {
+  it('retires an active product, which nothing could do before', async () => {
+    renderPage();
+
+    const row = await rowContaining('Business Working Capital');
+    await userEvent.click(within(row).getByRole('button', { name: 'Retire' }));
+
+    expect(setProductStatus).toHaveBeenCalledWith(
+      '018f0000-0000-7000-8000-000000000001',
+      'retired',
+    );
+  });
+
+  it('offers to bring back a retired one, so a mis-click is not permanent', async () => {
+    products.mockResolvedValue([product({ status: 'retired' })]);
+    renderPage();
+
+    const row = await rowContaining('Business Working Capital');
+    expect(within(row).getByText('Retired')).toBeTruthy();
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Bring back' }));
+    expect(setProductStatus).toHaveBeenCalledWith('018f0000-0000-7000-8000-000000000001', 'active');
+  });
+
+  it('still shows a retired product rather than hiding it', async () => {
+    // Hiding it would leave an administrator no way to bring it back, and the
+    // loans written against it still name it.
+    products.mockResolvedValue([product({ status: 'retired' })]);
+    renderPage();
+
+    expect(await screen.findByText('Business Working Capital')).toBeTruthy();
+  });
+});

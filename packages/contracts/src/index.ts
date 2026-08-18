@@ -102,6 +102,7 @@ export {
   secureLoanRequestSchema,
   submitLoanRequestSchema,
   termMonthsSchema,
+  updateLoanProductRequestSchema,
   type BotLoanType,
   type CreateLoanProductRequest,
   type CreateLoanRequest,
@@ -117,6 +118,7 @@ export {
   type RepaymentSchedule,
   type ScheduleInstalment,
   type SecureLoanRequest,
+  type UpdateLoanProductRequest,
 } from './loans.js';
 
 export {
@@ -201,6 +203,7 @@ export {
   savingsAccountSchema,
   savingsProductSchema,
   savingsTransactionSchema,
+  updateSavingsProductRequestSchema,
   type CreateSavingsProductRequest,
   type OpenSavingsAccountRequest,
   type RecordSavingsEntryRequest,
@@ -211,6 +214,7 @@ export {
   type SavingsDirection,
   type SavingsProduct,
   type SavingsTransaction,
+  type UpdateSavingsProductRequest,
 } from './savings.js';
 
 export {

@@ -95,6 +95,18 @@ export interface SavingsRepository {
     userId: string,
     request: CreateSavingsProductRequest,
   ): Promise<SavingsProduct>;
+  setProductStatus(
+    institutionId: string,
+    userId: string,
+    productId: string,
+    status: 'active' | 'closed',
+  ): Promise<SavingsProduct | null>;
+  /** A product's status, so the use case can refuse a closed one by name. */
+  findProduct(
+    institutionId: string,
+    userId: string,
+    productId: string,
+  ): Promise<SavingsProduct | null>;
   listAccounts(
     institutionId: string,
     userId: string,
@@ -153,6 +165,44 @@ export class PostgresSavingsRepository implements SavingsRepository {
         throw notFound('The savings product could not be read back after being created.');
       }
       return toProduct(row);
+    });
+  }
+
+  /**
+   * Close a product to new accounts, or reopen it.
+   *
+   * Accounts already open against it are untouched. Their balances still report
+   * on MSP2-01 Sno46 and MSP2-10, and making real money vanish from a return
+   * because a product was withdrawn would be a misstatement, not a tidy-up.
+   */
+  public async setProductStatus(
+    institutionId: string,
+    userId: string,
+    productId: string,
+    status: 'active' | 'closed',
+  ): Promise<SavingsProduct | null> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const updated = await client.query<ProductRow>(
+        `UPDATE savings_products
+            SET status = $2
+          WHERE id = $1
+        RETURNING id, code, name, is_compulsory, status`,
+        [productId, status],
+      );
+      const row = updated.rows[0];
+      return row === undefined ? null : toProduct(row);
+    });
+  }
+
+  public async findProduct(
+    institutionId: string,
+    userId: string,
+    productId: string,
+  ): Promise<SavingsProduct | null> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const rows = await client.query<ProductRow>(`${PRODUCT_SELECT} WHERE id = $1`, [productId]);
+      const row = rows.rows[0];
+      return row === undefined ? null : toProduct(row);
     });
   }
 

@@ -58,6 +58,20 @@ export const createSavingsProductRequestSchema = z
 
 export type CreateSavingsProductRequest = z.infer<typeof createSavingsProductRequestSchema>;
 
+/**
+ * Closing a savings product, or reopening one.
+ *
+ * A closed product takes no new accounts. Accounts already open against it are
+ * untouched — their balances still report on MSP2-01 Sno46 and MSP2-10, and
+ * making them vanish because a product was withdrawn would take real money off
+ * a return.
+ */
+export const updateSavingsProductRequestSchema = z
+  .object({ status: z.enum(['active', 'closed']) })
+  .strict();
+
+export type UpdateSavingsProductRequest = z.infer<typeof updateSavingsProductRequestSchema>;
+
 export const savingsAccountSchema = z
   .object({
     id: uuidSchema,

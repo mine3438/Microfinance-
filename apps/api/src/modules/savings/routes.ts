@@ -7,6 +7,7 @@ import {
   savingsAccountListQuerySchema,
   savingsAccountSchema,
   savingsProductSchema,
+  updateSavingsProductRequestSchema,
   savingsTransactionSchema,
   uuidSchema,
 } from '@mfi/contracts';
@@ -26,6 +27,7 @@ import {
   openSavingsAccount,
   recordSavingsEntry,
   reverseSavingsEntry,
+  setSavingsProductStatus,
 } from './use-cases.js';
 
 const accountPageSchema = pageSchema(savingsAccountSchema);
@@ -83,6 +85,27 @@ export function registerSavingsRoutes(app: FastifyInstance, options: SavingsRout
 
       void reply.status(201);
       return savingsProductSchema.parse(product);
+    },
+  );
+
+  /** Close a product to new accounts, or reopen it. */
+  app.patch(
+    '/savings/products/:id',
+    { preHandler: [authenticated, requirePermission('settings.manage')] },
+    async (request): Promise<unknown> => {
+      const body = updateSavingsProductRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That savings product cannot be changed as entered.');
+      }
+
+      return savingsProductSchema.parse(
+        await setSavingsProductStatus(
+          principalOf(request),
+          idOf(request, 'id', 'savings product'),
+          body.data.status,
+          savings,
+        ),
+      );
     },
   );
 

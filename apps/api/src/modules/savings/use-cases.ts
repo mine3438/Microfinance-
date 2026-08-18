@@ -74,7 +74,44 @@ export async function openSavingsAccount(
 ): Promise<SavingsAccount> {
   refuseFutureDate(request.openedOn, now, 'A savings account cannot be opened in the future.');
 
+  // A closed product takes no new accounts. This check was missing entirely:
+  // the web client filtered closed products out of its picker and nothing on
+  // the server said no, which put a business rule in the browser — where any
+  // caller not using that browser simply did not have it.
+  const product = await savings.findProduct(
+    principal.institutionId,
+    principal.userId,
+    request.productId,
+  );
+  if (product === null) {
+    throw notFound('That savings product does not exist.');
+  }
+  if (product.status !== 'active') {
+    throw ruleViolation(
+      `${product.name} is closed to new accounts, so none can be opened against it.`,
+    );
+  }
+
   return savings.openAccount(principal.institutionId, principal.userId, request);
+}
+
+/** Close a product to new accounts, or reopen it. */
+export async function setSavingsProductStatus(
+  principal: Principal,
+  productId: string,
+  status: 'active' | 'closed',
+  savings: SavingsRepository,
+): Promise<SavingsProduct> {
+  const updated = await savings.setProductStatus(
+    principal.institutionId,
+    principal.userId,
+    productId,
+    status,
+  );
+  if (updated === null) {
+    throw notFound('That savings product does not exist.');
+  }
+  return updated;
 }
 
 export async function listSavingsTransactions(

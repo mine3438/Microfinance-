@@ -12,6 +12,7 @@ import {
   pageSchema,
   previewScheduleRequestSchema,
   repaymentScheduleSchema,
+  updateLoanProductRequestSchema,
   uuidSchema,
 } from '@mfi/contracts';
 import { type FastifyInstance, type FastifyRequest } from 'fastify';
@@ -29,6 +30,7 @@ import {
   listLoans,
   previewSchedule,
   secureLoan,
+  setLoanProductStatus,
   submitLoan,
 } from './use-cases.js';
 
@@ -39,6 +41,14 @@ const botLoanTypeListSchema = z.array(botLoanTypeSchema);
 export interface LoanRouteOptions {
   readonly loans: LoanRepository;
   readonly tokens: AccessTokenService;
+}
+
+function productIdOf(request: FastifyRequest): string {
+  const parsed = uuidSchema.safeParse((request.params as { id?: unknown }).id);
+  if (!parsed.success) {
+    throw validationFailed(parsed.error, 'That is not a loan product identifier.');
+  }
+  return parsed.data;
 }
 
 function loanIdOf(request: FastifyRequest): string {
@@ -117,6 +127,33 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
 
       void reply.status(201).header('location', `/loan-products/${product.id}`);
       return loanProductSchema.parse(product);
+    },
+  );
+
+  /**
+   * Retire a product, or bring one back.
+   *
+   * `settings.manage`, as creating one is. Only the status moves: terms are
+   * never amended in place, because a product describing terms no loan on the
+   * book was written under is worse than a retired product.
+   */
+  app.patch(
+    '/loan-products/:id',
+    { preHandler: [authenticated, requirePermission('settings.manage')] },
+    async (request): Promise<unknown> => {
+      const body = updateLoanProductRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That loan product cannot be changed as entered.');
+      }
+
+      return loanProductSchema.parse(
+        await setLoanProductStatus(
+          principalOf(request),
+          productIdOf(request),
+          body.data.status,
+          loans,
+        ),
+      );
     },
   );
 

@@ -196,6 +196,20 @@ export const loans = {
     return apiRequest('/loan-products', loanProductSchema, { method: 'POST', body: request });
   },
 
+  /**
+   * Retire a product, or bring one back.
+   *
+   * Only the status moves. Terms are never amended in place: a loan copies its
+   * rate and term at creation, so editing a product would leave it describing
+   * terms no loan on the book was written under.
+   */
+  async setProductStatus(id: string, status: 'active' | 'retired'): Promise<LoanProduct> {
+    return apiRequest(`/loan-products/${id}`, loanProductSchema, {
+      method: 'PATCH',
+      body: { status },
+    });
+  },
+
   async list(
     parameters: {
       status?: string | undefined;
@@ -360,6 +374,14 @@ export const savings = {
     return apiRequest('/savings/products', savingsProductSchema, {
       method: 'POST',
       body: request,
+    });
+  },
+
+  /** Close a product to new accounts, or reopen it. Accounts already open are untouched. */
+  async setProductStatus(id: string, status: 'active' | 'closed'): Promise<SavingsProduct> {
+    return apiRequest(`/savings/products/${id}`, savingsProductSchema, {
+      method: 'PATCH',
+      body: { status },
     });
   },
 

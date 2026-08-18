@@ -16,6 +16,7 @@ import {
   settings as settingsApi,
 } from '../../shared/api/endpoints.js';
 import { formatMoney } from '../../shared/lib/format.js';
+import { Badge } from '../../shared/ui/badge.js';
 import { EmptyState } from '../../shared/ui/empty-state.js';
 import { Field } from '../../shared/ui/field.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
@@ -252,6 +253,7 @@ function LoanProductsPanel(): ReactNode {
                     Term
                   </th>
                   <th scope="col">Penalty</th>
+                  <th scope="col" />
                 </tr>
               </thead>
               <tbody>
@@ -273,13 +275,28 @@ function ProductRow({
   product: LoanProduct;
   loanTypes: readonly BotLoanType[];
 }): ReactNode {
+  const queryClient = useQueryClient();
   const loanType = loanTypes.find((type) => type.code === product.botLoanType);
+  const retired = product.status === 'retired';
+
+  const setStatus = useMutation({
+    mutationFn: (status: 'active' | 'retired') => loansApi.setProductStatus(product.id, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['loan-products'] });
+    },
+  });
 
   return (
     <tr>
       <td>
         {product.name}
         <span className="muted"> · {product.code}</span>
+        {retired && (
+          <>
+            {' '}
+            <Badge tone="neutral">Retired</Badge>
+          </>
+        )}
       </td>
       <td>{loanType?.name ?? product.botLoanType}</td>
       <td>{product.interestMethod === 'flat' ? 'Flat' : 'Reducing balance'}</td>
@@ -290,6 +307,18 @@ function ProductRow({
         {product.minTermMonths}–{product.maxTermMonths} months
       </td>
       <td>{describePenalty(product)}</td>
+      <td>
+        <button
+          className="button button--small"
+          type="button"
+          disabled={setStatus.isPending}
+          onClick={() => {
+            setStatus.mutate(retired ? 'active' : 'retired');
+          }}
+        >
+          {retired ? 'Bring back' : 'Retire'}
+        </button>
+      </td>
     </tr>
   );
 }

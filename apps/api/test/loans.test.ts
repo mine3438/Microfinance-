@@ -1019,3 +1019,126 @@ describe('POST /loan-products', () => {
     expect(listed.map((product) => product.id)).toContain(created.json<LoanProduct>().id);
   });
 });
+
+describe('PATCH /loan-products/:id', () => {
+  const freshProduct = async (): Promise<LoanProduct> =>
+    (
+      await request('POST', '/loan-products', disburserToken, {
+        code: `R${randomUUID().slice(0, 8)}`,
+        name: 'Retirable Product',
+        botLoanType: loanTypeCode,
+        interestMethod: 'reducing_balance',
+        minMonthlyRate: '0.0100',
+        maxMonthlyRate: '0.0500',
+        minTermMonths: 3,
+        maxTermMonths: 36,
+        minPrincipal: '100000.00',
+        maxPrincipal: '5000000.00',
+      })
+    ).json<LoanProduct>();
+
+  it('retires a product, which nothing could do before', async () => {
+    const product = await freshProduct();
+
+    const retired = await request('PATCH', `/loan-products/${product.id}`, disburserToken, {
+      status: 'retired',
+    });
+
+    expect(retired.statusCode).toBe(200);
+    expect(retired.json<LoanProduct>().status).toBe('retired');
+  });
+
+  it('makes the refusal that already existed reachable', async () => {
+    // requireApplicationContext has always rejected lending on a retired
+    // product. Until now no path could produce one, so the refusal was
+    // unreachable code.
+    const product = await freshProduct();
+    await request('PATCH', `/loan-products/${product.id}`, disburserToken, { status: 'retired' });
+
+    const response = await request('POST', '/loans', officerToken, {
+      clientId,
+      productId: product.id,
+      principal: PRINCIPAL,
+      monthlyRate: MONTHLY_RATE,
+      termMonths: TERM_MONTHS,
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json<ErrorResponse>().error.message).toContain('retired');
+  });
+
+  it('leaves loans already written against it exactly as they were', async () => {
+    // A loan copies its terms at creation rather than referencing the product,
+    // so retiring one restates nothing — not the schedule, not MSP2-04.
+    const product = await freshProduct();
+    const loan = (
+      await request('POST', '/loans', officerToken, {
+        clientId,
+        productId: product.id,
+        principal: PRINCIPAL,
+        monthlyRate: MONTHLY_RATE,
+        termMonths: TERM_MONTHS,
+      })
+    ).json<Loan>();
+
+    await request('PATCH', `/loan-products/${product.id}`, disburserToken, { status: 'retired' });
+
+    const after = (
+      await request('GET', `/loans/${loan.id}`, officerToken)
+    ).json<LoanWithSchedule>();
+    expect(after.monthlyRate).toBe(loan.monthlyRate);
+    expect(after.termMonths).toBe(loan.termMonths);
+    expect(after.status).toBe(loan.status);
+  });
+
+  it('brings a product back, so a mis-click is not permanent', async () => {
+    const product = await freshProduct();
+    await request('PATCH', `/loan-products/${product.id}`, disburserToken, { status: 'retired' });
+
+    const reinstated = await request('PATCH', `/loan-products/${product.id}`, disburserToken, {
+      status: 'active',
+    });
+
+    expect(reinstated.json<LoanProduct>().status).toBe('active');
+
+    const application = await request('POST', '/loans', officerToken, {
+      clientId,
+      productId: product.id,
+      principal: PRINCIPAL,
+      monthlyRate: MONTHLY_RATE,
+      termMonths: TERM_MONTHS,
+    });
+    expect(application.statusCode).toBe(201);
+  });
+
+  it('refuses an officer, who may lend but not withdraw a product', async () => {
+    const product = await freshProduct();
+
+    const response = await request('PATCH', `/loan-products/${product.id}`, officerToken, {
+      status: 'retired',
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('refuses a product from another institution as though it did not exist', async () => {
+    const response = await request('PATCH', `/loan-products/${randomUUID()}`, disburserToken, {
+      status: 'retired',
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('refuses to amend terms in place, accepting only the status', async () => {
+    // A product describing terms no loan on the book was written under is
+    // worse than a retired one.
+    const product = await freshProduct();
+
+    const response = await request('PATCH', `/loan-products/${product.id}`, disburserToken, {
+      status: 'active',
+      maxMonthlyRate: '0.9000',
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+});

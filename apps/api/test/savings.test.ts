@@ -146,7 +146,7 @@ async function tokenFor(user: SeededUser): Promise<string> {
 }
 
 const request = async (
-  method: 'GET' | 'POST' | 'PUT',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
   url: string,
   token: string,
   payload?: Record<string, unknown>,
@@ -482,5 +482,96 @@ describe('GET /savings/accounts', () => {
     const response = await request('GET', '/savings/accounts', await tokenFor(outsider));
 
     expect(response.json<{ items: SavingsAccount[] }>().items).toHaveLength(0);
+  });
+});
+
+describe('PATCH /savings/products/:id', () => {
+  /** A product of this test's own, so closing it disturbs no other suite. */
+  const freshProduct = async (code: string): Promise<SavingsProduct> =>
+    (
+      await request('POST', '/savings/products', adminToken, {
+        code,
+        name: `Product ${code}`,
+        isCompulsory: false,
+      })
+    ).json<SavingsProduct>();
+
+  it('closes a product to new accounts', async () => {
+    const product = await freshProduct(`close-${Date.now().toString(36)}`);
+
+    const closed = await request('PATCH', `/savings/products/${product.id}`, adminToken, {
+      status: 'closed',
+    });
+
+    expect(closed.statusCode).toBe(200);
+    expect(closed.json<SavingsProduct>().status).toBe('closed');
+  });
+
+  it('refuses an account against a closed product — the server, not the browser', async () => {
+    // This rule lived only in the web client's product filter until now. A
+    // caller not using that browser simply did not have it.
+    const product = await freshProduct(`refuse-${Date.now().toString(36)}`);
+    await request('PATCH', `/savings/products/${product.id}`, adminToken, { status: 'closed' });
+
+    const response = await request('POST', '/savings/accounts', managerToken, {
+      clientId,
+      branchId: officer.branchId,
+      productId: product.id,
+      openedOn: '2026-01-05',
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json<ErrorResponse>().error.message).toContain('closed to new accounts');
+  });
+
+  it('leaves accounts already open against it untouched', async () => {
+    // Their balances still report on MSP2-01 Sno46 and MSP2-10. Making real
+    // money vanish from a return because a product was withdrawn would be a
+    // misstatement, not a tidy-up.
+    const product = await freshProduct(`keep-${Date.now().toString(36)}`);
+    const opened = await openAccount(product.id);
+    await deposit(opened.id, '75000.00', '2026-01-10');
+
+    await request('PATCH', `/savings/products/${product.id}`, adminToken, { status: 'closed' });
+
+    const after = await request('GET', `/savings/accounts/${opened.id}`, managerToken);
+    expect(after.statusCode).toBe(200);
+    expect(after.json<SavingsAccount>().balance).toBe('75000.00');
+    expect(after.json<SavingsAccount>().status).toBe('active');
+  });
+
+  it('reopens a product that was closed by mistake', async () => {
+    const product = await freshProduct(`reopen-${Date.now().toString(36)}`);
+    await request('PATCH', `/savings/products/${product.id}`, adminToken, { status: 'closed' });
+
+    const reopened = await request('PATCH', `/savings/products/${product.id}`, adminToken, {
+      status: 'active',
+    });
+
+    expect(reopened.json<SavingsProduct>().status).toBe('active');
+
+    const account = await request('POST', '/savings/accounts', managerToken, {
+      clientId,
+      branchId: officer.branchId,
+      productId: product.id,
+      openedOn: '2026-01-05',
+    });
+    expect(account.statusCode).toBe(201);
+  });
+
+  it('refuses a caller without settings.manage', async () => {
+    const response = await request('PATCH', `/savings/products/${voluntary.id}`, officerToken, {
+      status: 'closed',
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('refuses a status the column does not have', async () => {
+    const response = await request('PATCH', `/savings/products/${voluntary.id}`, adminToken, {
+      status: 'dormant',
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 });

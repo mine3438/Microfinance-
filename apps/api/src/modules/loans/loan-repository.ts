@@ -186,6 +186,12 @@ export interface LoanRepository {
     userId: string,
     product: CreateLoanProductRequest,
   ): Promise<LoanProduct>;
+  setProductStatus(
+    institutionId: string,
+    userId: string,
+    productId: string,
+    status: 'active' | 'retired',
+  ): Promise<LoanProduct | null>;
   listBotLoanTypes(): Promise<BotLoanType[]>;
 }
 
@@ -659,6 +665,37 @@ export class PostgresLoanRepository implements LoanRepository {
         throw notFound('The loan product could not be read back after being created.');
       }
       return toProduct(row);
+    });
+  }
+
+  /**
+   * Retire a product, or bring one back.
+   *
+   * Only the status moves. Terms are never amended in place: a loan copies its
+   * rate and term from the product at creation (§9), so editing them would not
+   * restate a historic schedule — but it *would* leave the product describing
+   * terms no loan on the book was written under, which is worse than either.
+   */
+  public async setProductStatus(
+    institutionId: string,
+    userId: string,
+    productId: string,
+    status: 'active' | 'retired',
+  ): Promise<LoanProduct | null> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const updated = await client.query<ProductRow>(
+        `UPDATE loan_products
+            SET status = $2, updated_at = now()
+          WHERE id = $1
+        RETURNING id, code, name, bot_loan_type, interest_method,
+                  min_monthly_rate, max_monthly_rate, min_term_months, max_term_months,
+                  min_principal, max_principal, status,
+                  penalty_daily_rate, penalty_grace_days, penalty_cap_fraction`,
+        [productId, status],
+      );
+
+      const row = updated.rows[0];
+      return row === undefined ? null : toProduct(row);
     });
   }
 

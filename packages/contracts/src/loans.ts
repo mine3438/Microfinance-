@@ -360,3 +360,20 @@ export const createLoanProductRequestSchema = z
   });
 
 export type CreateLoanProductRequest = z.infer<typeof createLoanProductRequestSchema>;
+
+/**
+ * Retiring a product, or bringing one back.
+ *
+ * `loan_products.status` has carried `'retired'` since migration 0008 and
+ * nothing ever set it, so a product entered in error stayed on the officer's
+ * list for good. Both directions are offered rather than retirement alone: the
+ * column has exactly two legitimate values, neither transition risks anything —
+ * a loan copies its terms from the product at creation rather than referencing
+ * it (§9), so retiring disturbs no loan already written — and a one-way door
+ * would make a mis-click permanent without a database console.
+ */
+export const updateLoanProductRequestSchema = z
+  .object({ status: z.enum(['active', 'retired']) })
+  .strict();
+
+export type UpdateLoanProductRequest = z.infer<typeof updateLoanProductRequestSchema>;

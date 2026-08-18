@@ -4,6 +4,7 @@ import {
   type DisburseLoanRequest,
   type Loan,
   type LoanListQuery,
+  type LoanProduct,
   type LoanWithSchedule,
   type PreviewScheduleRequest,
   type RepaymentSchedule,
@@ -156,6 +157,33 @@ async function loadContext(
   }
 
   return context;
+}
+
+/**
+ * Retire a product, or bring one back.
+ *
+ * `loan_products.status` has carried `'retired'` since migration 0008 with
+ * nothing to set it, so a product entered in error stayed on the officer's list
+ * for good. The refusal that makes retirement mean anything already existed —
+ * `requireApplicationContext` above rejects lending on a retired product — so
+ * this only supplies the transition it was waiting for.
+ */
+export async function setLoanProductStatus(
+  principal: Principal,
+  productId: string,
+  status: 'active' | 'retired',
+  loans: LoanRepository,
+): Promise<LoanProduct> {
+  const updated = await loans.setProductStatus(
+    principal.institutionId,
+    principal.userId,
+    productId,
+    status,
+  );
+  if (updated === null) {
+    throw notFound('That loan product does not exist.');
+  }
+  return updated;
 }
 
 /**

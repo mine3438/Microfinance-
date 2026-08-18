@@ -2070,13 +2070,37 @@ labelling and the property that matters most on that screen: a foreign balance
 is sent in its own currency with the rate it was taken at, and no TZS equivalent
 is computed in the browser.
 
-### 26.5 What this surface still lacks
+### 26.5 Retiring a product — and a rule that lived in the browser
 
-Amending or retiring a product is absent. `loan_products.status` carries
-`'retired'` and nothing sets it, so a product defined in error stays on the
-officer's list. Loans copy their terms from the product at creation rather than
-referencing it (§9), so retiring one is safe to add and does not disturb loans
-already written against it.
+`loan_products.status` had carried `'retired'` since migration 0008 with nothing
+to set it, so a product entered in error stayed on the officer's list for good.
+`PATCH /loan-products/:id` supplies the transition. The refusal that gives it
+meaning already existed — `requireApplicationContext` has always rejected
+lending on a retired product — so until now that was unreachable code.
+
+**Only the status moves.** Terms are never amended in place. A loan copies its
+rate and term from the product at creation (§9), so editing a product would not
+restate a historic schedule — but it *would* leave the product describing terms
+no loan on the book was ever written under, which is worse than either. The
+request schema is `{ status }` and nothing else, and a request carrying a rate
+is refused.
+
+Both directions are offered, not retirement alone. The column has exactly two
+legitimate values, neither transition risks anything, and a one-way door would
+make a mis-click permanent without a database console.
+
+The savings equivalent turned up a live defect. `savings_products.status`
+carried `'closed'`, the web client filtered closed products out of its picker —
+and **nothing on the server refused an account against one.** A business rule
+enforced only in the browser is a business rule that any caller not using that
+browser does not have, which is precisely what §2 forbids. `openSavingsAccount`
+now checks the product and refuses by name, with a test that opens an account
+against a closed product and expects 422.
+
+Closing a savings product leaves accounts already open against it untouched.
+Their balances still report on MSP2-01 Sno46 and MSP2-10, and making real money
+vanish from a return because a product was withdrawn would be a misstatement
+rather than a tidy-up.
 
 ## 27. Complaints, on screen
 
