@@ -54,10 +54,21 @@ export function compileMsp2_08(request: Msp2_08Request): Msp2_08 {
 
   const published = new Set(request.institutionCodes);
   for (const balance of request.balances) {
-    if (!published.has(balance.institutionCode)) {
+    // Zero is not a balance that needs a row.
+    //
+    // The refusal exists because a figure naming an unlisted institution has
+    // nowhere to sit on the form and would silently vanish from the total. A
+    // zero has nothing to vanish. Refusing it rejected an entirely ordinary
+    // book: an institution banking with an MNO records that account's
+    // quarter-end position for MSP2-07, agent banking included at nil, and the
+    // whole return then refused to compile over a figure of nothing.
+    //
+    // A non-zero balance against an unlisted institution still refuses, which
+    // is the case worth refusing.
+    if (!balance.balance.isZero() && !published.has(balance.institutionCode)) {
       throw new DomainValidationError(
-        `An agent-banking balance references "${balance.institutionCode}", which is not on ` +
-          'BOT’s agent-banking list.',
+        `An agent-banking balance of ${balance.balance.toString()} references ` +
+          `"${balance.institutionCode}", which is not on BOT’s agent-banking list.`,
       );
     }
   }

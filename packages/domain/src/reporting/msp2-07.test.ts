@@ -136,6 +136,35 @@ describe('compileMsp2_08', () => {
     ).toThrow(/agent-banking list/);
   });
 
+  it('ignores a zero balance against an institution not on the list', () => {
+    // Found by running the software rather than by reading it. An institution
+    // banking with an MNO records that account's quarter-end position for
+    // MSP2-07 — agent banking included at nil, because the form asks — and the
+    // whole return then refused to compile over a figure of nothing.
+    //
+    // A zero has no row to need and changes no total, so there is nothing for
+    // it to silently vanish from. The non-zero case above still refuses.
+    expect(() =>
+      compileMsp2_08({
+        institutionCodes: CODES,
+        balances: [{ institutionCode: 'mpesa', balance: Money.zero() }],
+      }),
+    ).not.toThrow();
+  });
+
+  it('leaves the total untouched by an ignored zero', () => {
+    const form = compileMsp2_08({
+      institutionCodes: CODES,
+      balances: [
+        { institutionCode: 'crdb_bank_plc', balance: Money.of('4500000.50') },
+        { institutionCode: 'mpesa', balance: Money.zero() },
+      ],
+    });
+
+    expect(form.total.toDatabaseValue()).toBe('4500000.50');
+    expect(form.rows).toHaveLength(CODES.length);
+  });
+
   it('refuses to compile without the institution list', () => {
     expect(() => compileMsp2_08({ institutionCodes: [], balances: [] })).toThrow(
       DomainValidationError,
