@@ -18,6 +18,7 @@ import { PostgresPenaltyRepository } from './modules/penalties/penalty-repositor
 import { PostgresSettingsRepository } from './modules/settings/settings-repository.js';
 import { PostgresFilingRepository } from './modules/filings/filing-repository.js';
 import { PostgresCellMapRepository } from './modules/exports/cell-map.js';
+import { PostgresClassificationRepository } from './modules/portfolio/classification-repository.js';
 import { PostgresExportRepository } from './modules/exports/export-repository.js';
 import { PostgresReportRepository } from './modules/reporting/report-repository.js';
 import { PostgresStatementRepository } from './modules/statements/statement-repository.js';
@@ -74,6 +75,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const settings = new PostgresSettingsRepository(database);
   const exports = new PostgresExportRepository(database);
   const cellMaps = new PostgresCellMapRepository(database);
+  const classification = new PostgresClassificationRepository(database);
 
   const server = await buildServer({
     environment,
@@ -93,6 +95,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     settings,
     exports,
     cellMaps,
+    classification,
     tokens,
   });
 

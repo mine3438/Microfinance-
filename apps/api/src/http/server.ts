@@ -28,6 +28,8 @@ import { type PenaltyRepository } from '../modules/penalties/penalty-repository.
 import { registerPenaltyRoutes } from '../modules/penalties/routes.js';
 import { type SettingsRepository } from '../modules/settings/settings-repository.js';
 import { registerSettingsRoutes } from '../modules/settings/routes.js';
+import { type ClassificationRepository } from '../modules/portfolio/classification-repository.js';
+import { registerPortfolioRoutes } from '../modules/portfolio/routes.js';
 import { type CellMapRepository } from '../modules/exports/cell-map.js';
 import { type ExportRepository } from '../modules/exports/export-repository.js';
 import { registerExportRoutes } from '../modules/exports/routes.js';
@@ -68,6 +70,7 @@ export interface ServerDependencies {
   readonly settings: SettingsRepository;
   readonly exports: ExportRepository;
   readonly cellMaps: CellMapRepository;
+  readonly classification: ClassificationRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -103,6 +106,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     settings,
     exports,
     cellMaps,
+    classification,
     tokens,
   } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
@@ -267,6 +271,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerPenaltyRoutes(app, { penalties, tokens, now });
   registerSettingsRoutes(app, { settings, tokens });
   registerExportRoutes(app, { filings, exports, cellMaps, tokens });
+  registerPortfolioRoutes(app, { classification, tokens });
 
   return app;
 }

@@ -1,14 +1,21 @@
 import { type CompiledReturn } from '@mfi/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiRequestError } from '../../shared/api/client.js';
 
 const quarterlyReturn = vi.fn<() => Promise<CompiledReturn>>();
+const reclassify =
+  vi.fn<() => Promise<{ institutionId: string; unclassifiableLoanCount: number }>>();
 
 vi.mock('../../shared/api/endpoints.js', () => ({
   reports: { quarterlyReturn: (): Promise<CompiledReturn> => quarterlyReturn() },
+  portfolio: {
+    reclassify: (): Promise<{ institutionId: string; unclassifiableLoanCount: number }> =>
+      reclassify(),
+  },
 }));
 
 const { ReportsPage, lastCompletedQuarter } = await import('./reports-page.js');
@@ -369,6 +376,8 @@ function renderPage(): void {
 
 beforeEach(() => {
   quarterlyReturn.mockReset();
+  reclassify.mockReset();
+  reclassify.mockResolvedValue({ institutionId: 'i', unclassifiableLoanCount: 0 });
 });
 
 describe('lastCompletedQuarter', () => {
@@ -617,5 +626,73 @@ describe('field labelling', () => {
     const conversion = await screen.findByLabelText('Rate conversion');
     expect(conversion.getAttribute('aria-describedby')).toBe('report-annualisation-hint');
     expect(screen.getByText(/simple or compounded is unconfirmed/)).toBeInTheDocument();
+  });
+});
+
+describe('acting on a refusal', () => {
+  /** The 422 the server sends when classifications have never been computed. */
+  const staleRefusal = (): ApiRequestError =>
+    new ApiRequestError(
+      'rule_violation',
+      'This return cannot be compiled from figures in their current state.',
+      422,
+      [
+        {
+          path: ['never_classified'],
+          message:
+            'Overdue classifications have never been computed for this institution, so every ' +
+            'loan would report as it stood at creation. Run the classification job before filing.',
+        },
+      ],
+    );
+
+  it('offers to run the classification the refusal asks for', async () => {
+    // The whole point. A refusal answerable only at a database console is how
+    // the previous build's job came to be run by hand and then forgotten.
+    quarterlyReturn.mockRejectedValue(staleRefusal());
+    renderPage();
+
+    expect(
+      await screen.findByRole('button', { name: 'Run classification now' }),
+    ).toBeInTheDocument();
+  });
+
+  it('runs it and asks for the return again', async () => {
+    quarterlyReturn.mockRejectedValue(staleRefusal());
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Run classification now' }));
+
+    expect(reclassify).toHaveBeenCalledTimes(1);
+  });
+
+  it('says so when the run left loans no band covers', async () => {
+    // A run that "succeeded" with a non-zero count has not made the return
+    // fileable, and reporting only success would mislead.
+    quarterlyReturn.mockRejectedValue(staleRefusal());
+    reclassify.mockResolvedValue({ institutionId: 'i', unclassifiableLoanCount: 4 });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Run classification now' }));
+
+    expect(await screen.findByText(/4 loan\(s\) fall outside/)).toBeInTheDocument();
+    expect(screen.getByText(/§11\.5/)).toBeInTheDocument();
+  });
+
+  it('offers no button for a refusal running the job cannot fix', async () => {
+    // Branches with no BOT district need a person to decide something. A button
+    // that cannot help is worse than none.
+    quarterlyReturn.mockRejectedValue(
+      new ApiRequestError(
+        'rule_violation',
+        'This return cannot be compiled from figures in their current state.',
+        422,
+        [{ path: ['unlocated_branches'], message: 'Two active branches have no BOT district.' }],
+      ),
+    );
+    renderPage();
+
+    await screen.findByText(/have no BOT district/);
+    expect(screen.queryByRole('button', { name: 'Run classification now' })).toBeNull();
   });
 });

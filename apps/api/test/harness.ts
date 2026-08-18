@@ -20,6 +20,7 @@ import { PostgresPenaltyRepository } from '../src/modules/penalties/penalty-repo
 import { PostgresSettingsRepository } from '../src/modules/settings/settings-repository.js';
 import { PostgresFilingRepository } from '../src/modules/filings/filing-repository.js';
 import { PostgresCellMapRepository } from '../src/modules/exports/cell-map.js';
+import { PostgresClassificationRepository } from '../src/modules/portfolio/classification-repository.js';
 import { PostgresExportRepository } from '../src/modules/exports/export-repository.js';
 import { PostgresReportRepository } from '../src/modules/reporting/report-repository.js';
 import { PostgresStatementRepository } from '../src/modules/statements/statement-repository.js';
@@ -129,6 +130,7 @@ export async function startHarness(
     settings: new PostgresSettingsRepository(database),
     exports: new PostgresExportRepository(database),
     cellMaps: new PostgresCellMapRepository(database),
+    classification: new PostgresClassificationRepository(database),
     tokens,
   });
   await server.ready();

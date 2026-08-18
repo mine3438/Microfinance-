@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { type Gender } from './clients.js';
 import { HOLDING_KINDS } from './finance.js';
 import { msp2_01Schema, msp2_05Schema } from './statements.js';
-import { isoDateSchema, moneyAmountSchema } from './scalars.js';
+import { isoDateSchema, moneyAmountSchema, uuidSchema } from './scalars.js';
 
 /**
  * The BOT MSP2 quarterly return, as it travels.
@@ -417,3 +417,23 @@ export const compileReturnQuerySchema = z
   .strict();
 
 export type CompileReturnQuery = z.infer<typeof compileReturnQuerySchema>;
+
+/**
+ * What one classification run did.
+ *
+ * The unclassifiable count is the figure worth returning. BOT's housing
+ * microfinance schedule begins at 91 days and defines nothing below it
+ * (02-BOT-REPORTING-SPEC.md §11.5), so a housing loan less overdue than that
+ * has no classification BOT has issued. Those loans are left unclassified and
+ * counted rather than defaulted into `current`, and the readiness gate refuses
+ * on the count — so a run that "succeeded" with a non-zero count has not made
+ * the return fileable, and the caller needs to be told so.
+ */
+export const classificationRunSchema = z
+  .object({
+    institutionId: uuidSchema,
+    unclassifiableLoanCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type ClassificationRun = z.infer<typeof classificationRunSchema>;

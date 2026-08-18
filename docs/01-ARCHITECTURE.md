@@ -2219,3 +2219,87 @@ real-timer race would be flaky rather than informative.
 `Field`'s `hint` now accepts `string | undefined`, matching `error`. Under
 `exactOptionalPropertyTypes` a conditionally-present hint could not otherwise be
 passed without a spread at every call site.
+
+## 29. The classification job, and the caller it never had
+
+Standing the system up to look at it turned this up, and it is the most
+serious gap the build had. Compiling a return refused with:
+
+> Overdue classifications have never been computed for this institution, so
+> every loan would report as it stood at creation.
+
+That refusal is correct and the machinery behind it was already complete.
+Migration 0011 built `update_overdue_classifications()` — it recomputes every
+active loan's days overdue, places each in a provisioning band, stamps
+`system_health`, and returns the count no band covers. The `mfi_classifier`
+role exists, narrowly granted. `assessReportingReadiness` gates on the result.
+
+**Nothing called it.** Which is, exactly, the defect this system was written to
+replace: the predecessor had this job too, scheduled by a `pg_cron` line left
+commented out, so no loan's classification ever changed after creation and a
+loan forty days overdue reported "Current" to the Bank of Tanzania for as long
+as the system ran (00-PROJECT-ANALYSIS.md R5). Having rebuilt the job, the
+gate, and the role, this build had reproduced the original failure in a
+different place — the numbers were refused rather than wrong, which is better,
+but no institution could have filed.
+
+### 29.1 Two callers, deliberately
+
+`pnpm classify` (`apps/api/src/jobs/classify.ts`) is what a cron entry or
+systemd timer runs. It exits non-zero when any institution fails, because a
+scheduler that cannot tell success from failure is the commented-out cron line
+in a different costume. One institution failing does not stop the others. It
+prints what it did on every run, including "no institutions to classify" —
+a job whose only output is silence gives an operator nothing to notice the
+absence of.
+
+`POST /portfolio/classification` is the other, guarded by `report.generate`,
+and the reports screen now offers **"Run classification now"** on precisely the
+two refusals that running it can fix. The permission is `report.generate`
+because the person this exists for is the one the screen has just refused; a
+refusal answerable only at a database console is how the previous build's job
+came to be run by hand and then forgotten. The button is deliberately *not*
+offered for the other two problems — loans outside every provisioning band
+(§11.5) and branches with no district need a person to decide something, and a
+button that cannot help is worse than none.
+
+The endpoint does not replace the schedule. An institution relying on someone
+noticing a red banner is an institution whose figures go stale the first quiet
+week.
+
+### 29.2 A production-only failure the type system could not catch
+
+`listInstitutionIds` cannot be tenant-scoped: the scheduled run has no
+institution to scope to, because covering all of them is the job. The obvious
+implementation — `SELECT id FROM institutions` inside `withTransaction` —
+would have **worked in development and CI and returned nothing in production**.
+`withTransaction` does not step down to `mfi_app`; in tests the connection is a
+superuser and row-level security does not apply, while in production the
+application connects as `mfi_app` and `institutions_select` evaluates
+`id = current_institution_id()` with no tenant set.
+
+The job would have reported success having classified nothing — the same silent
+success R5 is about, reintroduced by the fix for R5.
+
+Migration 0024 adds `institution_ids_for_classification()`, a SECURITY DEFINER
+function owned by `mfi_classifier` and executable by `mfi_app`, returning
+identifiers and nothing else. The alternative — a policy letting `mfi_app` read
+every institution — would have widened the tenancy boundary for every request
+in the system to serve one unattended job. Closed institutions are excluded: a
+closed institution has no ongoing book, and stamping its health record would
+make a dormant tenant look freshly classified. Suspended ones are included,
+because a suspended provider still holds loans and still owes BOT a return.
+
+### 29.3 What deployment now requires
+
+The job must be scheduled. Daily, before anyone opens the reports screen, since
+`MAXIMUM_CLASSIFICATION_AGE_HOURS` is 24 and a loan crosses from ESM into
+Substandard because a day passed:
+
+```
+0 2 * * *  cd /srv/mfi && pnpm classify >> /var/log/mfi/classify.log 2>&1
+```
+
+This is the one operational requirement the system cannot satisfy for itself,
+and it is written here rather than in a comment because a commented-out
+schedule is how the last system failed.

@@ -310,6 +310,24 @@ export default defineConfig([
     },
   },
 
+  // ── Scheduled jobs ────────────────────────────────────────────────────────
+  // `no-console` exists to keep stray debugging out of server code, where the
+  // structured logger is the only correct way to say anything. A scheduled job
+  // is the exception it was never meant to cover: its normal output belongs on
+  // stdout, because that is what a cron entry captures and what an operator
+  // reads to confirm the run happened at all.
+  //
+  // That last part is the whole reason this directory exists — the system being
+  // replaced failed because its classification job silently never ran
+  // (00-PROJECT-ANALYSIS.md R5), so a job that says nothing on a successful run
+  // is the defect, not the tidy option.
+  {
+    files: ['apps/api/src/jobs/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
   // ── Build and data-generation scripts ─────────────────────────────────────
   // Plain Node ESM, outside any package tsconfig, so the Node globals they use
   // have to be declared rather than inferred from types.

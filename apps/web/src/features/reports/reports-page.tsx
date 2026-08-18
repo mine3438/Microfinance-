@@ -3,11 +3,11 @@ import {
   type AnnualisationConvention,
   type CompiledReturn,
 } from '@mfi/contracts';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
 import { ApiRequestError } from '../../shared/api/client.js';
-import { reports as reportsApi } from '../../shared/api/endpoints.js';
+import { portfolio as portfolioApi, reports as reportsApi } from '../../shared/api/endpoints.js';
 import { formatDate, formatQuarter } from '../../shared/lib/format.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
 import { Field } from '../../shared/ui/field.js';
@@ -194,9 +194,26 @@ export function ReportsPage(): ReactNode {
  * notice, which knows when to show a correlation ID and when not to.
  */
 function CompilationRefusal({ error }: { error: unknown }): ReactNode {
+  const queryClient = useQueryClient();
+
+  const reclassify = useMutation({
+    mutationFn: () => portfolioApi.reclassify(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['msp2-return'] });
+    },
+  });
+
   if (!(error instanceof ApiRequestError) || error.code !== 'rule_violation') {
     return <ErrorNotice error={error} />;
   }
+
+  // Only the two staleness problems are fixable from here. Loans outside every
+  // provisioning band (§11.5) and branches with no district need a person to
+  // decide something; offering a button that cannot help would be worse than
+  // offering none.
+  const classificationIsStale = error.details.some((detail) =>
+    /classification/i.test(detail.message),
+  );
 
   return (
     <Panel title="This return cannot be filed yet" tone="danger">
@@ -208,6 +225,31 @@ function CompilationRefusal({ error }: { error: unknown }): ReactNode {
             <li key={`${detail.path.join('.')}-${detail.message}`}>{detail.message}</li>
           ))}
         </ul>
+      )}
+
+      {classificationIsStale && (
+        <div className="form-actions">
+          <button
+            className="button button--primary"
+            type="button"
+            disabled={reclassify.isPending}
+            onClick={() => {
+              reclassify.mutate();
+            }}
+          >
+            {reclassify.isPending ? 'Classifying…' : 'Run classification now'}
+          </button>
+        </div>
+      )}
+
+      {reclassify.error !== null && <ErrorNotice error={reclassify.error} />}
+
+      {reclassify.data !== undefined && reclassify.data.unclassifiableLoanCount > 0 && (
+        <p className="notice__message">
+          Classification ran, but {reclassify.data.unclassifiableLoanCount} loan(s) fall outside
+          every provisioning band BOT has published, so the return still cannot be filed.
+          BOT&rsquo;s housing schedule begins at 91 days and defines nothing below it (§11.5).
+        </p>
       )}
 
       <p className="hint-block">

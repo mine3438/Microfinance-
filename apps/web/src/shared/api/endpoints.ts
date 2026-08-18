@@ -3,6 +3,7 @@ import {
   allocationPreviewSchema,
   approvalThresholdSchema,
   botLoanTypeSchema,
+  classificationRunSchema,
   branchSchema,
   complaintNatureSchema,
   complaintSchema,
@@ -44,6 +45,7 @@ import {
   type AllocationPreview,
   type BotLoanType,
   type Branch,
+  type ClassificationRun,
   type Client,
   type Complaint,
   type ComplaintListQuery,
@@ -529,6 +531,23 @@ export const statements = {
         body: request,
       },
     );
+  },
+};
+
+export const portfolio = {
+  /**
+   * Recompute overdue classifications for the signed-in institution.
+   *
+   * The scheduled job is what normally keeps these fresh. This exists so the
+   * person the reports screen has just refused can act on the refusal from the
+   * screen that raised it — a refusal answerable only at a database console is
+   * how the previous build's job came to be run by hand and then forgotten.
+   */
+  async reclassify(): Promise<ClassificationRun> {
+    return apiRequest('/portfolio/classification', classificationRunSchema, {
+      method: 'POST',
+      body: {},
+    });
   },
 };
 
