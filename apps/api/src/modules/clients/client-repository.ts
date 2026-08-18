@@ -1,4 +1,4 @@
-import { type Client, type ClientStatus, type Gender } from '@mfi/contracts';
+import { type Branch, type Client, type ClientStatus, type Gender } from '@mfi/contracts';
 import { type Database, type TransactionClient } from '@mfi/db';
 
 import { decodeCursor, toPage, type PagedRows } from '../../http/cursor.js';
@@ -120,6 +120,7 @@ export interface ClientRepository {
   ): Promise<Client | null>;
   /** Whether a branch exists in this institution. */
   branchExists(institutionId: string, userId: string, branchId: string): Promise<boolean>;
+  listBranches(institutionId: string, userId: string): Promise<Branch[]>;
   /**
    * Which of the supplied reference codes BOT's taxonomy does not contain.
    *
@@ -281,6 +282,38 @@ export class PostgresClientRepository implements ClientRepository {
 
       const row = updated.rows[0];
       return row === undefined ? null : this.requireById(client, row.id);
+    });
+  }
+
+  /**
+   * The institution's branches.
+   *
+   * Closed ones are included, because a client, a loan or a complaint recorded
+   * against a branch that has since closed still has to render with a name
+   * rather than a bare identifier. A screen offering a branch to choose is
+   * expected to filter to the active ones itself.
+   */
+  public async listBranches(institutionId: string, userId: string): Promise<Branch[]> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const rows = await client.query<{
+        id: string;
+        code: string;
+        name: string;
+        is_head_office: boolean;
+        status: 'active' | 'closed';
+      }>(
+        `SELECT id, code, name, is_head_office, status
+           FROM branches
+          ORDER BY is_head_office DESC, name`,
+      );
+
+      return rows.rows.map((row) => ({
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        isHeadOffice: row.is_head_office,
+        status: row.status,
+      }));
     });
   }
 

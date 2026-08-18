@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router';
 
 import { SignInPage } from '../features/auth/sign-in-page.js';
 import { ClientsPage } from '../features/clients/clients-page.js';
+import { ComplaintsPage } from '../features/complaints/complaints-page.js';
 import { NewClientPage } from '../features/clients/new-client-page.js';
 import { LoanPage } from '../features/loans/loan-page.js';
 import { LoansPage } from '../features/loans/loans-page.js';
@@ -111,6 +112,15 @@ export function AppRoutes(): ReactNode {
           element={
             <RequirePermission permission="report.generate">
               <ReportsPage />
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="/complaints"
+          element={
+            <RequirePermission permission="complaint.read">
+              <ComplaintsPage />
             </RequirePermission>
           }
         />

@@ -2077,3 +2077,54 @@ Amending or retiring a product is absent. `loan_products.status` carries
 officer's list. Loans copy their terms from the product at creation rather than
 referencing it (§9), so retiring one is safe to add and does not disturb loans
 already written against it.
+
+## 27. Complaints, on screen
+
+MSP2-06 had a compiler, a table, an API and no way for anyone to enter a
+complaint. The form would have compiled zeros forever and looked correct doing
+it.
+
+`/complaints` records **dated facts and never a tally**. There is no field
+asking how many complaints were resolved this quarter, because the return works
+that out from when each one was received and when it was resolved — which is the
+whole reason §22 keeps records rather than quarterly figures. The screen asks
+"received on" and never "which quarter", for the same reason the finance screen
+does.
+
+Two vocabularies come from the server rather than from a list in the bundle. The
+**nature** is one of BOT's six categories — their form has a column for each and
+no room for a seventh — and the **resolution route** is one of the two lines by
+which a complaint leaves the unresolved population. A resolution naming neither
+would vanish from the roll-forward, which is why the contract requires it and
+the screen offers exactly two options.
+
+The disputed amount is omitted from the request when left blank rather than sent
+as an empty string. Blank means no amount is in dispute; zero means an amount of
+nothing. Sending `''` would make the server choose which was meant.
+
+### 27.1 `GET /branches`, which nothing could do without
+
+Logging a complaint needs a branch, and there was no way to obtain one. The
+session carries the signed-in user's branch, but it is `null` for a user with
+institution-wide authority — so a screen reading only the session would have
+left exactly the administrators unable to file anything at all.
+
+`GET /branches` is guarded by `branch.read`, which a branch officer holds too:
+an officer confined to one branch still needs the list, because a record is
+filed against a named branch and theirs is only one of the choices. Closed
+branches are returned as well as open ones — a record filed against a branch
+that has since closed still has to render with a name rather than a bare
+identifier — and a picker filters to the active ones itself.
+
+### 27.2 A shared `Badge`
+
+The stylesheet defined five badge tones and `StatusBadge` exposed none of them
+to a caller; it mapped a loan status to a tone through a private table. The
+complaint states are not loan statuses, so this screen would have had to write
+`<span className="badge badge--warning">` and quietly own a sixth spelling of a
+shared idea.
+
+`Badge` now takes one of the five tones as a named union, and `StatusBadge` is
+expressed in terms of it — so a status is never two colours in two places, and
+the rule that a badge always renders text rather than colour alone lives in one
+component instead of in a convention.

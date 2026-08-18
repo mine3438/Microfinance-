@@ -162,3 +162,23 @@ export const clientListQuerySchema = paginationQuerySchema.extend({
 });
 
 export type ClientListQuery = z.infer<typeof clientListQuerySchema>;
+
+/**
+ * A branch, as a client needs it to file something against one.
+ *
+ * Served rather than derived from the session, because the session's branch is
+ * `null` for a user with institution-wide authority — and a screen that read
+ * only the session would leave exactly those users unable to record a client, a
+ * complaint or a savings account at all.
+ */
+export const branchSchema = z
+  .object({
+    id: uuidSchema,
+    code: z.string(),
+    name: z.string(),
+    isHeadOffice: z.boolean(),
+    status: z.enum(['active', 'closed']),
+  })
+  .strict();
+
+export type Branch = z.infer<typeof branchSchema>;

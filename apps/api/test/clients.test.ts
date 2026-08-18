@@ -564,3 +564,29 @@ describe('authorisation', () => {
     expect((await request('GET', '/clients', token)).statusCode).toBe(200);
   });
 });
+
+describe('GET /branches', () => {
+  it('lists the institution’s branches, head office first', async () => {
+    const listed = (await request('GET', '/branches', officerToken)).json<
+      { id: string; name: string; isHeadOffice: boolean }[]
+    >();
+
+    expect(listed.length).toBeGreaterThanOrEqual(2);
+    expect(listed[0]?.isHeadOffice).toBe(true);
+    expect(listed.map((branch) => branch.id)).toContain(otherBranchId);
+  });
+
+  it('is answerable by a branch officer, not only by an administrator', async () => {
+    // An officer confined to one branch still needs the list: a client, a loan
+    // or a complaint is filed against a named branch, and the officer's own is
+    // only one of the choices their institution has.
+    expect((await request('GET', '/branches', officerToken)).statusCode).toBe(200);
+    expect((await request('GET', '/branches', adminToken)).statusCode).toBe(200);
+  });
+
+  it('shows an outsider nothing of this institution’s branches', async () => {
+    const listed = (await request('GET', '/branches', outsiderToken)).json<{ id: string }[]>();
+
+    expect(listed.map((branch) => branch.id)).not.toContain(otherBranchId);
+  });
+});

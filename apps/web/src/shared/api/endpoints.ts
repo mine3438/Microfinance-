@@ -3,6 +3,9 @@ import {
   allocationPreviewSchema,
   approvalThresholdSchema,
   botLoanTypeSchema,
+  branchSchema,
+  complaintNatureSchema,
+  complaintSchema,
   bankAccountBalanceSchema,
   bankAccountSchema,
   clientSchema,
@@ -37,7 +40,11 @@ import {
   sessionUserSchema,
   type AllocationPreview,
   type BotLoanType,
+  type Branch,
   type Client,
+  type Complaint,
+  type ComplaintListQuery,
+  type ComplaintNature,
   type CreateClientRequest,
   type CreateLoanProductRequest,
   type CreateLoanRequest,
@@ -52,7 +59,10 @@ import {
   type Payment,
   type PreviewScheduleRequest,
   type RecordPaymentRequest,
+  type LogComplaintRequest,
+  type ReferComplaintRequest,
   type RepaymentSchedule,
+  type ResolveComplaintRequest,
   type ReversePaymentRequest,
   type RoleCode,
   type SessionUser,
@@ -76,6 +86,9 @@ const paymentPageSchema = pageSchema(paymentSchema);
 const productListSchema = z.array(loanProductSchema);
 const botLoanTypeListSchema = z.array(botLoanTypeSchema);
 const approvalThresholdListSchema = z.array(approvalThresholdSchema);
+const branchListSchema = z.array(branchSchema);
+const complaintNatureListSchema = z.array(complaintNatureSchema);
+const complaintPageSchema = pageSchema(complaintSchema);
 const financeEntryPageSchema = pageSchema(financeEntrySchema);
 const lineListSchema = z.array(msp2_02LineSchema);
 const institutionListSchema = z.array(financialInstitutionSchema);
@@ -262,6 +275,59 @@ export const payments = {
  * copy compiled into this bundle is a copy that can disagree with the one the
  * database enforces.
  */
+export const branches = {
+  /**
+   * The institution's branches.
+   *
+   * Changes rarely, so callers cache it for the session. Closed branches come
+   * back too — a record filed against one still has to render with a name —
+   * and a picker filters to the active ones itself.
+   */
+  async list(): Promise<Branch[]> {
+    return apiRequest('/branches', branchListSchema);
+  },
+};
+
+export const complaints = {
+  async natures(): Promise<ComplaintNature[]> {
+    return apiRequest('/reference/complaint-natures', complaintNatureListSchema);
+  },
+
+  async list(parameters: Partial<ComplaintListQuery> = {}): Promise<Page<Complaint>> {
+    return apiRequest(`/complaints${query({ ...parameters })}`, complaintPageSchema);
+  },
+
+  async get(id: string): Promise<Complaint> {
+    return apiRequest(`/complaints/${id}`, complaintSchema);
+  },
+
+  async log(request: LogComplaintRequest): Promise<Complaint> {
+    return apiRequest('/complaints', complaintSchema, { method: 'POST', body: request });
+  },
+
+  /**
+   * Resolve a complaint.
+   *
+   * The route is required by the contract, and that is MSP2-06's doing: lines 3
+   * and 4 are the only ways a complaint leaves the unresolved population, so a
+   * resolution naming neither would vanish from the roll-forward.
+   */
+  async resolve(id: string, request: ResolveComplaintRequest): Promise<Complaint> {
+    return apiRequest(`/complaints/${id}/resolution`, complaintSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /** Refer one onward. Dated, because MSP2-06 counts referrals as at a date. */
+  async refer(id: string, request: ReferComplaintRequest): Promise<Complaint> {
+    return apiRequest(`/complaints/${id}/referral`, complaintSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+};
+
 export const reference = {
   /**
    * BOT's loan type taxonomy, in BOT's own order.

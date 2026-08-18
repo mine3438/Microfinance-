@@ -1,4 +1,5 @@
 import {
+  branchSchema,
   clientListQuerySchema,
   clientSchema,
   createClientRequestSchema,
@@ -7,6 +8,7 @@ import {
   uuidSchema,
 } from '@mfi/contracts';
 import { type FastifyInstance, type FastifyRequest } from 'fastify';
+import { z } from 'zod';
 
 import { type AccessTokenService } from '../../auth/access-token.js';
 import { authenticate, principalOf, requirePermission } from '../../http/authentication.js';
@@ -15,6 +17,7 @@ import { type ClientRepository } from './client-repository.js';
 import { createClient, getClient, listClients, updateClient } from './use-cases.js';
 
 const clientPageSchema = pageSchema(clientSchema);
+const branchListSchema = z.array(branchSchema);
 const clientIdSchema = uuidSchema;
 
 export interface ClientRouteOptions {
@@ -48,6 +51,25 @@ function clientIdOf(request: FastifyRequest): string {
 export function registerClientRoutes(app: FastifyInstance, options: ClientRouteOptions): void {
   const { clients, tokens } = options;
   const authenticated = authenticate(tokens);
+
+  /**
+   * The institution's branches.
+   *
+   * `branch.read`, and served rather than left to the session: a user with
+   * institution-wide authority has `branch` null on their session, so a screen
+   * reading only the session would leave exactly those users unable to file a
+   * client or a complaint against any branch at all.
+   */
+  app.get(
+    '/branches',
+    { preHandler: [authenticated, requirePermission('branch.read')] },
+    async (request): Promise<unknown> => {
+      const principal = principalOf(request);
+      return branchListSchema.parse(
+        await clients.listBranches(principal.institutionId, principal.userId),
+      );
+    },
+  );
 
   app.get(
     '/clients',
