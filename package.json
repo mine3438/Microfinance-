@@ -23,6 +23,7 @@
     "db:status": "pnpm --filter @mfi/migrator build && node packages/migrator/dist/cli.js status",
     "db:verify": "pnpm --filter @mfi/migrator build && node packages/migrator/dist/cli.js verify",
     "classify": "pnpm --filter @mfi/api build && node apps/api/dist/jobs/classify-main.js",
+    "accrue-penalties": "pnpm --filter @mfi/api build && node apps/api/dist/jobs/accrue-penalties-main.js",
     "services:up": "./scripts/services.sh up",
     "services:down": "./scripts/services.sh down",
     "verify": "pnpm format:check && pnpm build && pnpm lint && pnpm typecheck && pnpm test",

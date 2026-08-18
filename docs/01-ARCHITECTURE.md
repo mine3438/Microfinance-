@@ -2300,6 +2300,65 @@ Substandard because a day passed:
 0 2 * * *  cd /srv/mfi && pnpm classify >> /var/log/mfi/classify.log 2>&1
 ```
 
-This is the one operational requirement the system cannot satisfy for itself,
-and it is written here rather than in a comment because a commented-out
-schedule is how the last system failed.
+### 29.4 The same defect, one module over
+
+Having found it once, the obvious question was whether anything else in this
+build had an endpoint and no schedule. **Penalty accrual did.**
+`POST /penalties/accrual` existed; nothing ran it, so a borrower's penalty would
+have accrued only on days somebody happened to press a button.
+
+It is worth being precise about how this differs from the classification gap,
+because the difference runs the opposite way from what one would guess.
+
+**Less serious:** penalty balances reach no BOT return. Nothing on MSP2-01
+through MSP2-10 carries them, so an un-accrued book still files a *correct*
+return. There is no filing gate here, and adding one would be inventing a rule
+BOT has not written.
+
+**More serious:** because no return depends on it, nothing refuses. A stale
+classification stops the reports screen with a red panel somebody has to answer.
+A stale penalty accrual produces no symptom at all — arrears on every borrower's
+account are simply lower than the agreement says, indefinitely, and the first
+person to notice is a borrower charged the right amount after a gap who asks why
+it jumped.
+
+The accrual is idempotent by date: each loan carries a watermark and a run
+charges only the days between it and the date asked for. Verified against a
+seeded book — first run charged 580,868.17 across two loans and left the third
+alone (its product has no penalty terms); the second run the same day charged
+nothing and moved no balance. That is what makes a missed night recoverable
+rather than lost, and it is why catching up a week in one run gives the same
+figure as seven daily ones.
+
+### 29.5 One runner, two jobs
+
+Both jobs share `runForEveryInstitution`. The part worth writing once is not the
+loop; it is the failure semantics, which are easy to get subtly different and
+expensive to get wrong: one institution failing must not stop the others, the
+process must still exit non-zero, and every run must say what it did including
+one that found nothing to do.
+
+Writing a test for that exposed a design fault: the runner read `process.env`
+and opened its own connection, so it could only be exercised by a test willing
+to arrange both. It now takes an open `Database`, and `runJob` does the reading
+and opening — which is also the rule the rest of the codebase already follows,
+where nothing outside `composition.ts` reads configuration.
+
+### 29.6 What deployment now requires
+
+Both jobs must be scheduled. Classification daily, before anyone opens the
+reports screen, since `MAXIMUM_CLASSIFICATION_AGE_HOURS` is 24 and a loan
+crosses from ESM into Substandard because a day passed. Penalty accrual daily
+for the same reason its watermark exists — a day's charge is a day's charge:
+
+```
+0 2 * * *  cd /srv/mfi && pnpm classify          >> /var/log/mfi/classify.log 2>&1
+15 2 * * * cd /srv/mfi && pnpm accrue-penalties  >> /var/log/mfi/penalties.log 2>&1
+```
+
+Both exit non-zero on failure and 78 on misconfiguration, so a scheduler can
+tell "this host is set up wrong" from "this run found a broken book".
+
+These are the operational requirements the system cannot satisfy for itself, and
+they are written here rather than in a comment because a commented-out schedule
+is how the last system failed.

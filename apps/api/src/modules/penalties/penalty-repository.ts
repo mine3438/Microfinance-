@@ -89,10 +89,30 @@ export interface AccrualOutcome {
 
 export interface PenaltyRepository {
   accrueTo(institutionId: string, userId: string, asAt: string): Promise<AccrualOutcome>;
+  /**
+   * Every institution the scheduled accrual covers.
+   *
+   * Through the same definer function the classification job uses (migration
+   * 0024). A plain `SELECT ... FROM institutions` inside `withTransaction`
+   * would read everything in development and CI, where the connection is a
+   * superuser and row-level security does not apply, and nothing in production,
+   * where the application connects as `mfi_app` with no tenant set — a job that
+   * reports success having charged no one.
+   */
+  listInstitutionIds(): Promise<string[]>;
 }
 
 export class PostgresPenaltyRepository implements PenaltyRepository {
   public constructor(private readonly database: Database) {}
+
+  public async listInstitutionIds(): Promise<string[]> {
+    return this.database.withTransaction(async (client) => {
+      const rows = await client.query<{ institution_id: string }>(
+        'SELECT institution_id FROM institution_ids_for_classification()',
+      );
+      return rows.rows.map((row) => row.institution_id);
+    });
+  }
 
   public async accrueTo(
     institutionId: string,
