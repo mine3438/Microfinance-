@@ -7,6 +7,8 @@ import {
   portfolioSummarySchema,
   branchSchema,
   complaintNatureSchema,
+  districtSchema,
+  sectorSchema,
   complaintSchema,
   savingsAccountSchema,
   savingsProductSchema,
@@ -47,6 +49,10 @@ import {
   type BotLoanType,
   type Branch,
   type ClassificationRun,
+  type CreateBranchRequest,
+  type District,
+  type Sector,
+  type UpdateBranchRequest,
   type PortfolioSummary,
   type Client,
   type Complaint,
@@ -101,6 +107,8 @@ const productListSchema = z.array(loanProductSchema);
 const botLoanTypeListSchema = z.array(botLoanTypeSchema);
 const approvalThresholdListSchema = z.array(approvalThresholdSchema);
 const branchListSchema = z.array(branchSchema);
+const districtListSchema = z.array(districtSchema);
+const sectorListSchema = z.array(sectorSchema);
 const complaintNatureListSchema = z.array(complaintNatureSchema);
 const complaintPageSchema = pageSchema(complaintSchema);
 const savingsProductListSchema = z.array(savingsProductSchema);
@@ -317,6 +325,16 @@ export const branches = {
   async list(): Promise<Branch[]> {
     return apiRequest('/branches', branchListSchema);
   },
+
+  /** Open a branch. The district is required — MSP2-10 reports per district. */
+  async create(request: CreateBranchRequest): Promise<Branch> {
+    return apiRequest('/branches', branchSchema, { method: 'POST', body: request });
+  },
+
+  /** Rename, relocate or close a branch. Only what is sent is changed. */
+  async update(id: string, request: UpdateBranchRequest): Promise<Branch> {
+    return apiRequest(`/branches/${id}`, branchSchema, { method: 'PATCH', body: request });
+  },
 };
 
 export const complaints = {
@@ -444,6 +462,21 @@ export const reference = {
    * can disagree with BOT's. It changes only by migration, so it is cached for
    * the life of the page.
    */
+  /**
+   * BOT's 193 districts, in BOT's own order, with region names.
+   *
+   * Cached for the life of the page: it changes only by migration, and every
+   * screen that files something against a district needs the same list.
+   */
+  async districts(): Promise<District[]> {
+    return apiRequest('/reference/districts', districtListSchema);
+  },
+
+  /** BOT's economic sectors, in the order MSP2-03 lists them. */
+  async sectors(): Promise<Sector[]> {
+    return apiRequest('/reference/sectors', sectorListSchema);
+  },
+
   async loanTypes(): Promise<BotLoanType[]> {
     return apiRequest('/reference/loan-types', botLoanTypeListSchema);
   },

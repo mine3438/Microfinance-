@@ -2,6 +2,9 @@ import {
   INTEREST_METHODS,
   type ApprovalThreshold,
   type BotLoanType,
+  type Branch,
+  type District,
+  type UpdateBranchRequest,
   type CreateLoanProductRequest,
   type InterestMethod,
   type LoanProduct,
@@ -11,6 +14,7 @@ import { useState, type ReactNode } from 'react';
 
 import { ApiRequestError } from '../../shared/api/client.js';
 import {
+  branches as branchesApi,
   loans as loansApi,
   reference,
   settings as settingsApi,
@@ -53,6 +57,7 @@ export function SettingsPage(): ReactNode {
       </div>
 
       <ApprovalThresholdsPanel />
+      <BranchesPanel />
       <LoanProductsPanel />
     </div>
   );
@@ -186,6 +191,307 @@ function ThresholdRow({ threshold }: { threshold: ApprovalThreshold }): ReactNod
           </td>
         </tr>
       )}
+    </>
+  );
+}
+
+/**
+ * The institution's branches.
+ *
+ * Until this existed nothing in the application could open or amend one: they
+ * were whatever a seed script had created. That is not only an onboarding gap
+ * — MSP2-10 reports branches and employees per district, and the reporting
+ * readiness gate refuses a whole return while any active branch has no BOT
+ * district, a refusal that could previously be answered only with SQL.
+ */
+function BranchesPanel(): ReactNode {
+  const queryClient = useQueryClient();
+  const [opening, setOpening] = useState(false);
+
+  const branchList = useQuery({ queryKey: ['branches'], queryFn: () => branchesApi.list() });
+  const districts = useQuery({
+    queryKey: ['districts'],
+    queryFn: () => reference.districts(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+  const unplaced = (branchList.data ?? []).filter(
+    (branch) => branch.status === 'active' && branch.districtCode === null,
+  );
+
+  return (
+    <Panel
+      title="Branches"
+      actions={
+        <button
+          className="button button--small"
+          type="button"
+          onClick={() => {
+            setOpening((open) => !open);
+          }}
+        >
+          {opening ? 'Cancel' : 'Open a branch'}
+        </button>
+      }
+    >
+      {unplaced.length > 0 && (
+        <p className="field__error">
+          {unplaced.length} active branch(es) have no Bank of Tanzania district. The quarterly
+          return will refuse to compile until each is placed.
+        </p>
+      )}
+
+      {opening && (
+        <BranchForm
+          districts={districts.data ?? []}
+          onOpened={async () => {
+            setOpening(false);
+            await queryClient.invalidateQueries({ queryKey: ['branches'] });
+          }}
+        />
+      )}
+
+      {branchList.isPending && <Spinner label="Loading branches" />}
+      {branchList.error !== null && <ErrorNotice error={branchList.error} />}
+
+      {branchList.data !== undefined && (
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">Branch</th>
+                <th scope="col">District</th>
+                <th scope="col">State</th>
+                <th scope="col" />
+              </tr>
+            </thead>
+            <tbody>
+              {branchList.data.map((branch) => (
+                <BranchRow key={branch.id} branch={branch} districts={districts.data ?? []} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/** One branch, relocatable and closable in place. */
+function BranchRow({
+  branch,
+  districts,
+}: {
+  branch: Branch;
+  districts: readonly District[];
+}): ReactNode {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [districtCode, setDistrictCode] = useState(branch.districtCode ?? '');
+
+  const save = useMutation({
+    mutationFn: (changes: UpdateBranchRequest) => branchesApi.update(branch.id, changes),
+    onSuccess: async () => {
+      setEditing(false);
+      await queryClient.invalidateQueries({ queryKey: ['branches'] });
+    },
+  });
+
+  return (
+    <>
+      <tr>
+        <td>
+          {branch.name}
+          <span className="muted"> · {branch.code}</span>
+          {branch.isHeadOffice && (
+            <>
+              {' '}
+              <Badge tone="info">Head office</Badge>
+            </>
+          )}
+        </td>
+        <td>{branch.districtName ?? <span className="field__error">Not placed</span>}</td>
+        <td>
+          <Badge tone={branch.status === 'active' ? 'success' : 'neutral'}>
+            {branch.status === 'active' ? 'Active' : 'Closed'}
+          </Badge>
+        </td>
+        <td>
+          <button
+            className="button button--small"
+            type="button"
+            onClick={() => {
+              setDistrictCode(branch.districtCode ?? '');
+              setEditing((open) => !open);
+            }}
+          >
+            {editing ? 'Cancel' : 'Change'}
+          </button>
+        </td>
+      </tr>
+
+      {editing && (
+        <tr>
+          <td colSpan={4}>
+            <form
+              className="report-controls"
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault();
+                save.mutate({ districtCode });
+              }}
+            >
+              <Field
+                id={`branch-district-${branch.id}`}
+                label="District"
+                hint="MSP2-10 reports branches and employees per district."
+              >
+                {(props) => (
+                  <select
+                    {...props}
+                    className="input"
+                    value={districtCode}
+                    required
+                    onChange={(event) => {
+                      setDistrictCode(event.target.value);
+                    }}
+                  >
+                    <option value="">Choose a district…</option>
+                    {districts.map((district) => (
+                      <option key={district.code} value={district.code}>
+                        {district.name} — {district.regionName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+
+              <div className="report-controls__action">
+                <button className="button button--primary" type="submit" disabled={save.isPending}>
+                  {save.isPending ? 'Saving…' : 'Save'}
+                </button>
+                {branch.status === 'active' && !branch.isHeadOffice && (
+                  <button
+                    className="button button--small"
+                    type="button"
+                    disabled={save.isPending}
+                    onClick={() => {
+                      save.mutate({ status: 'closed' });
+                    }}
+                  >
+                    Close branch
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {save.error !== null && <ErrorNotice error={save.error} />}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/** Opening one. */
+function BranchForm({
+  districts,
+  onOpened,
+}: {
+  districts: readonly District[];
+  onOpened: () => Promise<void>;
+}): ReactNode {
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [districtCode, setDistrictCode] = useState('');
+
+  const open = useMutation({
+    mutationFn: () => branchesApi.create({ code, name, districtCode }),
+    onSuccess: async () => {
+      setCode('');
+      setName('');
+      setDistrictCode('');
+      await onOpened();
+    },
+  });
+
+  const fieldError = (field: string): string | undefined =>
+    open.error instanceof ApiRequestError ? open.error.fieldError(field) : undefined;
+
+  return (
+    <>
+      <form
+        className="product-form"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          open.mutate();
+        }}
+      >
+        <Field id="branch-code" label="Code" error={fieldError('code')}>
+          {(props) => (
+            <input
+              {...props}
+              className="input"
+              value={code}
+              required
+              maxLength={40}
+              onChange={(event) => {
+                setCode(event.target.value);
+              }}
+            />
+          )}
+        </Field>
+
+        <Field id="branch-name" label="Name" error={fieldError('name')}>
+          {(props) => (
+            <input
+              {...props}
+              className="input"
+              value={name}
+              required
+              maxLength={120}
+              onChange={(event) => {
+                setName(event.target.value);
+              }}
+            />
+          )}
+        </Field>
+
+        <Field
+          id="branch-new-district"
+          label="District"
+          hint="Required. MSP2-10 reports per district, and a branch without one blocks the whole return."
+          error={fieldError('districtCode')}
+        >
+          {(props) => (
+            <select
+              {...props}
+              className="input"
+              value={districtCode}
+              required
+              onChange={(event) => {
+                setDistrictCode(event.target.value);
+              }}
+            >
+              <option value="">Choose a district…</option>
+              {districts.map((district) => (
+                <option key={district.code} value={district.code}>
+                  {district.name} — {district.regionName}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+
+        <div className="form-actions">
+          <button className="button button--primary" type="submit" disabled={open.isPending}>
+            {open.isPending ? 'Opening…' : 'Open branch'}
+          </button>
+        </div>
+      </form>
+
+      {open.error !== null && <ErrorNotice error={open.error} />}
     </>
   );
 }

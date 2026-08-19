@@ -1,6 +1,10 @@
 import {
   branchSchema,
   clientListQuerySchema,
+  createBranchRequestSchema,
+  districtSchema,
+  sectorSchema,
+  updateBranchRequestSchema,
   clientSchema,
   createClientRequestSchema,
   pageSchema,
@@ -12,13 +16,23 @@ import { z } from 'zod';
 
 import { type AccessTokenService } from '../../auth/access-token.js';
 import { authenticate, principalOf, requirePermission } from '../../http/authentication.js';
-import { validationFailed } from '../../http/errors.js';
+import { notFound, validationFailed } from '../../http/errors.js';
 import { type ClientRepository } from './client-repository.js';
 import { createClient, getClient, listClients, updateClient } from './use-cases.js';
 
 const clientPageSchema = pageSchema(clientSchema);
 const branchListSchema = z.array(branchSchema);
+const districtListSchema = z.array(districtSchema);
+const sectorListSchema = z.array(sectorSchema);
 const clientIdSchema = uuidSchema;
+
+function branchIdOf(request: FastifyRequest): string {
+  const parsed = uuidSchema.safeParse((request.params as { id?: unknown }).id);
+  if (!parsed.success) {
+    throw validationFailed(parsed.error, 'That is not a branch identifier.');
+  }
+  return parsed.data;
+}
 
 export interface ClientRouteOptions {
   readonly clients: ClientRepository;
@@ -60,6 +74,32 @@ export function registerClientRoutes(app: FastifyInstance, options: ClientRouteO
    * reading only the session would leave exactly those users unable to file a
    * client or a complaint against any branch at all.
    */
+  /**
+   * BOT's district and sector taxonomies.
+   *
+   * `client.read`, matching the finance module's precedent of guarding
+   * reference data with the permission of the feature that consumes it. Client
+   * registration is the main consumer; an administrator opening a branch holds
+   * it too.
+   *
+   * These existed as tables from migration 0004 and had no endpoint, which is
+   * why the client form asked for a district *code* as free text. The server
+   * refuses an unknown one, but a near-miss that happens to be another real
+   * district is not refused at all — it silently moves a borrower between two
+   * MSP2-10 totals.
+   */
+  app.get(
+    '/reference/districts',
+    { preHandler: [authenticated, requirePermission('client.read')] },
+    async (): Promise<unknown> => districtListSchema.parse(await clients.listDistricts()),
+  );
+
+  app.get(
+    '/reference/sectors',
+    { preHandler: [authenticated, requirePermission('client.read')] },
+    async (): Promise<unknown> => sectorListSchema.parse(await clients.listSectors()),
+  );
+
   app.get(
     '/branches',
     { preHandler: [authenticated, requirePermission('branch.read')] },
@@ -68,6 +108,60 @@ export function registerClientRoutes(app: FastifyInstance, options: ClientRouteO
       return branchListSchema.parse(
         await clients.listBranches(principal.institutionId, principal.userId),
       );
+    },
+  );
+
+  /**
+   * Open a branch.
+   *
+   * `branch.manage`, which until now no route used. Nothing in the application
+   * could create or amend a branch at all: they existed only where a seed
+   * script had put them, so an institution opening one had no way to record it
+   * — and the reporting readiness gate's refusal over branches with no BOT
+   * district could only be answered with SQL.
+   */
+  app.post(
+    '/branches',
+    { preHandler: [authenticated, requirePermission('branch.manage')] },
+    async (request, reply): Promise<unknown> => {
+      const body = createBranchRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That branch cannot be opened as entered.');
+      }
+
+      const principal = principalOf(request);
+      const branch = await clients.createBranch(
+        principal.institutionId,
+        principal.userId,
+        body.data,
+      );
+
+      void reply.status(201).header('location', `/branches/${branch.id}`);
+      return branchSchema.parse(branch);
+    },
+  );
+
+  app.patch(
+    '/branches/:id',
+    { preHandler: [authenticated, requirePermission('branch.manage')] },
+    async (request): Promise<unknown> => {
+      const body = updateBranchRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That branch cannot be changed as entered.');
+      }
+
+      const principal = principalOf(request);
+      const updated = await clients.updateBranch(
+        principal.institutionId,
+        principal.userId,
+        branchIdOf(request),
+        body.data,
+      );
+      if (updated === null) {
+        throw notFound('That branch does not exist.');
+      }
+
+      return branchSchema.parse(updated);
     },
   );
 

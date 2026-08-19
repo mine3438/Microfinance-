@@ -1,7 +1,17 @@
-import { type Branch, type Client, type ClientStatus, type Gender } from '@mfi/contracts';
+import {
+  type Branch,
+  type Client,
+  type ClientStatus,
+  type CreateBranchRequest,
+  type District,
+  type Gender,
+  type Sector,
+  type UpdateBranchRequest,
+} from '@mfi/contracts';
 import { type Database, type TransactionClient } from '@mfi/db';
 
 import { decodeCursor, toPage, type PagedRows } from '../../http/cursor.js';
+import { notFound } from '../../http/errors.js';
 
 /** A client row joined to the names a caller needs to display it. */
 interface ClientRow {
@@ -75,6 +85,35 @@ function formatDateOnly(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+interface BranchRow {
+  id: string;
+  code: string;
+  name: string;
+  is_head_office: boolean;
+  status: 'active' | 'closed';
+  district_code: string | null;
+  district_name: string | null;
+}
+
+/** One projection for every branch read, so a list and a read-back agree. */
+const BRANCH_PROJECTION = `
+  SELECT b.id, b.code, b.name, b.is_head_office, b.status,
+         b.district_code, d.name AS district_name
+    FROM branches b
+    LEFT JOIN reference.districts d ON d.code = b.district_code`;
+
+function toBranch(row: BranchRow): Branch {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    isHeadOffice: row.is_head_office,
+    status: row.status,
+    districtCode: row.district_code,
+    districtName: row.district_name,
+  };
+}
+
 /** What a list request narrows by. */
 export interface ClientListFilters {
   readonly limit: number;
@@ -121,6 +160,17 @@ export interface ClientRepository {
   /** Whether a branch exists in this institution. */
   branchExists(institutionId: string, userId: string, branchId: string): Promise<boolean>;
   listBranches(institutionId: string, userId: string): Promise<Branch[]>;
+  createBranch(institutionId: string, userId: string, branch: CreateBranchRequest): Promise<Branch>;
+  updateBranch(
+    institutionId: string,
+    userId: string,
+    branchId: string,
+    changes: UpdateBranchRequest,
+  ): Promise<Branch | null>;
+  /** BOT's published district list, with region names for a readable picker. */
+  listDistricts(): Promise<District[]>;
+  /** BOT's twenty-two economic sectors. */
+  listSectors(): Promise<Sector[]>;
   /**
    * Which of the supplied reference codes BOT's taxonomy does not contain.
    *
@@ -295,25 +345,149 @@ export class PostgresClientRepository implements ClientRepository {
    */
   public async listBranches(institutionId: string, userId: string): Promise<Branch[]> {
     return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const rows = await client.query<BranchRow>(
+        `${BRANCH_PROJECTION} ORDER BY b.is_head_office DESC, b.name`,
+      );
+
+      return rows.rows.map(toBranch);
+    });
+  }
+
+  /**
+   * Open a branch.
+   *
+   * The district is required by the contract rather than by the column, which
+   * is nullable because migration 0013 added it to branches that already
+   * existed. New ones have no such excuse: MSP2-10 reports per district, and a
+   * branch without one blocks the whole return.
+   */
+  public async createBranch(
+    institutionId: string,
+    userId: string,
+    branch: CreateBranchRequest,
+  ): Promise<Branch> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO branches (institution_id, code, name, district_code)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [institutionId, branch.code, branch.name, branch.districtCode],
+      );
+
+      const rows = await client.query<BranchRow>(`${BRANCH_PROJECTION} WHERE b.id = $1`, [
+        inserted.rows[0]?.id ?? null,
+      ]);
+      const row = rows.rows[0];
+      if (row === undefined) {
+        throw notFound('The branch could not be read back after being created.');
+      }
+      return toBranch(row);
+    });
+  }
+
+  /**
+   * Amend a branch.
+   *
+   * Fields are applied only where supplied, so a request that sets the district
+   * does not blank the name. `is_head_office` is not amendable here — exactly
+   * one per institution is a partial unique index, and moving it is a two-row
+   * change one UPDATE cannot make.
+   */
+  public async updateBranch(
+    institutionId: string,
+    userId: string,
+    branchId: string,
+    changes: UpdateBranchRequest,
+  ): Promise<Branch | null> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const assignments: string[] = [];
+      const parameters: unknown[] = [branchId];
+
+      const set = (column: string, value: unknown): void => {
+        parameters.push(value);
+        assignments.push(`${column} = $${String(parameters.length)}`);
+      };
+
+      if (changes.name !== undefined) {
+        set('name', changes.name);
+      }
+      if (changes.districtCode !== undefined) {
+        set('district_code', changes.districtCode);
+      }
+      if (changes.status !== undefined) {
+        set('status', changes.status);
+      }
+
+      // The contract refuses an empty request, so there is always something to
+      // set; this guard exists so a future caller cannot produce invalid SQL.
+      if (assignments.length === 0) {
+        const unchanged = await client.query<BranchRow>(`${BRANCH_PROJECTION} WHERE b.id = $1`, [
+          branchId,
+        ]);
+        const row = unchanged.rows[0];
+        return row === undefined ? null : toBranch(row);
+      }
+
+      // Identifier interpolation, and the one kind this codebase permits. Every
+      // fragment in `assignments` was built by the `set` helper from a column
+      // name written above, so the text between the placeholders is a
+      // compile-time constant and no caller input reaches it. The values stay
+      // parameterised.
+      // eslint-disable-next-line no-restricted-syntax -- column names are literals, never input
+      const statement = `UPDATE branches SET ${assignments.join(', ')} WHERE id = $1 RETURNING id`;
+      const updated = await client.query<{ id: string }>(statement, parameters);
+      if (updated.rows[0] === undefined) {
+        return null;
+      }
+
+      const rows = await client.query<BranchRow>(`${BRANCH_PROJECTION} WHERE b.id = $1`, [
+        branchId,
+      ]);
+      const row = rows.rows[0];
+      return row === undefined ? null : toBranch(row);
+    });
+  }
+
+  /**
+   * BOT's district list.
+   *
+   * Reference data, identical for every tenant, so this is not tenant-scoped —
+   * no institution's figures pass through it. Ordered as BOT orders it, by
+   * region then district, because a picker of 193 entries is only usable if it
+   * runs in the order the person expects.
+   */
+  public async listDistricts(): Promise<District[]> {
+    return this.database.withTransaction(async (client) => {
       const rows = await client.query<{
-        id: string;
         code: string;
         name: string;
-        is_head_office: boolean;
-        status: 'active' | 'closed';
+        region_code: string;
+        region_name: string;
+        council_type: 'CC' | 'MC' | 'DC' | 'TC' | null;
       }>(
-        `SELECT id, code, name, is_head_office, status
-           FROM branches
-          ORDER BY is_head_office DESC, name`,
+        `SELECT d.code, d.name, d.region_code, r.name AS region_name, d.council_type
+           FROM reference.districts d
+           JOIN reference.regions r ON r.code = d.region_code
+          ORDER BY r.sort_order, d.sort_order`,
       );
 
       return rows.rows.map((row) => ({
-        id: row.id,
         code: row.code,
         name: row.name,
-        isHeadOffice: row.is_head_office,
-        status: row.status,
+        regionCode: row.region_code,
+        regionName: row.region_name,
+        councilType: row.council_type,
       }));
+    });
+  }
+
+  public async listSectors(): Promise<Sector[]> {
+    return this.database.withTransaction(async (client) => {
+      const rows = await client.query<{ code: string; name: string }>(
+        // Ordered by BOT's own line number, which is the order MSP2-03 lists them.
+        'SELECT code, name FROM reference.sectors ORDER BY sno',
+      );
+      return rows.rows.map((row) => ({ code: row.code, name: row.name }));
     });
   }
 

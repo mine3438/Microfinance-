@@ -57,6 +57,8 @@ const BRANCHES: Branch[] = [
     name: 'Head Office',
     isHeadOffice: true,
     status: 'active',
+    districtCode: 'tz_arusha__karatu',
+    districtName: 'Karatu DC',
   },
   {
     id: '019fef66-0000-7000-8000-0000000000b2',
@@ -64,6 +66,8 @@ const BRANCHES: Branch[] = [
     name: 'Arusha',
     isHeadOffice: false,
     status: 'active',
+    districtCode: 'tz_arusha__karatu',
+    districtName: 'Karatu DC',
   },
   {
     id: '019fef66-0000-7000-8000-0000000000b3',
@@ -71,6 +75,8 @@ const BRANCHES: Branch[] = [
     name: 'Closed Branch',
     isHeadOffice: false,
     status: 'closed',
+    districtCode: 'tz_arusha__karatu',
+    districtName: 'Karatu DC',
   },
 ];
 

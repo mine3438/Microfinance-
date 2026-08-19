@@ -590,3 +590,158 @@ describe('GET /branches', () => {
     expect(listed.map((branch) => branch.id)).not.toContain(otherBranchId);
   });
 });
+
+describe('branch management', () => {
+  const districtCode = async (): Promise<string> =>
+    (await request('GET', '/reference/districts', officerToken)).json<{ code: string }[]>()[0]
+      ?.code ?? '';
+
+  it('opens a branch, which nothing in the application could do before', async () => {
+    // Branches existed only where a seed script had put them. An institution
+    // opening one had no way to record it.
+    const response = await request('POST', '/branches', adminToken, {
+      code: `BR${randomUUID().slice(0, 6)}`,
+      name: 'Mwanza Branch',
+      districtCode: await districtCode(),
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json<{ name: string; districtCode: string | null }>().name).toBe(
+      'Mwanza Branch',
+    );
+    expect(response.json<{ districtCode: string | null }>().districtCode).not.toBeNull();
+  });
+
+  it('requires a district, because MSP2-10 reports per district', async () => {
+    // The column is nullable only because migration 0013 added it to branches
+    // that already existed. A new branch has no such excuse, and one without a
+    // district blocks the whole return through the readiness gate.
+    const response = await request('POST', '/branches', adminToken, {
+      code: `BR${randomUUID().slice(0, 6)}`,
+      name: 'Nowhere Branch',
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('names the district on every branch it lists', async () => {
+    const code = await districtCode();
+    await request('POST', '/branches', adminToken, {
+      code: `BR${randomUUID().slice(0, 6)}`,
+      name: 'Listed Branch',
+      districtCode: code,
+    });
+
+    const listed = (await request('GET', '/branches', officerToken)).json<
+      { name: string; districtName: string | null }[]
+    >();
+
+    const branch = listed.find((row) => row.name === 'Listed Branch');
+    expect(branch?.districtName).not.toBeNull();
+  });
+
+  it('places a branch that had no district, answering the readiness refusal', async () => {
+    // This is the refusal that previously needed SQL: the gate blocks a return
+    // while any active branch is unplaced.
+    const created = (
+      await request('POST', '/branches', adminToken, {
+        code: `BR${randomUUID().slice(0, 6)}`,
+        name: 'Relocatable Branch',
+        districtCode: await districtCode(),
+      })
+    ).json<{ id: string }>();
+
+    const districts = (await request('GET', '/reference/districts', officerToken)).json<
+      { code: string }[]
+    >();
+    const elsewhere = districts[1]?.code ?? '';
+
+    const moved = await request('PATCH', `/branches/${created.id}`, adminToken, {
+      districtCode: elsewhere,
+    });
+
+    expect(moved.statusCode).toBe(200);
+    expect(moved.json<{ districtCode: string }>().districtCode).toBe(elsewhere);
+  });
+
+  it('changes only what it was given', async () => {
+    const created = (
+      await request('POST', '/branches', adminToken, {
+        code: `BR${randomUUID().slice(0, 6)}`,
+        name: 'Keeps Its Name',
+        districtCode: await districtCode(),
+      })
+    ).json<{ id: string; name: string; districtCode: string }>();
+
+    const closed = await request('PATCH', `/branches/${created.id}`, adminToken, {
+      status: 'closed',
+    });
+
+    expect(closed.json<{ status: string }>().status).toBe('closed');
+    expect(closed.json<{ name: string }>().name).toBe('Keeps Its Name');
+    expect(closed.json<{ districtCode: string }>().districtCode).toBe(created.districtCode);
+  });
+
+  it('refuses an empty change rather than silently doing nothing', async () => {
+    const created = (
+      await request('POST', '/branches', adminToken, {
+        code: `BR${randomUUID().slice(0, 6)}`,
+        name: 'Unchanged Branch',
+        districtCode: await districtCode(),
+      })
+    ).json<{ id: string }>();
+
+    expect((await request('PATCH', `/branches/${created.id}`, adminToken, {})).statusCode).toBe(
+      400,
+    );
+  });
+
+  it('refuses a district BOT does not publish', async () => {
+    const response = await request('POST', '/branches', adminToken, {
+      code: `BR${randomUUID().slice(0, 6)}`,
+      name: 'Imaginary Place',
+      districtCode: 'not_a_real_district',
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('refuses an officer, who may see branches but not open one', async () => {
+    const response = await request('POST', '/branches', officerToken, {
+      code: `BR${randomUUID().slice(0, 6)}`,
+      name: 'Unauthorised Branch',
+      districtCode: await districtCode(),
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json<ErrorResponse>().error.message).toContain('branch.manage');
+  });
+
+  it('refuses to amend another institution’s branch as though it did not exist', async () => {
+    expect(
+      (await request('PATCH', `/branches/${randomUUID()}`, adminToken, { name: 'Nope' }))
+        .statusCode,
+    ).toBe(404);
+  });
+});
+
+describe('GET /reference/districts and /reference/sectors', () => {
+  it('serves BOT’s district list with its region names', async () => {
+    // 193 bare district names are unusable — several repeat across regions.
+    const districts = (await request('GET', '/reference/districts', officerToken)).json<
+      { code: string; name: string; regionName: string }[]
+    >();
+
+    expect(districts.length).toBeGreaterThan(100);
+    expect(districts[0]?.regionName).toBeTruthy();
+  });
+
+  it('serves BOT’s sectors', async () => {
+    const sectors = (await request('GET', '/reference/sectors', officerToken)).json<
+      { code: string; name: string }[]
+    >();
+
+    expect(sectors.length).toBeGreaterThan(1);
+    expect(sectors[0]?.name).toBeTruthy();
+  });
+});

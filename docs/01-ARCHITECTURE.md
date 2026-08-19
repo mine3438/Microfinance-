@@ -2417,3 +2417,71 @@ Loans no band covers are shown on their own row and never folded into
 **Current**. BOT has no column for them (§11.5), and quietly calling them
 performing is how a book comes to look healthier than it is — the same
 understatement the classification gate refuses a return over.
+
+## 31. Branches, districts and sectors
+
+Checking which permissions in the catalogue no route enforced turned up
+`branch.manage`, and behind it a gap larger than a missing screen: **nothing in
+the application could create or amend a branch.** They existed only where a seed
+script had put them.
+
+Three consequences, all real:
+
+1. An institution opening a branch had no way to record it.
+2. MSP2-10 reports branches and employees *per district*, so the institution's
+   reported structure was frozen at whatever was seeded.
+3. The reporting readiness gate refuses a whole return while any active branch
+   has no BOT district — and that refusal **could only be answered with SQL**,
+   which is the same shape of dead end §29 found for classification.
+
+`POST /branches` and `PATCH /branches/:id` close it, guarded by `branch.manage`.
+The district is required on creation: the column is nullable only because
+migration 0013 added it to branches that already existed, and a new branch has
+no such excuse. `PATCH` applies only what it is given, so relocating a branch
+does not blank its name.
+
+`isHeadOffice` is deliberately not amendable. Exactly one head office per
+institution is a partial unique index, and moving it is a two-row change one
+`UPDATE` cannot make atomically. A wrong head office is rare and consequential
+enough to deserve its own operation rather than a field that fails a constraint
+half the time.
+
+### 31.1 The reference lists, and a silent misfiling they prevent
+
+Branches needed a district picker, and `reference.districts` had existed since
+migration 0004 with no endpoint. So had `reference.sectors`. That absence had
+already been recorded as a known gap on the borrower form, where both were typed
+as free text.
+
+The gap was worse than the note admitted. An unknown code is refused by the
+server and the field is named, so that mistake is caught. But a misspelling that
+happens to be **another real district** is not refused at all — it silently
+moves a borrower from one MSP2-10 district total into another, and no validation
+anywhere can notice. The same holds for sectors, which decide MSP2-03's
+classification and provisioning.
+
+`GET /reference/districts` and `GET /reference/sectors` are guarded by
+`client.read`, following the finance module's precedent of guarding reference
+data with the permission of the feature that consumes it. Districts carry their
+region name, because BOT publishes 193 and several district names repeat across
+regions — a list of bare names cannot be chosen from correctly.
+
+Both the borrower form and the branch form now pick from BOT's own lists.
+
+### 31.2 What checking the permission catalogue also found
+
+Two other permissions still enforce nothing, and both are honest gaps rather
+than oversights:
+
+- **`share.read` / `share.manage`** — §13.5 (shares) is unanswered, so there is
+  nothing to build against. Legitimately absent.
+- **`user.read` / `user.invite` / `user.manage`** — there is no user
+  management at all. An institution cannot add a member of staff; everyone must
+  be seeded by script. The `invitations` table exists and nothing writes it.
+  This is the largest remaining gap in the system and is **not** blocked on any
+  §13 question — it is simply not built. It needs an invitation flow, which
+  needs email delivery, which no supplied document specifies.
+- **`audit.read`** — audit rows are written by database triggers on every
+  business table (and a schema invariant enforces that new tables get one), but
+  nothing can read them back. An audit trail nobody can inspect is weaker than
+  one they can.

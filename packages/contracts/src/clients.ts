@@ -178,7 +178,86 @@ export const branchSchema = z
     name: z.string(),
     isHeadOffice: z.boolean(),
     status: z.enum(['active', 'closed']),
+    /**
+     * `null` where the branch has never been placed in a BOT district.
+     *
+     * Not a cosmetic omission: MSP2-10 reports per district, and the readiness
+     * gate refuses the whole return while any active branch is unplaced.
+     */
+    districtCode: z.string().nullable(),
+    districtName: z.string().nullable(),
   })
   .strict();
 
 export type Branch = z.infer<typeof branchSchema>;
+
+/**
+ * A BOT district, as a picker needs it.
+ *
+ * Served rather than typed. BOT publishes 193 of them, and until this existed
+ * the client form asked for the code as free text — a misspelling the server
+ * refuses, but only after the person has typed it, and a near-miss that happens
+ * to be another real code is not refused at all. It drops a borrower out of one
+ * MSP2-10 district total and into another, which no validation can catch.
+ *
+ * `regionName` travels with it because district names are not unique across
+ * regions and a list of 193 bare names is unusable.
+ */
+export const districtSchema = z
+  .object({
+    code: z.string(),
+    name: z.string(),
+    regionCode: z.string(),
+    regionName: z.string(),
+    /** CC city, MC municipal, DC district, TC town. Null where BOT states none. */
+    councilType: z.enum(['CC', 'MC', 'DC', 'TC']).nullable(),
+  })
+  .strict();
+
+export type District = z.infer<typeof districtSchema>;
+
+/** A BOT economic sector. Twenty-two, and a loan reports under exactly one. */
+export const sectorSchema = z.object({ code: z.string(), name: z.string() }).strict();
+
+export type Sector = z.infer<typeof sectorSchema>;
+
+/**
+ * Opening a branch.
+ *
+ * The district is required, and that is BOT's doing rather than this system's:
+ * MSP2-10 reports branches and employees per district, and the reporting
+ * readiness gate refuses a whole return while any active branch has none. Until
+ * this endpoint existed that refusal could only be answered with SQL, because
+ * nothing in the application could create or amend a branch at all.
+ */
+export const createBranchRequestSchema = z
+  .object({
+    code: requiredTextSchema(40),
+    name: requiredTextSchema(120),
+    districtCode: requiredTextSchema(60),
+  })
+  .strict();
+
+export type CreateBranchRequest = z.infer<typeof createBranchRequestSchema>;
+
+/**
+ * Amending a branch.
+ *
+ * `isHeadOffice` is absent deliberately. Exactly one head office per
+ * institution is a partial unique index, and moving it is a two-row change this
+ * endpoint cannot make atomically in one `UPDATE`. A wrong head office is rare
+ * and consequential enough to deserve its own operation rather than a field
+ * that fails a constraint half the time.
+ */
+export const updateBranchRequestSchema = z
+  .object({
+    name: requiredTextSchema(120).optional(),
+    districtCode: requiredTextSchema(60).optional(),
+    status: z.enum(['active', 'closed']).optional(),
+  })
+  .strict()
+  .refine((changes) => Object.keys(changes).length > 0, {
+    error: 'Nothing to change.',
+  });
+
+export type UpdateBranchRequest = z.infer<typeof updateBranchRequestSchema>;

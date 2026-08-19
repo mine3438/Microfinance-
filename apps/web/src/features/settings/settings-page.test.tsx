@@ -1,4 +1,10 @@
-import { type ApprovalThreshold, type BotLoanType, type LoanProduct } from '@mfi/contracts';
+import {
+  type ApprovalThreshold,
+  type BotLoanType,
+  type Branch,
+  type District,
+  type LoanProduct,
+} from '@mfi/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -20,6 +26,10 @@ const products = vi.fn<() => Promise<LoanProduct[]>>();
 const createProduct = vi.fn<(...args: unknown[]) => Promise<LoanProduct>>();
 const loanTypes = vi.fn<() => Promise<BotLoanType[]>>();
 const setProductStatus = vi.fn<(...args: unknown[]) => Promise<LoanProduct>>();
+const listBranches = vi.fn<() => Promise<Branch[]>>();
+const createBranch = vi.fn<(...args: unknown[]) => Promise<Branch>>();
+const updateBranch = vi.fn<(...args: unknown[]) => Promise<Branch>>();
+const listDistricts = vi.fn<() => Promise<District[]>>();
 
 vi.mock('../../shared/api/endpoints.js', () => ({
   settings: {
@@ -34,8 +44,42 @@ vi.mock('../../shared/api/endpoints.js', () => ({
   },
   reference: {
     loanTypes: (): Promise<BotLoanType[]> => loanTypes(),
+    districts: (): Promise<District[]> => listDistricts(),
+  },
+  branches: {
+    list: (): Promise<Branch[]> => listBranches(),
+    create: (...args: unknown[]): Promise<Branch> => createBranch(...args),
+    update: (...args: unknown[]): Promise<Branch> => updateBranch(...args),
   },
 }));
+
+const DISTRICTS: District[] = [
+  {
+    code: 'tz_arusha__karatu',
+    name: 'Karatu DC',
+    regionCode: 'tz_arusha',
+    regionName: 'Arusha',
+    councilType: 'DC',
+  },
+  {
+    code: 'tz_mwanza__ilemela',
+    name: 'Ilemela MC',
+    regionCode: 'tz_mwanza',
+    regionName: 'Mwanza',
+    councilType: 'MC',
+  },
+];
+
+const branch = (overrides: Partial<Branch> = {}): Branch => ({
+  id: '018f0000-0000-7000-8000-0000000000b1',
+  code: 'HO',
+  name: 'Head Office',
+  isHeadOffice: true,
+  status: 'active',
+  districtCode: 'tz_arusha__karatu',
+  districtName: 'Karatu DC',
+  ...overrides,
+});
 
 const { SettingsPage } = await import('./settings-page.js');
 
@@ -125,6 +169,10 @@ beforeEach(() => {
   products.mockResolvedValue([product()]);
   createProduct.mockResolvedValue(product());
   setProductStatus.mockResolvedValue(product({ status: 'retired' }));
+  listDistricts.mockResolvedValue(DISTRICTS);
+  listBranches.mockResolvedValue([branch()]);
+  createBranch.mockResolvedValue(branch());
+  updateBranch.mockResolvedValue(branch());
 });
 
 describe('approval limits', () => {
@@ -322,5 +370,97 @@ describe('retiring a product', () => {
     renderPage();
 
     expect(await screen.findByText('Business Working Capital')).toBeTruthy();
+  });
+});
+
+describe('branches', () => {
+  it('warns loudly when an active branch has no BOT district', async () => {
+    // This is the readiness refusal that previously needed SQL to answer: the
+    // gate blocks the whole return while any active branch is unplaced.
+    listBranches.mockResolvedValue([
+      branch({
+        id: 'b2',
+        code: 'MWZ',
+        name: 'Mwanza',
+        isHeadOffice: false,
+        districtCode: null,
+        districtName: null,
+      }),
+    ]);
+    renderPage();
+
+    expect(await screen.findByText(/will refuse to compile until each is placed/)).toBeTruthy();
+  });
+
+  it('says so on the row itself, not only in the banner', async () => {
+    listBranches.mockResolvedValue([
+      branch({
+        id: 'b2',
+        code: 'MWZ',
+        name: 'Mwanza',
+        isHeadOffice: false,
+        districtCode: null,
+        districtName: null,
+      }),
+    ]);
+    renderPage();
+
+    const row = await rowContaining('Mwanza');
+    expect(within(row).getByText('Not placed')).toBeTruthy();
+  });
+
+  it('shows each district with its region, because names repeat', async () => {
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open a branch' }));
+
+    const options = within(screen.getByLabelText('District'))
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+
+    expect(options).toEqual(['Choose a district…', 'Karatu DC — Arusha', 'Ilemela MC — Mwanza']);
+  });
+
+  it('sends the district code when opening a branch', async () => {
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open a branch' }));
+    await userEvent.type(screen.getByLabelText('Code'), 'MWZ');
+    await userEvent.type(screen.getByLabelText('Name'), 'Mwanza Branch');
+    await userEvent.selectOptions(screen.getByLabelText('District'), 'tz_mwanza__ilemela');
+    await userEvent.click(screen.getByRole('button', { name: 'Open branch' }));
+
+    expect(createBranch).toHaveBeenCalledWith({
+      code: 'MWZ',
+      name: 'Mwanza Branch',
+      districtCode: 'tz_mwanza__ilemela',
+    });
+  });
+
+  it('relocates a branch without touching its name', async () => {
+    // The endpoint applies only what it is given; a request that sets the
+    // district must not blank the name.
+    renderPage();
+
+    const row = await rowContaining('Head Office');
+    await userEvent.click(within(row).getByRole('button', { name: 'Change' }));
+    await userEvent.selectOptions(screen.getByLabelText('District'), 'tz_mwanza__ilemela');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(updateBranch).toHaveBeenCalledWith('018f0000-0000-7000-8000-0000000000b1', {
+      districtCode: 'tz_mwanza__ilemela',
+    });
+  });
+
+  it('offers no way to close the head office', async () => {
+    // Exactly one head office per institution is a partial unique index, so
+    // closing the only one leaves the institution without the branch every
+    // record filed at head office points at.
+    renderPage();
+
+    const row = await rowContaining('Head Office');
+    await userEvent.click(within(row).getByRole('button', { name: 'Change' }));
+
+    expect(screen.queryByRole('button', { name: 'Close branch' })).toBeNull();
   });
 });

@@ -134,7 +134,15 @@ beforeEach(() => {
   transactions.mockResolvedValue([entry()]);
   recordEntry.mockResolvedValue(entry());
   listBranches.mockResolvedValue([
-    { id: BRANCH_ID, code: 'HO', name: 'Head Office', isHeadOffice: true, status: 'active' },
+    {
+      id: BRANCH_ID,
+      code: 'HO',
+      name: 'Head Office',
+      isHeadOffice: true,
+      status: 'active',
+      districtCode: 'tz_arusha__karatu',
+      districtName: 'Karatu DC',
+    },
   ]);
   listClients.mockResolvedValue({ items: [], nextCursor: null });
 });

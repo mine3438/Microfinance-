@@ -1,10 +1,10 @@
 import { GENDERS } from '@mfi/contracts';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 
 import { ApiRequestError } from '../../shared/api/client.js';
-import { clients as clientsApi } from '../../shared/api/endpoints.js';
+import { clients as clientsApi, reference } from '../../shared/api/endpoints.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
 import { Field } from '../../shared/ui/field.js';
 import { Panel } from '../../shared/ui/panel.js';
@@ -12,14 +12,29 @@ import { Panel } from '../../shared/ui/panel.js';
 /**
  * Registering a borrower.
  *
- * The district and sector codes are typed rather than chosen from a list, which
- * is a gap this screen has until the reference taxonomies get their own
- * endpoint — BOT publishes 193 districts and 22 sectors, and a text box invites
- * the misspelling that drops a borrower out of an MSP2-10 total. The server
- * refuses an unknown code and names the field, so the mistake is caught; it is
- * still a worse experience than a picker.
+ * The district and sector are chosen from BOT's own published lists rather than
+ * typed. They were typed until `GET /reference/districts` and
+ * `/reference/sectors` existed, and the gap was worse than an inconvenience: an
+ * unknown code the server refuses is caught, but a *misspelling that happens to
+ * be another real district* is not refused at all. It silently moves a borrower
+ * from one MSP2-10 district total into another, and no validation anywhere can
+ * notice.
+ *
+ * District names repeat across regions, which is why each option carries its
+ * region — a list of 193 bare names cannot be chosen from correctly.
  */
 export function NewClientPage(): ReactNode {
+  const districts = useQuery({
+    queryKey: ['districts'],
+    queryFn: () => reference.districts(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const sectors = useQuery({
+    queryKey: ['sectors'],
+    queryFn: () => reference.sectors(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -139,39 +154,53 @@ export function NewClientPage(): ReactNode {
 
           <Field
             id="district"
-            label="District code"
-            hint="From the Bank of Tanzania's published district list."
+            label="District"
+            hint="Where the borrower lives. MSP2-10 reports borrowers per district."
             error={fieldError('districtCode')}
           >
             {(props) => (
-              <input
+              <select
                 {...props}
                 className="input"
                 value={districtCode}
                 onChange={(event) => {
-                  setDistrictCode(event.target.value.trim());
+                  setDistrictCode(event.target.value);
                 }}
                 required
-              />
+              >
+                <option value="">Choose a district…</option>
+                {(districts.data ?? []).map((district) => (
+                  <option key={district.code} value={district.code}>
+                    {district.name} — {district.regionName}
+                  </option>
+                ))}
+              </select>
             )}
           </Field>
 
           <Field
             id="sector"
-            label="Economic sector code"
-            hint="From the Bank of Tanzania's published sector list."
+            label="Economic sector"
+            hint="What the borrower's activity is. MSP2-03 classifies and provisions by sector."
             error={fieldError('sectorCode')}
           >
             {(props) => (
-              <input
+              <select
                 {...props}
                 className="input"
                 value={sectorCode}
                 onChange={(event) => {
-                  setSectorCode(event.target.value.trim());
+                  setSectorCode(event.target.value);
                 }}
                 required
-              />
+              >
+                <option value="">Choose a sector…</option>
+                {(sectors.data ?? []).map((sector) => (
+                  <option key={sector.code} value={sector.code}>
+                    {sector.name}
+                  </option>
+                ))}
+              </select>
             )}
           </Field>
 
