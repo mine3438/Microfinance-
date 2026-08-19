@@ -4,6 +4,7 @@ import {
   approvalThresholdSchema,
   botLoanTypeSchema,
   classificationRunSchema,
+  portfolioSummarySchema,
   branchSchema,
   complaintNatureSchema,
   complaintSchema,
@@ -46,6 +47,7 @@ import {
   type BotLoanType,
   type Branch,
   type ClassificationRun,
+  type PortfolioSummary,
   type Client,
   type Complaint,
   type ComplaintListQuery,
@@ -535,6 +537,17 @@ export const statements = {
 };
 
 export const portfolio = {
+  /**
+   * The loan book by BOT's five classifications, as at the last run.
+   *
+   * Today's state, not a reporting period — the MSP2 compilers reconstruct
+   * classification point-in-time instead. The staleness stamp comes back with
+   * the figures because they are exactly as old as the last classification run.
+   */
+  async summary(): Promise<PortfolioSummary> {
+    return apiRequest('/portfolio/summary', portfolioSummarySchema);
+  },
+
   /**
    * Recompute overdue classifications for the signed-in institution.
    *

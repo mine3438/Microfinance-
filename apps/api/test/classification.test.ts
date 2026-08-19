@@ -211,3 +211,86 @@ describe('enumerating institutions for the scheduled run', () => {
     expect(ids).not.toContain(closed.institutionId);
   });
 });
+
+describe('GET /portfolio/summary', () => {
+  it('reports every one of BOT’s five classes, including the empty ones', async () => {
+    // A missing row is not the same as a zero. An officer scanning for
+    // "Substandard" must find it reading nought rather than not find it.
+    const summary = (await request('GET', '/portfolio/summary', accountantToken)).json<{
+      classes: { classification: string; loanCount: number; outstanding: string }[];
+    }>();
+
+    expect(summary.classes.map((row) => row.classification)).toEqual([
+      'current',
+      'esm',
+      'substandard',
+      'doubtful',
+      'loss',
+    ]);
+  });
+
+  it('says when the figures were computed, because that is how old they are', async () => {
+    // R5 was a dashboard showing a stopped job's last answer as though it were
+    // current. The stamp travels with the figures rather than beside them.
+    const before = (await request('GET', '/portfolio/summary', accountantToken)).json<{
+      classificationsUpdatedAt: string | null;
+    }>();
+
+    await request('POST', '/portfolio/classification', accountantToken);
+
+    const after = (await request('GET', '/portfolio/summary', accountantToken)).json<{
+      classificationsUpdatedAt: string | null;
+    }>();
+
+    expect(after.classificationsUpdatedAt).not.toBeNull();
+    if (before.classificationsUpdatedAt !== null) {
+      expect(Date.parse(after.classificationsUpdatedAt ?? '')).toBeGreaterThanOrEqual(
+        Date.parse(before.classificationsUpdatedAt),
+      );
+    }
+  });
+
+  it('returns amounts as strings, never as JSON numbers', async () => {
+    const summary = (await request('GET', '/portfolio/summary', accountantToken)).json<{
+      totalOutstanding: unknown;
+      nonPerformingRatio: unknown;
+      classes: { outstanding: unknown }[];
+    }>();
+
+    expect(typeof summary.totalOutstanding).toBe('string');
+    expect(typeof summary.nonPerformingRatio).toBe('string');
+    for (const row of summary.classes) {
+      expect(typeof row.outstanding).toBe('string');
+    }
+  });
+
+  it('counts unclassified loans apart, never as performing', async () => {
+    // Loans no band covers (§11.5) and loans never classified both land here.
+    // Folding either into `current` makes a book look healthier than it is.
+    const summary = (await request('GET', '/portfolio/summary', accountantToken)).json<{
+      unclassifiedLoanCount: number;
+      classes: { classification: string; loanCount: number }[];
+    }>();
+
+    expect(summary.unclassifiedLoanCount).toBeGreaterThanOrEqual(0);
+    expect(summary.classes.find((row) => row.classification === 'current')?.loanCount).toBe(0);
+  });
+
+  it('shows an officer their own book', async () => {
+    // loan.read, not report.generate: arrears are the officer's own portfolio.
+    expect((await request('GET', '/portfolio/summary', officerToken)).statusCode).toBe(200);
+  });
+
+  it('shows nothing of another institution’s book', async () => {
+    const outsider = await seedUser(harness.database, { roles: ['accountant'] });
+    const outsiderToken = await tokenFor(outsider);
+
+    const summary = (await request('GET', '/portfolio/summary', outsiderToken)).json<{
+      totalLoans: number;
+      classificationsUpdatedAt: string | null;
+    }>();
+
+    expect(summary.totalLoans).toBe(0);
+    expect(summary.classificationsUpdatedAt).toBeNull();
+  });
+});

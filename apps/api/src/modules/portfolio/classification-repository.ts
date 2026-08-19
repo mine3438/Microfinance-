@@ -1,4 +1,7 @@
+import { type OverdueClassification, type PortfolioSummary } from '@mfi/contracts';
 import { type Database } from '@mfi/db';
+import { OVERDUE_CLASSIFICATIONS, nonPerformingRatio } from '@mfi/domain';
+import { Money } from '@mfi/money';
 
 /**
  * Running the overdue classification.
@@ -40,6 +43,8 @@ export interface ClassificationRun {
 }
 
 export interface ClassificationRepository {
+  /** The book by BOT's five classes, as at the last run. */
+  summary(institutionId: string, userId: string): Promise<PortfolioSummary>;
   /** Reclassify one institution's active loans. */
   reclassify(institutionId: string, userId: string, asAt?: string): Promise<ClassificationRun>;
   /**
@@ -79,6 +84,87 @@ export class PostgresClassificationRepository implements ClassificationRepositor
       return {
         institutionId,
         unclassifiableLoanCount: result.rows[0]?.unclassifiable ?? 0,
+      };
+    });
+  }
+
+  /**
+   * The loan book by classification, as it stands now.
+   *
+   * **The only reader of `loans.overdue_class` in the system.** Until this
+   * existed, the classification job wrote three columns nothing consumed: the
+   * MSP2 compilers deliberately reconstruct classification point-in-time
+   * instead, because a return for a quarter that closed six weeks ago must
+   * describe the book as it stood then rather than today.
+   *
+   * The health stamp comes back with the figures rather than beside them,
+   * because these numbers are exactly as old as the last run and a screen that
+   * cannot say so is R5 — a dashboard showing a stopped job's last answer as
+   * though it were current.
+   *
+   * Loans the job could not classify are counted separately, never folded into
+   * `current`. BOT has no column for them (§11.5) and quietly calling them
+   * performing is how a book looks healthier than it is.
+   */
+  public async summary(institutionId: string, userId: string): Promise<PortfolioSummary> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const byClass = await client.query<{
+        overdue_class: OverdueClassification | null;
+        loan_count: string;
+        outstanding: string;
+      }>(
+        `SELECT overdue_class,
+                count(*) AS loan_count,
+                COALESCE(sum(COALESCE(outstanding_balance, principal)), 0) AS outstanding
+           FROM loans
+          WHERE status = 'active'
+          GROUP BY overdue_class`,
+      );
+
+      const health = await client.query<{
+        classifications_updated_at: Date | null;
+      }>('SELECT classifications_updated_at FROM system_health');
+
+      const outstandingByClass = new Map<OverdueClassification, Money>();
+      const countByClass = new Map<OverdueClassification, number>();
+      let unclassifiedLoanCount = 0;
+
+      for (const row of byClass.rows) {
+        const count = Number.parseInt(row.loan_count, 10);
+        if (row.overdue_class === null) {
+          // Either never classified or covered by no band. Both are "not on a
+          // BOT column", and neither may be reported as performing.
+          unclassifiedLoanCount += count;
+          continue;
+        }
+        outstandingByClass.set(row.overdue_class, Money.fromDatabaseValue(row.outstanding));
+        countByClass.set(row.overdue_class, count);
+      }
+
+      const classes = OVERDUE_CLASSIFICATIONS.map((classification) => ({
+        classification,
+        loanCount: countByClass.get(classification) ?? 0,
+        outstanding: (outstandingByClass.get(classification) ?? Money.zero()).toDatabaseValue(),
+      }));
+
+      // Through the domain's own function, which is MSP2-03 line 73's
+      // definition — not a second implementation of the same ratio.
+      const portfolio = Object.fromEntries(
+        OVERDUE_CLASSIFICATIONS.map((classification) => [
+          classification,
+          outstandingByClass.get(classification) ?? Money.zero(),
+        ]),
+      ) as Record<OverdueClassification, Money>;
+
+      const totalOutstanding = Money.sum(Object.values(portfolio));
+
+      return {
+        classes,
+        totalOutstanding: totalOutstanding.toDatabaseValue(),
+        totalLoans: classes.reduce((total, row) => total + row.loanCount, 0),
+        nonPerformingRatio: nonPerformingRatio(portfolio).toString(),
+        classificationsUpdatedAt: health.rows[0]?.classifications_updated_at?.toISOString() ?? null,
+        unclassifiedLoanCount,
       };
     });
   }

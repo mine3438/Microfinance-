@@ -2362,3 +2362,58 @@ tell "this host is set up wrong" from "this run found a broken book".
 These are the operational requirements the system cannot satisfy for itself, and
 they are written here rather than in a comment because a commented-out schedule
 is how the last system failed.
+
+## 30. Portfolio — the classification's missing reader
+
+§29 gave the classification job a caller. It then wrote three columns —
+`loans.overdue_class`, `loans.days_overdue`, `loans.classified_at` — that
+**nothing in the system read.** The MSP2 compilers deliberately do not: a return
+for a quarter that closed six weeks ago must describe the book as it stood then,
+so they reconstruct classification point-in-time from the schedule and payments
+(§21). The stored columns describe today, and today had no consumer.
+
+That is not a gap to fill with invented metrics. The documentation names a
+"dashboard, analytics" stage and never says what it contains, and a figure an
+officer acts on deserves the same treatment as a figure BOT reads — §13 exists
+because inventing one is worse than lacking it.
+
+But this particular reader is not invented. `00-PROJECT-ANALYSIS.md` describes
+the predecessor's failure as a loan forty days overdue "reporting Current — to
+the dashboard *and* to the Bank of Tanzania". A view of the book by
+classification is the documented consumer these columns always had, and the
+whole freshness apparatus exists to protect it. So `/portfolio` shows exactly
+what the system already derives — BOT's five classes, their counts and
+outstanding, and MSP2-03 line 73's non-performing ratio — and nothing it does
+not.
+
+### 30.1 The age is part of the figure
+
+R5 was not wrong arithmetic. It was a job that silently stopped while the screen
+kept showing its last answer as though it were current. A portfolio screen that
+renders these numbers without saying how old they are reproduces that defect
+exactly, and no amount of correct summing would help.
+
+So `classificationsUpdatedAt` travels *with* the figures rather than beside
+them, the screen states the age in words before showing anything, and there are
+three states rather than two — **never run** is not a very stale run. An
+institution that has never classified has no figures at all; every loan would be
+reading as it stood at creation, which is precisely what R5 looked like from the
+outside.
+
+Past twenty-four hours the panel turns and says the BOT return will refuse to
+compile, which is true: it is the same `MAXIMUM_CLASSIFICATION_AGE_HOURS` the
+readiness gate uses. Anyone holding `report.generate` can run the job from here,
+for the same reason the reports screen offers it — a refusal answerable only at
+a database console gets answered once and then forgotten.
+
+### 30.2 What the screen does not do
+
+It computes nothing. Counts, totals and the ratio all arrive from the server,
+which derives the ratio through the same `nonPerformingRatio` the MSP2-03
+compiler uses. A second implementation on the browser side could disagree with
+the filed return by a shilling and nobody would know which was right.
+
+Loans no band covers are shown on their own row and never folded into
+**Current**. BOT has no column for them (§11.5), and quietly calling them
+performing is how a book comes to look healthier than it is — the same
+understatement the classification gate refuses a return over.

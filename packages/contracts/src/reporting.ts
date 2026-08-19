@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { type Gender } from './clients.js';
 import { HOLDING_KINDS } from './finance.js';
 import { msp2_01Schema, msp2_05Schema } from './statements.js';
-import { isoDateSchema, moneyAmountSchema, uuidSchema } from './scalars.js';
+import { isoDateSchema, isoTimestampSchema, moneyAmountSchema, uuidSchema } from './scalars.js';
 
 /**
  * The BOT MSP2 quarterly return, as it travels.
@@ -437,3 +437,50 @@ export const classificationRunSchema = z
   .strict();
 
 export type ClassificationRun = z.infer<typeof classificationRunSchema>;
+
+/** One classification's share of the book, as it stands today. */
+export const portfolioClassSchema = z
+  .object({
+    classification: z.enum(OVERDUE_CLASSIFICATIONS),
+    loanCount: z.number().int().nonnegative(),
+    outstanding: moneyAmountSchema,
+  })
+  .strict();
+
+export type PortfolioClass = z.infer<typeof portfolioClassSchema>;
+
+/**
+ * The loan book by BOT's five classifications, as at the last classification run.
+ *
+ * **Today's state, not a reporting period.** This is the one place the stored
+ * `loans.overdue_class` is read — the MSP2 compilers deliberately reconstruct
+ * classification point-in-time instead, because a return for a quarter that
+ * ended six weeks ago must describe the book as it stood then, not now.
+ *
+ * Which makes `classificationsUpdatedAt` part of the figure rather than
+ * metadata beside it. These numbers are exactly as old as the last run, and the
+ * defect this whole system replaces was a classification job that silently
+ * stopped running while the dashboard kept showing its last answer as though it
+ * were current (00-PROJECT-ANALYSIS.md R5). A screen that cannot say how old
+ * these are is that defect.
+ */
+export const portfolioSummarySchema = z
+  .object({
+    classes: z.array(portfolioClassSchema),
+    totalOutstanding: moneyAmountSchema,
+    totalLoans: z.number().int().nonnegative(),
+    /** MSP2-03 line 73's ratio, as a percentage. */
+    nonPerformingRatio: z.string(),
+    /** `null` where the job has never run, which is not the same as zero loans. */
+    classificationsUpdatedAt: isoTimestampSchema.nullable(),
+    /**
+     * Active loans the job could not place in any band.
+     *
+     * Excluded from `classes` because BOT has no column for them, and reported
+     * separately rather than folded into `current` — §11.5.
+     */
+    unclassifiedLoanCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type PortfolioSummary = z.infer<typeof portfolioSummarySchema>;

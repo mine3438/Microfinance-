@@ -1,4 +1,4 @@
-import { classificationRunSchema } from '@mfi/contracts';
+import { classificationRunSchema, portfolioSummarySchema } from '@mfi/contracts';
 import { type FastifyInstance } from 'fastify';
 
 import { type AccessTokenService } from '../../auth/access-token.js';
@@ -29,6 +29,26 @@ export function registerPortfolioRoutes(
 ): void {
   const { classification, tokens } = options;
   const authenticated = authenticate(tokens);
+
+  /**
+   * The book by BOT's five classifications, as at the last run.
+   *
+   * `loan.read`, because this is the loan book — an officer looking at arrears
+   * is looking at their own portfolio, not at a report. The staleness stamp
+   * travels with the figures so the screen can say how old they are, which is
+   * the whole point: R5 was a dashboard showing a stopped job's last answer as
+   * though it were current.
+   */
+  app.get(
+    '/portfolio/summary',
+    { preHandler: [authenticated, requirePermission('loan.read')] },
+    async (request): Promise<unknown> => {
+      const principal = principalOf(request);
+      return portfolioSummarySchema.parse(
+        await classification.summary(principal.institutionId, principal.userId),
+      );
+    },
+  );
 
   app.post(
     '/portfolio/classification',
