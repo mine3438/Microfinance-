@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { type Branch, type ErrorResponse, type Payment } from '@mfi/contracts';
+import { Money } from '@mfi/money';
 import { hashPassword } from '@mfi/identity';
 import { type Response as InjectResponse } from 'light-my-request';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -209,7 +210,7 @@ describe('overpayment stays unallocated (§13.8 open)', () => {
     // credit, early settlement of a future instalment — is §13.8, unanswered.
     // Keeping it visible is what makes the eventual answer applicable; silently
     // adding it to principal would be an answer chosen by omission.
-    expect(Number(preview.allocation.unallocated)).toBeGreaterThan(0);
+    expect(Money.fromDatabaseValue(preview.allocation.unallocated).isPositive()).toBe(true);
     expect(preview.balanceAfter).toBe('0.00');
   });
 
@@ -222,16 +223,24 @@ describe('overpayment stays unallocated (§13.8 open)', () => {
     expect(recorded.statusCode).toBe(201);
 
     const payment = recorded.json<Payment>();
-    const parts = [
-      payment.allocation.penalty,
-      payment.allocation.fee,
-      payment.allocation.interest,
-      payment.allocation.principal,
-      payment.allocation.unallocated,
-    ].reduce((total, part) => total + Number(part), 0);
+
+    // Summed with `Money`, not with `Number`. A test guarding a financial
+    // invariant must not compute it the one way this system forbids everywhere
+    // else — a float sum could agree with a broken allocator, or disagree with
+    // a correct one, and either way the test would be reporting on its own
+    // arithmetic rather than on the server's.
+    const parts = Money.sum(
+      [
+        payment.allocation.penalty,
+        payment.allocation.fee,
+        payment.allocation.interest,
+        payment.allocation.principal,
+        payment.allocation.unallocated,
+      ].map((part) => Money.fromDatabaseValue(part)),
+    );
 
     // A split that loses a shilling produces a balance nobody can reconcile.
-    expect(parts.toFixed(2)).toBe(Number(payment.amountPaid).toFixed(2));
+    expect(parts.toDatabaseValue()).toBe(payment.amountPaid);
   });
 });
 
