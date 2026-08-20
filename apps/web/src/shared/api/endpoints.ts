@@ -1,6 +1,9 @@
 import {
   acknowledgementSchema,
   allocationPreviewSchema,
+  auditEntryDetailSchema,
+  auditEntrySchema,
+  auditedTableSchema,
   approvalThresholdSchema,
   botLoanTypeSchema,
   classificationRunSchema,
@@ -46,6 +49,10 @@ import {
   repaymentScheduleSchema,
   sessionUserSchema,
   type AllocationPreview,
+  type AuditEntry,
+  type AuditEntryDetail,
+  type AuditListQuery,
+  type AuditedTable,
   type BotLoanType,
   type Branch,
   type ClassificationRun,
@@ -100,6 +107,8 @@ import { apiRequest } from './client.js';
  * shape breaks the build here rather than rendering as `undefined`.
  */
 
+const auditPageSchema = pageSchema(auditEntrySchema);
+const auditedTableListSchema = z.array(auditedTableSchema);
 const clientPageSchema = pageSchema(clientSchema);
 const loanPageSchema = pageSchema(loanSchema);
 const paymentPageSchema = pageSchema(paymentSchema);
@@ -566,6 +575,35 @@ export const statements = {
         body: request,
       },
     );
+  },
+};
+
+/**
+ * The audit trail.
+ *
+ * Read-only, and there is nothing else it could be: the API exposes no write
+ * path to `audit_logs`, and the application's database role holds no privilege
+ * that would let one exist. Every function here is a GET.
+ */
+export const audit = {
+  async list(parameters: Partial<AuditListQuery> = {}): Promise<Page<AuditEntry>> {
+    return apiRequest(`/audit${query({ ...parameters })}`, auditPageSchema);
+  },
+
+  /**
+   * The tables the trail covers.
+   *
+   * Fetched rather than listed in this app. The set comes from the database
+   * catalogue, so a table added by a later migration appears in the filter
+   * without anyone here remembering to add it.
+   */
+  async tables(): Promise<AuditedTable[]> {
+    return apiRequest('/audit/tables', auditedTableListSchema);
+  },
+
+  /** One change, with the redacted row either side of it. */
+  async get(id: string): Promise<AuditEntryDetail> {
+    return apiRequest(`/audit/${id}`, auditEntryDetailSchema);
   },
 };
 

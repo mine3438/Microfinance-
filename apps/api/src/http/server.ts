@@ -8,6 +8,8 @@ import { type Redis } from 'ioredis';
 
 import { type AccessTokenService } from '../auth/access-token.js';
 import { type Environment } from '../config/environment.js';
+import { type AuditRepository } from '../modules/audit/audit-repository.js';
+import { registerAuditRoutes } from '../modules/audit/routes.js';
 import { type SessionRepository } from '../modules/auth/session-repository.js';
 import { type ClientRepository } from '../modules/clients/client-repository.js';
 import { registerClientRoutes } from '../modules/clients/routes.js';
@@ -71,6 +73,7 @@ export interface ServerDependencies {
   readonly exports: ExportRepository;
   readonly cellMaps: CellMapRepository;
   readonly classification: ClassificationRepository;
+  readonly audit: AuditRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -107,6 +110,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     exports,
     cellMaps,
     classification,
+    audit,
     tokens,
   } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
@@ -272,6 +276,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerSettingsRoutes(app, { settings, tokens });
   registerExportRoutes(app, { filings, exports, cellMaps, tokens });
   registerPortfolioRoutes(app, { classification, tokens });
+  registerAuditRoutes(app, { audit, tokens });
 
   return app;
 }

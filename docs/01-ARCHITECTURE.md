@@ -2484,4 +2484,129 @@ than oversights:
 - **`audit.read`** — audit rows are written by database triggers on every
   business table (and a schema invariant enforces that new tables get one), but
   nothing can read them back. An audit trail nobody can inspect is weaker than
-  one they can.
+  one they can. **Closed in §32.**
+
+
+## 32. The audit trail, and the reader it never had
+
+Migration 0006 built the trail properly: one generic trigger attached to every
+business table, a `SECURITY DEFINER` writer role the application cannot borrow,
+redaction of `password_hash` and `token_hash` before anything is stored, and a
+schema invariant that fails the build if a table is added without a trigger. It
+was written against R8 — the previous system's `audit_logs`, which had policies,
+had indexes, and was empty in every deployment because nothing ever wrote to it.
+
+What it did not build was a way to read it.
+
+`audit.read` was defined in the permission catalogue, granted to
+`institution_admin` and `auditor`, and checked by the row-level policy on
+`audit_logs` — and no route in the API selected from that table. An institution
+asked during a BOT inspection who changed a loan's interest rate, and when,
+could answer only from a database console.
+
+That is R8 arriving from the other end. A trail nobody writes and a trail nobody
+can read are the same defect measured at different points: in both cases the
+evidence is not available when it is needed. The second is more comfortable to
+live with, which is precisely why it survived three stages of work without being
+noticed.
+
+### 32.1 Three reads and no writes
+
+`GET /audit`, `GET /audit/tables` and `GET /audit/:id`, each guarded by
+`audit.read`. There is no `POST` and no `DELETE`, and their absence is not an
+omission to be filled in later:
+
+- A write route would let the application record history it chose, which makes
+  the trail a claim rather than a record.
+- A delete route would make it evidence of nothing.
+
+Neither is merely unimplemented. `mfi_app` holds `SELECT` on `audit_logs` and no
+other privilege, so both would be refused by the database whatever the
+application asked for. The repository class has no write method because there is
+no write it could perform.
+
+The route guard is the outer of two checks. The policy on `audit_logs` tests
+`has_permission('audit.read')` as well as the tenant, so a mistake in the HTTP
+layer — a route registered without its guard, a permission renamed on one side
+only — returns an empty page rather than an institution's change history.
+
+### 32.2 Two shapes, for a reason about volume
+
+The list carries *which* columns moved; it does not carry their values. The
+detail endpoint carries the redacted row either side of the change in full, and
+the screen fetches it only when a row is opened.
+
+The payloads are whole table rows, and the trail covers every business table in
+the schema. A list endpoint returning them would stream the loan book through
+the browser to render a table of timestamps, and almost every row in that table
+is never opened.
+
+`changedColumns` comes straight from the trigger, which records only the keys
+whose value actually moved — an `UPDATE` setting a column to the value it
+already held is not reported as a change to it. On an insert and a delete it is
+empty, because there the whole row is the change, and the screen falls back to
+showing every column of the payload.
+
+### 32.3 The actor, and the ones that have none
+
+The trigger records `current_user_id()` and nothing else about who acted. The
+reader joins `users` for the name at read time rather than the trail storing it.
+Storing the name would freeze it at the moment of each change, so renaming one
+member of staff would split their history between two people who never existed.
+
+A great many entries have no actor at all, and this is not a gap:
+
+- migrations,
+- the nightly classification and penalty-accrual runs,
+- signup, which necessarily precedes an institution's first user.
+
+The screen renders those as **System**. A blank cell would read as a defect in
+the trail, when it is in fact the trail describing exactly the changes nobody
+watched happen.
+
+### 32.4 A filter that refuses what it does not understand
+
+`?tableName=` is checked against the tables the trigger is actually attached to,
+read from `pg_trigger`, and a name that is not among them is refused with a
+`rule_violation` rather than served an empty page.
+
+The reason is specific to this endpoint. `clients` is a table; `client` is a
+plausible typing of it. An empty page in response to the second says *"no
+borrower was ever changed"* — a false answer to a question the server never
+understood. Everywhere else in the system an over-narrow filter costs a user one
+puzzled moment; in an audit tool it is the wrong answer to the only question the
+tool exists to answer.
+
+`GET /audit/tables` serves the same set to the screen's filter, so the value is
+picked rather than typed. That is the lesson of §31.1 applied a second time: the
+list comes from the catalogue, so a table added by a later migration appears
+without anyone here remembering to add it.
+
+### 32.5 One index, and a defect that would not have shown up in CI
+
+The reader pages by keyset on the identifier, as every list in this system does
+and for the reason `http/cursor.ts` sets out: UUIDv7 puts the timestamp in the
+leading bytes, so ordering by `id DESC` *is* ordering by time.
+
+Migration 0006's `(institution_id, changed_at DESC)` cannot serve that ordering.
+Postgres would walk the primary key backwards and discard every row belonging to
+another institution — free in a single-tenant test database, and worse with each
+tenant added in production. Migration 0025 adds `(institution_id, id DESC)`.
+
+This is the same shape as the defect §29 found in the classification job: code
+that is correct where it is tested and quietly wrong where it matters. The
+existing index is kept, since it answers a different question — what happened
+between two dates — which this endpoint does not ask.
+
+### 32.6 What is deliberately not here
+
+- **No branch filter.** `audit.read` is held only by institution-wide roles, the
+  policy scopes the table to the institution, and an audit row carries a table
+  name, an identifier and two payloads — it has no branch of its own to filter
+  on. Deriving one from the payload would be guesswork presented as a filter.
+- **No date range.** Expressible, since the identifier carries the timestamp,
+  but no supplied requirement asks for one and it would need a fourth index to
+  stay a seek rather than a scan.
+- **No retention policy.** How long an institution must keep its trail is a BOT
+  question, and no supplied document answers it. Deleting audit rows on a
+  schedule this system invented would be worse than keeping them all.

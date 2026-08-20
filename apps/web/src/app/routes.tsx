@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 
+import { AuditPage } from '../features/audit/audit-page.js';
 import { SignInPage } from '../features/auth/sign-in-page.js';
 import { ClientsPage } from '../features/clients/clients-page.js';
 import { ComplaintsPage } from '../features/complaints/complaints-page.js';
@@ -132,6 +133,19 @@ export function AppRoutes(): ReactNode {
           element={
             <RequirePermission permission="savings.read">
               <SavingsPage />
+            </RequirePermission>
+          }
+        />
+
+        {/* `audit.read` is held by the administrator and the auditor, and the
+            policy on `audit_logs` checks the same permission — so a role that
+            reached this route anyway would see an empty trail rather than
+            someone else's history. */}
+        <Route
+          path="/audit"
+          element={
+            <RequirePermission permission="audit.read">
+              <AuditPage />
             </RequirePermission>
           }
         />

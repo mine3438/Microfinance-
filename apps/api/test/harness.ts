@@ -9,6 +9,7 @@ import { Redis } from 'ioredis';
 import { AccessTokenService } from '../src/auth/access-token.js';
 import { loadEnvironment, type Environment } from '../src/config/environment.js';
 import { buildServer } from '../src/http/server.js';
+import { PostgresAuditRepository } from '../src/modules/audit/audit-repository.js';
 import { PostgresSessionRepository } from '../src/modules/auth/session-repository.js';
 import { PostgresClientRepository } from '../src/modules/clients/client-repository.js';
 import { PostgresLoanRepository } from '../src/modules/loans/loan-repository.js';
@@ -131,6 +132,7 @@ export async function startHarness(
     exports: new PostgresExportRepository(database),
     cellMaps: new PostgresCellMapRepository(database),
     classification: new PostgresClassificationRepository(database),
+    audit: new PostgresAuditRepository(database),
     tokens,
   });
   await server.ready();

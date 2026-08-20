@@ -7,6 +7,7 @@ import { Redis } from 'ioredis';
 import { AccessTokenService } from './auth/access-token.js';
 import { type Environment } from './config/environment.js';
 import { buildServer } from './http/server.js';
+import { PostgresAuditRepository } from './modules/audit/audit-repository.js';
 import { PostgresSessionRepository } from './modules/auth/session-repository.js';
 import { PostgresClientRepository } from './modules/clients/client-repository.js';
 import { PostgresLoanRepository } from './modules/loans/loan-repository.js';
@@ -76,6 +77,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const exports = new PostgresExportRepository(database);
   const cellMaps = new PostgresCellMapRepository(database);
   const classification = new PostgresClassificationRepository(database);
+  const audit = new PostgresAuditRepository(database);
 
   const server = await buildServer({
     environment,
@@ -96,6 +98,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     exports,
     cellMaps,
     classification,
+    audit,
     tokens,
   });
 

@@ -64,6 +64,21 @@ export {
 } from './pagination.js';
 
 export {
+  AUDIT_OPERATIONS,
+  auditEntryDetailSchema,
+  auditEntrySchema,
+  auditListQuerySchema,
+  auditPayloadSchema,
+  auditedTableSchema,
+  type AuditEntry,
+  type AuditEntryDetail,
+  type AuditListQuery,
+  type AuditOperation,
+  type AuditPayload,
+  type AuditedTable,
+} from './audit.js';
+
+export {
   CLIENT_STATUSES,
   GENDERS,
   branchSchema,

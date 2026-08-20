@@ -249,6 +249,30 @@ code,
   color: var(--ink-muted);
 }
 
+/*
+ * A table inside a table cell — the audit trail's before-and-after, opened
+ * under the row it belongs to. Inset and quieter, so the two levels do not read
+ * as one flat list of rows.
+ */
+.table--nested {
+  font-size: 0.86rem;
+  background: var(--canvas);
+}
+
+.table--nested th,
+.table--nested td {
+  border-bottom-color: transparent;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.table--nested tbody th {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
 /* ── Forms ──────────────────────────────────────────────────────────────── */
 
 .field {
@@ -345,6 +369,28 @@ code,
 .button--block {
   width: 100%;
   text-align: center;
+}
+
+/*
+ * An action that reads as a link but is a button.
+ *
+ * A control that changes what this page shows without navigating anywhere is a
+ * button, whatever it looks like: an anchor with no destination is announced as
+ * a link and cannot be operated by keyboard the way a button can.
+ */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: none;
 }
 
 /* ── Notices, badges, states ────────────────────────────────────────────── */
