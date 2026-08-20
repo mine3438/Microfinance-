@@ -266,7 +266,31 @@ describe('POST /users/invitations', () => {
     // `invitations_one_pending_per_email` is a partial unique index over the
     // invitations that are still open, so re-inviting means revoking first.
     const second = await invite({ email });
-    expect(second.statusCode).toBeGreaterThanOrEqual(400);
+    expect(second.statusCode).toBe(409);
+
+    // The refusal names no table and no constraint. A constraint name discloses
+    // the schema, so it goes to the log with the correlation ID instead.
+    const message = second.json<ErrorResponse>().error.message;
+    expect(message).not.toContain('invitations');
+    expect(message).not.toContain('idx');
+  });
+
+  it('leaves nothing behind when the second invitation is refused', async () => {
+    const email = freshEmail();
+    await invite({ email });
+    await invite({ email });
+
+    const rows = await harness.database.withTransaction(async (db) =>
+      db.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM invitations WHERE lower(email) = lower($1)',
+        [email],
+      ),
+    );
+
+    // The account and the invitation are written in one transaction, so a
+    // refused second attempt rolls back whole. A half-applied invite would
+    // leave an account that cannot accept and an address consumed globally.
+    expect(rows.rows[0]!.count).toBe('1');
   });
 
   it('refuses inviting somebody who already works here', async () => {

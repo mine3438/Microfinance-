@@ -261,11 +261,19 @@ because login identifies a user before any institution is known. So an address
 belongs to exactly one institution, for all time.
 
 **Current behaviour.** Inviting an address that already has an account anywhere is
-refused. Within the institution the refusal is specific and useful. Across
-institutions it is a conflict that does confirm an account exists somewhere —
-unavoidable while the address must be globally unique, and it discloses nothing
-else: no institution name, no person's name, no status. The endpoint is behind
-`user.invite` and rate-limited.
+refused.
+
+Within the institution the refusal is specific and useful — "that email address
+already belongs to a member of staff here". Across institutions the unique index
+fires and the generic integrity handler answers `409` with *"That record already
+exists. Check whether it has been entered before."* — which names no table, no
+constraint, no institution, no person and no status. The constraint name goes to
+the log with the correlation ID rather than to the caller.
+
+It is still an oracle: a `409` tells the caller the address is in use
+*somewhere*. That is unavoidable while login must resolve an address to one
+account before any institution is known. It is bounded by `user.invite` and by
+the rate limiter, and it discloses nothing beyond existence.
 
 **To unblock.** If the answer is yes, this needs a membership table separating
 identity from institution — a schema change and a login change, not a tweak.
