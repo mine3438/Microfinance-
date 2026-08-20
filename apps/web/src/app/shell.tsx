@@ -27,6 +27,7 @@ export function Shell(): ReactNode {
           {session.can('savings.read') && <NavLink to="/savings">Savings</NavLink>}
           {session.can('complaint.read') && <NavLink to="/complaints">Complaints</NavLink>}
           {session.can('report.generate') && <NavLink to="/reports">BOT return</NavLink>}
+          {session.can('user.read') && <NavLink to="/staff">Staff</NavLink>}
           {session.can('audit.read') && <NavLink to="/audit">Audit</NavLink>}
           {session.can('settings.manage') && <NavLink to="/settings">Settings</NavLink>}
         </nav>

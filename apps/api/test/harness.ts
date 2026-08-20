@@ -10,6 +10,8 @@ import { AccessTokenService } from '../src/auth/access-token.js';
 import { loadEnvironment, type Environment } from '../src/config/environment.js';
 import { buildServer } from '../src/http/server.js';
 import { PostgresAuditRepository } from '../src/modules/audit/audit-repository.js';
+import { PostgresUserRepository } from '../src/modules/users/user-repository.js';
+import { ManualInvitationDelivery } from '../src/notifications/invitation-delivery.js';
 import { PostgresSessionRepository } from '../src/modules/auth/session-repository.js';
 import { PostgresClientRepository } from '../src/modules/clients/client-repository.js';
 import { PostgresLoanRepository } from '../src/modules/loans/loan-repository.js';
@@ -133,6 +135,11 @@ export async function startHarness(
     cellMaps: new PostgresCellMapRepository(database),
     classification: new PostgresClassificationRepository(database),
     audit: new PostgresAuditRepository(database),
+    users: new PostgresUserRepository(database),
+    // The mechanism that hands the link back to the caller, so a suite can read
+    // the token it needs to accept an invitation without a mail server.
+    invitationDelivery: new ManualInvitationDelivery(),
+    webBaseUrl: 'http://localhost:5173',
     tokens,
   });
   await server.ready();

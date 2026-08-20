@@ -37,6 +37,7 @@ export {
   canAll,
   canAny,
   canApproveWorkOf,
+  canGrantRole,
   isPermission,
   isRoleCode,
 } from './permissions.js';

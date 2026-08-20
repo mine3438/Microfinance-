@@ -412,6 +412,13 @@ code,
   color: var(--warning);
 }
 
+/* Neither a failure nor a caution — something the reader must act on now,
+   such as an invitation link that is shown exactly once. */
+.notice--info {
+  background: var(--info-soft);
+  color: var(--accent);
+}
+
 .notice__message {
   margin: 0;
 }
@@ -675,4 +682,22 @@ code,
 /* The submit row spans the grid rather than sitting in the last cell. */
 .product-form .form-actions {
   grid-column: 1 / -1;
+}
+
+/*
+ * The invitation link, shown once.
+ *
+ * Wraps rather than scrolls, and is selectable as a whole: an administrator has
+ * to copy all of it, and a link truncated by an ellipsis is a link that gets
+ * pasted half-complete.
+ */
+.invitation-link {
+  display: block;
+  padding: 0.5rem 0.6rem;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  user-select: all;
 }

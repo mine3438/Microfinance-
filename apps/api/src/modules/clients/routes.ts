@@ -165,6 +165,38 @@ export function registerClientRoutes(app: FastifyInstance, options: ClientRouteO
     },
   );
 
+  /**
+   * Move the head office designation to this branch.
+   *
+   * Its own endpoint, not a field on `PATCH /branches/:id`. Exactly one branch
+   * per institution may be the head office, enforced by a partial unique index,
+   * and moving it is a two-row change — clear the old, set the new — that no
+   * single `UPDATE` can make without risking an intermediate state the index
+   * refuses. Expressing it as a field would make an atomic operation look like
+   * an ordinary edit and fail intermittently depending on row order.
+   *
+   * Idempotent: designating the branch that already holds it succeeds and
+   * changes nothing, so a retried request after a dropped response is safe.
+   */
+  app.post(
+    '/branches/:id/head-office',
+    { preHandler: [authenticated, requirePermission('branch.manage')] },
+    async (request): Promise<unknown> => {
+      const principal = principalOf(request);
+      const designated = await clients.designateHeadOffice(
+        principal.institutionId,
+        principal.userId,
+        branchIdOf(request),
+      );
+
+      if (designated === null) {
+        throw notFound('That branch does not exist.');
+      }
+
+      return branchSchema.parse(designated);
+    },
+  );
+
   app.get(
     '/clients',
     { preHandler: [authenticated, requirePermission('client.read')] },

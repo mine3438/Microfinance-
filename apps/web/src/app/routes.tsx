@@ -2,6 +2,8 @@ import { type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 
 import { AuditPage } from '../features/audit/audit-page.js';
+import { AcceptInvitationPage } from '../features/staff/accept-invitation-page.js';
+import { StaffPage } from '../features/staff/staff-page.js';
 import { SignInPage } from '../features/auth/sign-in-page.js';
 import { ClientsPage } from '../features/clients/clients-page.js';
 import { ComplaintsPage } from '../features/complaints/complaints-page.js';
@@ -32,6 +34,9 @@ export function AppRoutes(): ReactNode {
   return (
     <Routes>
       <Route path="/sign-in" element={<SignInPage />} />
+      {/* Reachable without a session: the person opening it does not have an
+          account yet, which is the point of the page. */}
+      <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
 
       <Route
         element={
@@ -133,6 +138,15 @@ export function AppRoutes(): ReactNode {
           element={
             <RequirePermission permission="savings.read">
               <SavingsPage />
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="/staff"
+          element={
+            <RequirePermission permission="user.read">
+              <StaffPage />
             </RequirePermission>
           }
         />

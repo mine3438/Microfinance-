@@ -131,6 +131,28 @@ const environmentSchema = z.object({
     .default('true')
     .transform((value) => value === 'true'),
 
+  /**
+   * How an invitation reaches the person invited.
+   *
+   * No supplied document names an email provider, so none is integrated. See
+   * `notifications/invitation-delivery.ts` for what the two values mean and why
+   * a third is a class rather than a configuration change.
+   *
+   * `manual` returns the link to the administrator who created the invitation;
+   * `log` writes it to the server log and is refused in production.
+   */
+  INVITATION_DELIVERY: z.enum(['manual', 'log']).default('manual'),
+
+  /**
+   * Where the acceptance page lives, for building the link in an invitation.
+   *
+   * The first configured CORS origin unless stated, because that is already the
+   * browser origin this API serves. Named separately so a deployment whose web
+   * app is not at the first origin is not left sending invitees to the wrong
+   * host — a link that 404s is an invitation that silently never works.
+   */
+  WEB_BASE_URL: z.url({ error: 'WEB_BASE_URL must be an absolute URL.' }).optional(),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

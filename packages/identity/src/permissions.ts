@@ -90,3 +90,26 @@ export function canActOnBranch(principal: Principal, branchId: string | null): b
 export function canApproveWorkOf(approver: Principal, makerUserId: string): boolean {
   return approver.userId !== makerUserId && can(approver, 'loan.approve');
 }
+
+/**
+ * Whether `granter` may assign a role carrying `rolePermissions`.
+ *
+ * The no-escalation invariant: you cannot give away authority you do not hold.
+ * Granting a permission you lack would let a user promote themselves by proxy —
+ * invite an account with more authority than their own, then use it.
+ *
+ * This is a security invariant rather than a business rule, which is why it is
+ * decided here and not left to configuration. It is not a claim about who
+ * *should* be able to invite whom; that follows entirely from the permission
+ * catalogue, and an institution that changes which role holds `user.invite`
+ * changes who can invite whom without anything here needing to know.
+ *
+ * The role's permissions are passed in rather than derived, because the
+ * authority on what a role grants is `reference.role_permissions` in the
+ * database. Copying that mapping into this package would be a second
+ * definition, and the two could disagree — the precise failure the catalogue's
+ * drift test exists to prevent.
+ */
+export function canGrantRole(granter: Principal, rolePermissions: readonly Permission[]): boolean {
+  return rolePermissions.every((permission) => granter.permissions.has(permission));
+}

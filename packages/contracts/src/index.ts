@@ -64,6 +64,29 @@ export {
 } from './pagination.js';
 
 export {
+  INVITATION_STATES,
+  USER_STATUSES,
+  acceptInvitationRequestSchema,
+  createInvitationRequestSchema,
+  createdInvitationSchema,
+  invitationPreviewSchema,
+  invitationSchema,
+  previewInvitationRequestSchema,
+  staffMemberSchema,
+  updateStaffRequestSchema,
+  type AcceptInvitationRequest,
+  type CreateInvitationRequest,
+  type CreatedInvitation,
+  type Invitation,
+  type InvitationPreview,
+  type InvitationState,
+  type PreviewInvitationRequest,
+  type StaffMember,
+  type UpdateStaffRequest,
+  type UserStatus,
+} from './users.js';
+
+export {
   AUDIT_OPERATIONS,
   auditEntryDetailSchema,
   auditEntrySchema,

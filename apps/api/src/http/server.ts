@@ -8,6 +8,9 @@ import { type Redis } from 'ioredis';
 
 import { type AccessTokenService } from '../auth/access-token.js';
 import { type Environment } from '../config/environment.js';
+import { type InvitationDelivery } from '../notifications/invitation-delivery.js';
+import { type UserRepository } from '../modules/users/user-repository.js';
+import { registerUserRoutes } from '../modules/users/routes.js';
 import { type AuditRepository } from '../modules/audit/audit-repository.js';
 import { registerAuditRoutes } from '../modules/audit/routes.js';
 import { type SessionRepository } from '../modules/auth/session-repository.js';
@@ -74,6 +77,9 @@ export interface ServerDependencies {
   readonly cellMaps: CellMapRepository;
   readonly classification: ClassificationRepository;
   readonly audit: AuditRepository;
+  readonly users: UserRepository;
+  readonly invitationDelivery: InvitationDelivery;
+  readonly webBaseUrl: string;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -111,6 +117,9 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     cellMaps,
     classification,
     audit,
+    users,
+    invitationDelivery,
+    webBaseUrl,
     tokens,
   } = dependencies;
   const now = dependencies.now ?? ((): Date => new Date());
@@ -277,6 +286,13 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
   registerExportRoutes(app, { filings, exports, cellMaps, tokens });
   registerPortfolioRoutes(app, { classification, tokens });
   registerAuditRoutes(app, { audit, tokens });
+  registerUserRoutes(app, {
+    users,
+    delivery: invitationDelivery,
+    webBaseUrl,
+    tokens,
+    now,
+  });
 
   return app;
 }

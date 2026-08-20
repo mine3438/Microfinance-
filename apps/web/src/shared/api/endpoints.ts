@@ -4,6 +4,10 @@ import {
   auditEntryDetailSchema,
   auditEntrySchema,
   auditedTableSchema,
+  createdInvitationSchema,
+  invitationPreviewSchema,
+  invitationSchema,
+  staffMemberSchema,
   approvalThresholdSchema,
   botLoanTypeSchema,
   classificationRunSchema,
@@ -53,6 +57,13 @@ import {
   type AuditEntryDetail,
   type AuditListQuery,
   type AuditedTable,
+  type AcceptInvitationRequest,
+  type CreateInvitationRequest,
+  type CreatedInvitation,
+  type Invitation,
+  type InvitationPreview,
+  type StaffMember,
+  type UpdateStaffRequest,
   type BotLoanType,
   type Branch,
   type ClassificationRun,
@@ -108,6 +119,8 @@ import { apiRequest } from './client.js';
  */
 
 const auditPageSchema = pageSchema(auditEntrySchema);
+const staffListSchema = z.array(staffMemberSchema);
+const invitationListSchema = z.array(invitationSchema);
 const auditedTableListSchema = z.array(auditedTableSchema);
 const clientPageSchema = pageSchema(clientSchema);
 const loanPageSchema = pageSchema(loanSchema);
@@ -680,6 +693,77 @@ export const settings = {
     return apiRequest(`/settings/approval-thresholds/${roleCode}`, approvalThresholdListSchema, {
       method: 'PUT',
       body: { maxPrincipal },
+    });
+  },
+};
+
+/**
+ * Staff, and the invitations that create them.
+ *
+ * Two audiences in one object. The `/users` calls are made by an administrator
+ * with a session; `previewInvitation` and `acceptInvitation` are made by
+ * somebody who has no account yet and is holding a link.
+ *
+ * Both invitation calls are POSTs, including the one that only reads. A token
+ * in a query string reaches the server's access log, the browser's history and
+ * the `Referer` header of everything the page loads next — three durable copies
+ * of a single-use credential.
+ */
+export const staff = {
+  async list(): Promise<StaffMember[]> {
+    return apiRequest('/users', staffListSchema);
+  },
+
+  async invitations(): Promise<Invitation[]> {
+    return apiRequest('/users/invitations', invitationListSchema);
+  },
+
+  async invite(request: CreateInvitationRequest): Promise<CreatedInvitation> {
+    return apiRequest('/users/invitations', createdInvitationSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /** Withdraw an invitation. The row stays; only the offer is closed. */
+  async revoke(id: string): Promise<Invitation> {
+    return apiRequest(`/users/invitations/${id}/revocation`, invitationSchema, {
+      method: 'POST',
+      body: {},
+    });
+  },
+
+  async update(id: string, request: UpdateStaffRequest): Promise<StaffMember> {
+    return apiRequest(`/users/${id}`, staffMemberSchema, { method: 'PATCH', body: request });
+  },
+};
+
+export const invitations = {
+  /** What the invitee is joining, before they choose a password. */
+  async preview(token: string): Promise<InvitationPreview> {
+    return apiRequest('/auth/invitations/preview', invitationPreviewSchema, {
+      method: 'POST',
+      body: { token },
+      authenticated: false,
+    });
+  },
+
+  /**
+   * Accept, and set a password.
+   *
+   * `z.undefined()` because acceptance answers 204: `apiRequest` maps an empty
+   * body to `undefined` rather than calling `json()` on it, so a schema
+   * expecting `null` would reject every successful acceptance.
+   *
+   * No session comes back. Signing in is the login endpoint's job, so the
+   * account the invitee has just created is proved to work before they rely on
+   * it, and one code path issues every session in the system.
+   */
+  async accept(request: AcceptInvitationRequest): Promise<void> {
+    await apiRequest('/auth/invitations/acceptance', z.undefined(), {
+      method: 'POST',
+      body: request,
+      authenticated: false,
     });
   },
 };

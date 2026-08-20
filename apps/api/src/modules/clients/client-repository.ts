@@ -167,6 +167,17 @@ export interface ClientRepository {
     branchId: string,
     changes: UpdateBranchRequest,
   ): Promise<Branch | null>;
+  /**
+   * Move the head office designation to one branch.
+   *
+   * Its own operation rather than a field on `updateBranch`, because it is a
+   * two-row change guarding a one-row invariant — see the implementation.
+   */
+  designateHeadOffice(
+    institutionId: string,
+    userId: string,
+    branchId: string,
+  ): Promise<Branch | null>;
   /** BOT's published district list, with region names for a readable picker. */
   listDistricts(): Promise<District[]>;
   /** BOT's twenty-two economic sectors. */
@@ -439,6 +450,67 @@ export class PostgresClientRepository implements ClientRepository {
       if (updated.rows[0] === undefined) {
         return null;
       }
+
+      const rows = await client.query<BranchRow>(`${BRANCH_PROJECTION} WHERE b.id = $1`, [
+        branchId,
+      ]);
+      const row = rows.rows[0];
+      return row === undefined ? null : toBranch(row);
+    });
+  }
+
+  /**
+   * Move the head office designation, atomically.
+   *
+   * `branches_one_head_office_per_institution` is a **partial unique index**,
+   * not a constraint, so it cannot be declared `DEFERRABLE` and is enforced the
+   * moment each row is written. That rules out the obvious single statement —
+   * `SET is_head_office = (id = $2)` over both rows — because Postgres gives no
+   * guarantee about the order rows are updated within one statement, and if the
+   * new head office is written before the old one is cleared the index refuses
+   * it. The failure would be intermittent and data-dependent, which is the
+   * worst kind.
+   *
+   * So: clear, then set, in that order, in one transaction. No other
+   * transaction observes the gap between them, because no other transaction can
+   * see uncommitted rows.
+   *
+   * The `SELECT ... FOR UPDATE` on the institution is what makes concurrent
+   * promotions safe. Two administrators promoting different branches at the
+   * same instant would otherwise both clear the old head office from their own
+   * snapshot, both set their own, and the second to commit would hit the unique
+   * index — a raw constraint error rather than an answer. Serialising on the
+   * institution row makes the second wait, see the first's result, and clear it
+   * properly. The row always exists, and `mfi_app` holds UPDATE on
+   * `institutions`, so the lock needs no new privilege.
+   *
+   * Returns null when the branch is not this institution's, which row-level
+   * security has already made true of everything visible here.
+   */
+  public async designateHeadOffice(
+    institutionId: string,
+    userId: string,
+    branchId: string,
+  ): Promise<Branch | null> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const target = await client.query<{ id: string; status: string }>(
+        'SELECT id, status FROM branches WHERE id = $1',
+        [branchId],
+      );
+
+      const branch = target.rows[0];
+      if (branch === undefined) {
+        return null;
+      }
+
+      // Serialise head-office transitions within this institution.
+      await client.query('SELECT id FROM institutions WHERE id = $1 FOR UPDATE', [institutionId]);
+
+      await client.query(
+        'UPDATE branches SET is_head_office = false WHERE institution_id = $1 AND is_head_office',
+        [institutionId],
+      );
+      await client.query('UPDATE branches SET is_head_office = true WHERE id = $1', [branchId]);
 
       const rows = await client.query<BranchRow>(`${BRANCH_PROJECTION} WHERE b.id = $1`, [
         branchId,

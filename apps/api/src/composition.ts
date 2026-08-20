@@ -3,11 +3,14 @@ import { type FastifyInstance } from 'fastify';
 // Named rather than default: ioredis ships CommonJS, and under NodeNext the
 // module's namespace object is not itself constructable.
 import { Redis } from 'ioredis';
+import { pino } from 'pino';
 
 import { AccessTokenService } from './auth/access-token.js';
 import { type Environment } from './config/environment.js';
 import { buildServer } from './http/server.js';
 import { PostgresAuditRepository } from './modules/audit/audit-repository.js';
+import { PostgresUserRepository } from './modules/users/user-repository.js';
+import { createInvitationDelivery } from './notifications/invitation-delivery.js';
 import { PostgresSessionRepository } from './modules/auth/session-repository.js';
 import { PostgresClientRepository } from './modules/clients/client-repository.js';
 import { PostgresLoanRepository } from './modules/loans/loan-repository.js';
@@ -78,6 +81,39 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const cellMaps = new PostgresCellMapRepository(database);
   const classification = new PostgresClassificationRepository(database);
   const audit = new PostgresAuditRepository(database);
+  const users = new PostgresUserRepository(database);
+
+  /**
+   * How invitations reach the people invited.
+   *
+   * Built here rather than inside the server so a deployment that has asked for
+   * a mechanism it may not use fails at startup, before a port is bound —
+   * `INVITATION_DELIVERY=log` in production throws from this call. A guard that
+   * fired on the first invitation instead would let the institution discover it
+   * at the worst moment, which is while onboarding staff.
+   *
+   * Its own logger, because the server's does not exist yet and this is the
+   * composition root: the alternative is passing a factory inward and letting
+   * `buildServer` decide, which moves a security-relevant choice out of the one
+   * file that is supposed to hold every such choice.
+   */
+  const invitationDelivery = createInvitationDelivery({
+    mode: environment.INVITATION_DELIVERY,
+    isProduction: environment.NODE_ENV === 'production',
+    logger: pino({ level: environment.LOG_LEVEL }),
+  });
+
+  // Where the acceptance link points. The first CORS origin is the browser
+  // origin this API already serves, so it is the right default; a deployment
+  // whose web app lives elsewhere names it, rather than silently sending every
+  // invitee to a host that 404s.
+  const webBaseUrl = environment.WEB_BASE_URL ?? environment.CORS_ORIGINS[0];
+
+  if (webBaseUrl === undefined) {
+    throw new Error(
+      'No web base URL: set WEB_BASE_URL, or list at least one origin in CORS_ORIGINS.',
+    );
+  }
 
   const server = await buildServer({
     environment,
@@ -99,6 +135,9 @@ export async function composeApplication(environment: Environment): Promise<Appl
     cellMaps,
     classification,
     audit,
+    users,
+    invitationDelivery,
+    webBaseUrl,
     tokens,
   });
 
