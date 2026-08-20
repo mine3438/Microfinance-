@@ -54,18 +54,58 @@ describe('a July fiscal year', () => {
 });
 
 describe('start months that do not begin a quarter', () => {
-  it('treats a mid-quarter start month by the quarter it falls in', () => {
-    // April, May and June are all in Q2. A fiscal year starting in May means
-    // Q2 2026 (April–June) begins after 1 May 2025 and before 1 May 2026, so
-    // it belongs to the year that began in May 2025.
+  /**
+   * The rule, stated by `fiscalYearStartFor` itself: the most recent occurrence
+   * of the start month on or before **the first month of the quarter**. So a
+   * quarter is placed by where it starts, not by where it ends.
+   */
+  it('places a quarter by its first month', () => {
+    // Q2 2026 is April–June. A May fiscal year: the most recent 1 May on or
+    // before 1 April 2026 is 1 May 2025.
     expect(fiscalYearStartFor(period(2026, 2), 5)).toBe('2025-05-01');
+    // Q3 2026 is July–September, which starts after 1 May 2026.
     expect(fiscalYearStartFor(period(2026, 3), 5)).toBe('2026-05-01');
   });
 
-  it('handles a December start, where only Q4 is in the current year', () => {
+  it('places every quarter of a December fiscal year by its first month', () => {
+    // Q4 2026 starts in October, and the most recent 1 December on or before
+    // October 2026 is 1 December 2025 — even though the quarter itself runs
+    // into December 2026. See the straddle test below.
     expect(fiscalYearStartFor(period(2026, 1), 12)).toBe('2025-12-01');
     expect(fiscalYearStartFor(period(2026, 3), 12)).toBe('2025-12-01');
-    expect(fiscalYearStartFor(period(2026, 4), 12)).toBe('2026-12-01');
+    expect(fiscalYearStartFor(period(2026, 4), 12)).toBe('2025-12-01');
+  });
+
+  it('produces a window longer than a year when the start month straddles a quarter', () => {
+    // Recorded rather than corrected. A fiscal year that does not begin on a
+    // quarter boundary makes some quarter span the boundary, and this rule then
+    // yields a year-to-date window of more than twelve months: for Q4 2026 with
+    // a December start, 2025-12-01 through 2026-12-31 — thirteen months.
+    //
+    // Whether an institution may even declare such a fiscal year is part of
+    // §11.8, which is unanswered, so the behaviour is left exactly as it is and
+    // pinned here. Changing it would mean choosing a rule for non-aligned
+    // fiscal years that nobody has stated. The window used is reported on the
+    // compiled form as `yearToDateFrom`, so it is visible rather than implied.
+    const start = fiscalYearStartFor(period(2026, 4), 12);
+    const quarterEnd = period(2026, 4).endDate;
+
+    expect(start).toBe('2025-12-01');
+    expect(quarterEnd).toBe('2026-12-31');
+
+    // A quarter-aligned start month cannot do this: every quarter sits wholly
+    // inside one fiscal year.
+    for (const aligned of [1, 4, 7, 10]) {
+      for (let quarter = 1; quarter <= 4; quarter += 1) {
+        const from = fiscalYearStartFor(period(2026, quarter), aligned);
+        const to = period(2026, quarter).endDate;
+        const months =
+          (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 +
+          (Number(to.slice(5, 7)) - Number(from.slice(5, 7))) +
+          1;
+        expect(months).toBeLessThanOrEqual(12);
+      }
+    }
   });
 });
 
@@ -88,9 +128,15 @@ describe('the date it produces', () => {
 
   it('is unaffected by a leap year, because it never names 29 February', () => {
     // The start is always the first of a month, so February's length cannot
-    // move it. Stated as a test because "check the leap years" is the kind of
-    // requirement that gets answered with a shrug otherwise.
-    expect(fiscalYearStartFor(period(2024, 1), 2)).toBe('2024-02-01');
-    expect(fiscalYearStartFor(period(2023, 1), 2)).toBe('2023-02-01');
+    // move it, in a leap year or out of one. Q1 starts in January, which
+    // precedes 1 February, so both land on the previous year's February.
+    expect(fiscalYearStartFor(period(2024, 1), 2)).toBe('2023-02-01');
+    expect(fiscalYearStartFor(period(2023, 1), 2)).toBe('2022-02-01');
+
+    // And the quarter that begins on the boundary lands on its own year, leap
+    // or not — 2024 is a leap year, 2023 is not, and the answers have the same
+    // shape.
+    expect(fiscalYearStartFor(period(2024, 2), 2)).toBe('2024-02-01');
+    expect(fiscalYearStartFor(period(2023, 2), 2)).toBe('2023-02-01');
   });
 });

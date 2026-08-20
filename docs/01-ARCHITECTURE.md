@@ -2475,12 +2475,13 @@ than oversights:
 
 - **`share.read` / `share.manage`** — §13.5 (shares) is unanswered, so there is
   nothing to build against. Legitimately absent.
-- **`user.read` / `user.invite` / `user.manage`** — there is no user
-  management at all. An institution cannot add a member of staff; everyone must
-  be seeded by script. The `invitations` table exists and nothing writes it.
-  This is the largest remaining gap in the system and is **not** blocked on any
-  §13 question — it is simply not built. It needs an invitation flow, which
-  needs email delivery, which no supplied document specifies.
+- **`user.read` / `user.invite` / `user.manage`** — there was no user management
+  at all. An institution could not add a member of staff; everyone had to be
+  seeded by script, and the `invitations` table existed with nothing writing to
+  it. **Closed in §33.** The email-delivery question it was said to depend on
+  turned out not to block it: delivery is an interface with a mechanism that
+  needs no vendor, and choosing a provider stayed the institution's decision
+  (§33.5).
 - **`audit.read`** — audit rows are written by database triggers on every
   business table (and a schema invariant enforces that new tables get one), but
   nothing can read them back. An audit trail nobody can inspect is weaker than
@@ -2610,3 +2611,186 @@ between two dates — which this endpoint does not ask.
 - **No retention policy.** How long an institution must keep its trail is a BOT
   question, and no supplied document answers it. Deleting audit rows on a
   schedule this system invented would be worse than keeping them all.
+
+## 33. Staff invitations — the gap the permission catalogue named
+
+Migration 0005 seeded `user.read`, `user.invite` and `user.manage`, and created
+an `invitations` table with row-level security, a partial unique index for
+duplicate prevention, and a `token_hash` column commented "only the hash is
+stored". None of the three permissions enforced anything. Nothing ever wrote to
+the table.
+
+So an institution could not add a member of staff. Every account came from a
+seed script, which means the loan-officer persona the whole product is designed
+around could not be created by the people who need it — and the migration that
+built the table said as much in its own header, recording it as the gap that
+made a second user impossible.
+
+### 33.1 The lookup migration 0012 said would come
+
+Acceptance has the same problem login has: the person has no institution yet,
+because _identifying_ one is the operation. `mfi_app` is subject to row-level
+security, so an unscoped read of `invitations` returns nothing.
+
+Migration 0012 anticipated this precisely. Its header names four operations in
+that position — login, refresh, invitation acceptance and password reset —
+builds two, and says of the others that they "land with the features that use
+them; adding their lookups now would be schema for a capability that does not
+exist, which is the fault this project records as R8."
+
+Migration 0026 is that lookup, in the shape 0012 established: column-level
+grants to `mfi_auth`, a `SELECT`-only policy naming that role, and
+`auth.find_invitation` — `SECURITY DEFINER`, owned by `mfi_auth`, returning the
+institution and the three timestamps that gate acceptance, with `EXECUTE`
+revoked from `PUBLIC`.
+
+It decides nothing. An expired invitation returns a row, a revoked one returns a
+row, an accepted one returns a row. Which of those the caller is told is the use
+case's job — and unlike login there is no enumeration risk to manage, because
+reaching the function at all requires possession of a 256-bit token.
+
+### 33.2 Three authorisation rules, and why the third is the one to get right
+
+1. **Tenant.** The institution comes from the inviter's session. There is no
+   field a caller could set, and row-level security would refuse the write even
+   if there were.
+2. **Branch.** A branch-scoped inviter may only invite into their own branch —
+   the same `canActOnBranch` the borrower form uses, and refused rather than
+   silently corrected.
+3. **Escalation.** An inviter may assign a role only if that role's permissions
+   are a subset of their own.
+
+The third is easy to omit and expensive to omit. Without it `user.invite` is
+silently equal to **every permission in the catalogue**: hold it, invite an
+`institution_admin`, accept the invitation, sign in. The permission would grant
+by proxy everything its holder was deliberately not given.
+
+`canGrantRole` lives in `@mfi/identity` as a pure function, and the role's
+permissions are read from `reference.role_permissions` rather than from a list
+compiled into the binary. That table is the authority on what a role means; a
+copy in application code would be a second definition, and the check that must
+not drift from the catalogue is the one that is checking against it.
+
+It is a security invariant, not a business rule. It makes no claim about who
+_should_ invite whom — that follows entirely from the catalogue, and an
+institution that moves `user.invite` to another role changes who may invite whom
+without anything here needing to know.
+
+### 33.3 The account and the invitation are one transaction
+
+Inviting creates a `users` row (status `invited`, no password) _and_ the
+invitation, together or not at all. The schema was built for this: `users.status`
+has an `invited` value, `password_hash` is nullable, and
+`users_active_requires_password` permits the combination — with a comment saying
+a row with no hash "cannot authenticate, which is what makes an invitation safe
+to create ahead of acceptance."
+
+Both or neither, because either half alone is worse than nothing:
+
+- An invitation whose account insert failed is a token that resolves to nothing.
+- An account whose invitation failed consumes the address **globally**, since
+  `users_email_unique` spans every institution — so the address would be
+  unusable everywhere, not merely here.
+
+Re-inviting reuses the existing account rather than inserting a second. It has
+to: the address is unique across the whole database.
+
+### 33.4 Acceptance is one conditional UPDATE
+
+```sql
+UPDATE invitations SET accepted_at = $2
+ WHERE id = $1 AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > $2
+```
+
+Single use, revocation and expiry are all in that predicate, and the predicate is
+on the **write** rather than in a preceding read. Two requests presenting the
+same token both pass a check-then-act; only one can match a row. The loser
+matches nothing and is refused.
+
+Expiry is in the same predicate for the same reason: a token that expires between
+the check and the write must not be redeemable, and the only way to guarantee
+that is to let the database evaluate the clock as part of the condition.
+
+Acceptance returns `204` and no session. One code path issues every session in
+the system, and routing the new user through it proves the account works before
+they depend on it.
+
+The token travels in a **request body**, on both acceptance and the preview that
+only reads. `GET` would be conventional for the preview; it is wrong here. A
+token in a URL is written to the access log, kept in browser history, and sent in
+the `Referer` header of everything the page loads next — three durable copies of
+a single-use credential, in places nobody audits.
+
+### 33.5 Delivery, without choosing a vendor
+
+No supplied document names an email provider, a sending domain, or who pays for
+one. All three would be chosen on the institution's behalf, and not reversibly:
+it puts a third party in the path of a credential that creates staff accounts.
+
+`InvitationDelivery` has two implementations, neither a provider. `manual`
+returns the link once to the administrator who created it; `log` writes it to the
+server log and is **refused at startup in production**. See `03-STATUS.md` §4 for
+the table and the reasoning.
+
+`manual` is not a placeholder. For a Tier II provider whose new officer is in the
+next room it is how the thing actually happens. Adding SMTP later is one class
+against the interface and one case in the factory.
+
+The production guard lives in the composition root, so a deployment asking for a
+mechanism it may not use fails before a port is bound — the same shape as
+`COOKIE_SECURE`, and for the same reason: a guard that fired on the first
+invitation would surface at the worst moment, which is while onboarding staff.
+
+### 33.6 What is not built, and why
+
+**Role changes on an existing account.** The escalation check would carry over
+unchanged; two other questions would not. May an administrator demote
+themselves? May an institution be left with no administrator? Neither is
+answered anywhere.
+
+Suspension sidesteps both. `user.manage` is held only by `institution_admin`,
+and nobody may amend their own account — so every caller is an administrator,
+each can suspend the others, none can suspend themselves, and **at least one
+active administrator always remains** whatever order the calls arrive in. That
+derived property is what makes suspension safe to ship while role changes wait
+for a rule.
+
+**Cross-institution identity.** `users_email_unique` is global, so one address
+belongs to one institution for all time. Whether a person may hold accounts at
+two is a real question somebody will meet; answering yes needs a membership table
+separating identity from institution, which is a schema and login change rather
+than a tweak. Recorded in `03-STATUS.md` §2.12.
+
+## 34. Moving the head office
+
+`branches_one_head_office_per_institution` is a **partial unique index**. A
+partial index cannot be a constraint, so it cannot be `DEFERRABLE`, so it is
+enforced the moment each row is written.
+
+That rules out the statement everybody writes first:
+
+```sql
+UPDATE branches SET is_head_office = (id = $2) WHERE institution_id = $1
+```
+
+Postgres gives no guarantee about the order rows are updated within one
+statement. If the new head office is written before the old one is cleared, the
+index refuses it — intermittently, depending on physical row order. A failure
+that appears only sometimes, only on some data, is the worst kind to ship.
+
+So `POST /branches/:id/head-office` clears, then sets, in that order, in one
+transaction. No other transaction sees the gap between them, because no other
+transaction can see uncommitted rows.
+
+Concurrency needs one more thing. Two administrators promoting different branches
+at the same instant would each clear the old head office **from their own
+snapshot**, each set their own, and the second to commit would collide with the
+index — a raw constraint error rather than an answer. A `SELECT ... FOR UPDATE`
+on the institution row serialises them: the second waits, then clears what the
+first actually set. The row always exists, and `mfi_app` already holds `UPDATE`
+on `institutions`, so the lock needs no new privilege.
+
+Idempotent, so a retried request after a dropped response is safe. Its own
+endpoint rather than a field on `PATCH /branches/:id`, because expressing a
+two-row atomic transition as an ordinary edit is what makes people write the
+single statement above.
