@@ -13,6 +13,13 @@ a reason nobody decided.
 Companion to `01-ARCHITECTURE.md`, which explains *how* each implemented thing
 works and why. This page says only whether it exists.
 
+`04-DECISION-REGISTER.md` carries the same blocked items under stable
+identifiers — `SHARES-01`, `BOT-11.5`, `IDENTITY-01` and so on — so a question
+can be cited in a commit message, a board paper or an email to the Bank of
+Tanzania. `OPEN-QUESTIONS.pdf` is the register rendered for people who do not
+read Markdown in a terminal; regenerate it with
+`node scripts/generate-open-questions-pdf.mjs`.
+
 ---
 
 ## 1. Implemented

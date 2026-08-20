@@ -35,6 +35,7 @@
     "@mfi/migrator": "workspace:*",
     "@types/node": "^22.10.2",
     "eslint": "^9.17.0",
+    "pdfkit": "^0.19.1",
     "pg": "^8.22.0",
     "prettier": "^3.4.2",
     "tsx": "^4.19.2",

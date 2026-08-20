@@ -140,3 +140,39 @@ describe('the date it produces', () => {
     expect(fiscalYearStartFor(period(2023, 2), 2)).toBe('2023-02-01');
   });
 });
+
+/**
+ * Every start month §18 names, in one table.
+ *
+ * The four quarter-aligned months are the ones an institution is most likely to
+ * declare; the two others are here because the parameter accepts them and
+ * nothing has said it should not.
+ */
+describe('the start months the requirement names', () => {
+  it.each([
+    // Quarter-aligned: every quarter sits wholly inside one fiscal year.
+    [1, ['2026-01-01', '2026-01-01', '2026-01-01', '2026-01-01']],
+    [4, ['2025-04-01', '2026-04-01', '2026-04-01', '2026-04-01']],
+    [7, ['2025-07-01', '2025-07-01', '2026-07-01', '2026-07-01']],
+    [10, ['2025-10-01', '2025-10-01', '2025-10-01', '2026-10-01']],
+    // Not quarter-aligned: one quarter straddles the boundary.
+    [12, ['2025-12-01', '2025-12-01', '2025-12-01', '2025-12-01']],
+    [2, ['2025-02-01', '2026-02-01', '2026-02-01', '2026-02-01']],
+  ])('places the four quarters of 2026 for a month-%i fiscal year', (month, expected) => {
+    const actual = [1, 2, 3, 4].map((quarter) =>
+      fiscalYearStartFor(reportingPeriod(2026, quarter), month),
+    );
+
+    expect(actual).toEqual(expected);
+  });
+
+  it('never silently normalises a start month to a quarter boundary', () => {
+    // The month asked for is the month in the answer. Rounding February to
+    // January would be this system deciding that non-aligned fiscal years are
+    // not permitted, which is exactly the unanswered question.
+    for (const month of [2, 3, 5, 6, 8, 9, 11, 12]) {
+      const produced = fiscalYearStartFor(reportingPeriod(2026, 2), month);
+      expect(produced.slice(5, 7)).toBe(String(month).padStart(2, '0'));
+    }
+  });
+});
