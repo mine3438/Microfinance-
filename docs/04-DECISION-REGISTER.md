@@ -47,10 +47,11 @@ with what it was.
 | GROUP-02 | Disbursement to group or to members | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: one disbursement to the group |
 | GROUP-03 | Group guarantee rules | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: members jointly bear the whole obligation |
 | GROUP-04 | Default handling for a group loan | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: arrears and classification at group-loan level |
-| FEE-01 | What qualifies as a loan fee | DECIDED + IMPLEMENTATION PENDING | Allocator bucket fixed, allocates nil | Build the TZS 5,000 application fee as a separate receipt |
-| FEE-02 | When a fee is charged | DECIDED + IMPLEMENTATION PENDING | Nothing charges a fee | Build: cash, at application submission |
-| FEE-03 | Whether a fee is refundable | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: refunded on rejection, retained on approval |
-| FEE-04 | Ledger accounts for collection, retention and refund | BLOCKED BY ACCOUNTING POLICY | No fee is recorded yet | Chart-of-accounts mapping |
+| FEE-01 | What qualifies as a loan fee | DECIDED + IMPLEMENTED | The TZS 5,000 application/form fee, in `loan_application_fees`; the allocator bucket keeps its position and still allocates nil | — |
+| FEE-02 | When a fee is charged | DECIDED + IMPLEMENTED | Cash, recorded against an application in draft or pending approval | — |
+| FEE-03 | Whether a fee is refundable | DECIDED + IMPLEMENTED | Retained on approval, refund_due on rejection, refunded by stamp that never erases the collection | — |
+| FEE-04 | Ledger accounts for collection, retention and refund | BLOCKED BY ACCOUNTING POLICY | Fees are recorded and traceable; no journal entry is posted | Chart-of-accounts mapping |
+| FEE-04a | Refund timing where a rejected application is revised and resubmitted | BLOCKED BY BUSINESS | Refundable while the application sits as a rejected draft; refused once resubmitted | Whether a refund is due the moment a decision is reject |
 | SETTLE-01 | Early-settlement discount | DECIDED + IMPLEMENTATION PENDING | No endpoint; ordinary repayments only | Build: no discount applies |
 | SETTLE-02 | Future-interest treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: interest through the settlement month, month granularity |
 | SETTLE-03 | Penalty and fee treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: all accrued penalties due; application fee excluded |

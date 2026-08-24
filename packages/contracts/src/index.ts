@@ -64,6 +64,18 @@ export {
 } from './pagination.js';
 
 export {
+  APPLICATION_FEE_AMOUNT,
+  APPLICATION_FEE_STATES,
+  applicationFeeSchema,
+  collectApplicationFeeRequestSchema,
+  refundApplicationFeeRequestSchema,
+  type ApplicationFee,
+  type ApplicationFeeState,
+  type CollectApplicationFeeRequest,
+  type RefundApplicationFeeRequest,
+} from './loans.js';
+
+export {
   loanRecoverySchema,
   loanWriteOffSchema,
   recordRecoveryRequestSchema,

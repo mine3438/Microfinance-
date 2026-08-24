@@ -470,3 +470,83 @@ export const loanRecoverySchema = z
   .strict();
 
 export type LoanRecovery = z.infer<typeof loanRecoverySchema>;
+
+/**
+ * The application/form fee.
+ *
+ * The institution's one approved application-stage charge: **TZS 5,000**, paid
+ * in cash when the applicant submits the loan forms.
+ *
+ * It is deliberately not part of the loan. It is not deducted from
+ * disbursement, not added to principal, not interest-bearing, not part of the
+ * repayment schedule, and not a balance the repayment allocator can reach — the
+ * allocator's fee bucket keeps its fixed position and continues to allocate
+ * nil, so no repayment splits differently because this fee exists.
+ */
+export const APPLICATION_FEE_AMOUNT = '5000.00';
+
+/** Where an application fee stands. Derived, never stored. */
+export const APPLICATION_FEE_STATES = ['collected', 'retained', 'refund_due', 'refunded'] as const;
+
+export type ApplicationFeeState = (typeof APPLICATION_FEE_STATES)[number];
+
+export const applicationFeeSchema = z
+  .object({
+    id: uuidSchema,
+    loanId: uuidSchema,
+    amount: z.string(),
+
+    collectedOn: isoDateSchema,
+    method: z.string().nullable(),
+    reference: z.string().nullable(),
+    collectedBy: uuidSchema,
+    collectedByName: z.string().nullable(),
+
+    /**
+     * Where it stands, worked out from the application and the refund stamp:
+     *
+     * - `collected` — taken; the application has not been decided.
+     * - `retained` — the application was approved, so the institution keeps it.
+     * - `refund_due` — the application was rejected and the money has not yet
+     *   been handed back.
+     * - `refunded` — handed back, with the collection record intact.
+     */
+    state: z.enum(APPLICATION_FEE_STATES),
+
+    refundedOn: isoDateSchema.nullable(),
+    refundedBy: uuidSchema.nullable(),
+    refundedByName: z.string().nullable(),
+    refundReason: z.string().nullable(),
+  })
+  .strict();
+
+export type ApplicationFee = z.infer<typeof applicationFeeSchema>;
+
+/**
+ * Recording the collection.
+ *
+ * No amount field. The charge is fixed policy at {@link APPLICATION_FEE_AMOUNT},
+ * so letting a caller state it would let a counter typo become the fee — and
+ * the figure is not theirs to choose.
+ */
+export const collectApplicationFeeRequestSchema = z
+  .object({
+    /** When the money was taken. Defaults to today; a future date is refused. */
+    collectedOn: isoDateSchema.optional(),
+    /** Cash, by the approved rule — recorded as written rather than enumerated. */
+    method: requiredTextSchema(100).optional(),
+    reference: requiredTextSchema(100).optional(),
+  })
+  .strict();
+
+export type CollectApplicationFeeRequest = z.infer<typeof collectApplicationFeeRequestSchema>;
+
+/** Handing it back after a rejected application. */
+export const refundApplicationFeeRequestSchema = z
+  .object({
+    refundedOn: isoDateSchema.optional(),
+    reason: requiredTextSchema(500).optional(),
+  })
+  .strict();
+
+export type RefundApplicationFeeRequest = z.infer<typeof refundApplicationFeeRequestSchema>;

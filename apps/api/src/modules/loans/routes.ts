@@ -6,7 +6,10 @@ import {
   disburseLoanRequestSchema,
   loanListQuerySchema,
   loanProductSchema,
+  applicationFeeSchema,
+  collectApplicationFeeRequestSchema,
   loanRecoverySchema,
+  refundApplicationFeeRequestSchema,
   loanSchema,
   loanWithScheduleSchema,
   loanWriteOffSchema,
@@ -26,6 +29,12 @@ import { type AccessTokenService } from '../../auth/access-token.js';
 import { authenticate, principalOf, requirePermission } from '../../http/authentication.js';
 import { validationFailed } from '../../http/errors.js';
 import { type LoanRepository } from './loan-repository.js';
+import { type ApplicationFeeRepository } from './application-fee-repository.js';
+import {
+  collectApplicationFee,
+  getApplicationFee,
+  refundApplicationFee,
+} from './application-fee-use-cases.js';
 import { type WriteOffRepository } from './write-off-repository.js';
 import {
   getWriteOff,
@@ -53,6 +62,7 @@ const recoveryListSchema = z.array(loanRecoverySchema);
 export interface LoanRouteOptions {
   readonly loans: LoanRepository;
   readonly writeOffs: WriteOffRepository;
+  readonly applicationFees: ApplicationFeeRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -83,7 +93,7 @@ function loanIdOf(request: FastifyRequest): string {
  * database constraint refuses it again beneath that.
  */
 export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptions): void {
-  const { loans, writeOffs, tokens } = options;
+  const { loans, writeOffs, applicationFees, tokens } = options;
   const now = options.now ?? ((): Date => new Date());
   const authenticated = authenticate(tokens);
 
@@ -374,5 +384,71 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
       recoveryListSchema.parse(
         await listRecoveries(principalOf(request), loanIdOf(request), writeOffs),
       ),
+  );
+
+  /**
+   * Record the TZS 5,000 application/form fee.
+   *
+   * `payment.create`: it is cash taken at the counter by the people who take
+   * cash. The request carries no amount — the charge is fixed policy, and a
+   * caller stating it would let a counter typo become the fee.
+   */
+  app.post(
+    '/loans/:id/application-fee',
+    { preHandler: [authenticated, requirePermission('payment.create')] },
+    async (request, reply): Promise<unknown> => {
+      const body = collectApplicationFeeRequestSchema.safeParse(request.body ?? {});
+      if (!body.success) {
+        throw validationFailed(body.error, 'That application fee cannot be recorded as entered.');
+      }
+
+      const collected = await collectApplicationFee(
+        principalOf(request),
+        loanIdOf(request),
+        body.data,
+        applicationFees,
+        now,
+      );
+
+      void reply.status(201);
+      return applicationFeeSchema.parse(collected);
+    },
+  );
+
+  app.get(
+    '/loans/:id/application-fee',
+    { preHandler: [authenticated, requirePermission('payment.read')] },
+    async (request): Promise<unknown> =>
+      applicationFeeSchema.parse(
+        await getApplicationFee(principalOf(request), loanIdOf(request), applicationFees),
+      ),
+  );
+
+  /**
+   * Hand the fee back after a rejected application.
+   *
+   * A POST recording a refund rather than a DELETE removing the collection: the
+   * requirement is that what was taken stays evidenced, and a deleted row
+   * evidences nothing.
+   */
+  app.post(
+    '/loans/:id/application-fee/refund',
+    { preHandler: [authenticated, requirePermission('payment.create')] },
+    async (request): Promise<unknown> => {
+      const body = refundApplicationFeeRequestSchema.safeParse(request.body ?? {});
+      if (!body.success) {
+        throw validationFailed(body.error, 'That refund cannot be recorded as entered.');
+      }
+
+      return applicationFeeSchema.parse(
+        await refundApplicationFee(
+          principalOf(request),
+          loanIdOf(request),
+          body.data,
+          applicationFees,
+          now,
+        ),
+      );
+    },
   );
 }
