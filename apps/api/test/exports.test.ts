@@ -492,14 +492,18 @@ describe('BOT filling instructions', () => {
       await request('GET', `/filings/${filed.id}/workbook`, accountantToken),
     );
 
-    // MSP2-01 Sno 52, Paid-up Ordinary Share Capital, at row 39. This
-    // institution is a sole business with no customer shares product, and the
-    // fixture funds no share capital — so the figure is genuinely nil.
+    // MSP2-01 Sno 52, Paid-up Ordinary Share Capital. The `form_rows` table is
+    // keyed (form_code, row_number, sno), so Sno 52 is row 65 — not row 52,
+    // which carries Sno 39. Reading that pair the other way round lands on C39,
+    // which is one of BOT's own formulas rather than a data cell.
+    //
+    // This institution is a sole business with no customer shares product, and
+    // the fixture funds no share capital, so the figure is genuinely nil.
     //
     // BOT: "All items in statutory returns with zero values are filled as such
     // and no cell is reported blank." A blank here is a rejected return; a
     // fabricated figure is worse.
-    const shareCapital = workbook.getWorksheet('MSP2_01')?.getCell('C39').value;
+    const shareCapital = workbook.getWorksheet('MSP2_01')?.getCell('C65').value;
 
     expect(shareCapital).toBe(0);
     expect(shareCapital).not.toBeNull();
