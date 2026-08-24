@@ -492,22 +492,31 @@ describe('BOT filling instructions', () => {
       await request('GET', `/filings/${filed.id}/workbook`, accountantToken),
     );
 
-    // MSP2-01 Sno 52, Paid-up Ordinary Share Capital. The `form_rows` table is
-    // keyed (form_code, row_number, sno), so Sno 52 is row 65 — not row 52,
-    // which carries Sno 39. Reading that pair the other way round lands on C39,
-    // which is one of BOT's own formulas rather than a data cell.
+    // Two cells, because the point is the contrast between them.
     //
-    // This institution is a sole business with no customer shares product, and
-    // the fixture funds no share capital, so the figure is genuinely nil.
+    // `reference.form_rows` is keyed (form_code, row_number, sno) and the row is
+    // the Sno plus a uniform offset of 13. So Sno 52 — Paid-up Ordinary Share
+    // Capital, which `fileBalancedQuarter` funds — is C65, and Sno 53 — Paid-up
+    // Preference Shares, which it does not — is C66.
+    //
+    // Preference shares are the cleaner subject anyway: this institution is a
+    // sole business that issues no shareholder instrument of any kind, so the
+    // figure is genuinely nil rather than merely unfunded by a fixture.
     //
     // BOT: "All items in statutory returns with zero values are filled as such
-    // and no cell is reported blank." A blank here is a rejected return; a
-    // fabricated figure is worse.
-    const shareCapital = workbook.getWorksheet('MSP2_01')?.getCell('C65').value;
+    // and no cell is reported blank." A blank is a rejected return; a fabricated
+    // figure is worse. Asserting the funded cell alongside it is what stops this
+    // passing for the wrong reason — a writer that emitted 0 everywhere would
+    // satisfy the nil assertion and lose the balance sheet.
+    const sheet = workbook.getWorksheet('MSP2_01');
+    const ordinaryShareCapital = sheet?.getCell('C65').value;
+    const preferenceShares = sheet?.getCell('C66').value;
 
-    expect(shareCapital).toBe(0);
-    expect(shareCapital).not.toBeNull();
-    expect(shareCapital).not.toBe('');
+    expect(ordinaryShareCapital).toBe(5_000_000);
+
+    expect(preferenceShares).toBe(0);
+    expect(preferenceShares).not.toBeNull();
+    expect(preferenceShares).not.toBe('');
   });
 
   it('reports to the nearest shilling, unscaled (BOT-FORMAT-02)', async () => {
