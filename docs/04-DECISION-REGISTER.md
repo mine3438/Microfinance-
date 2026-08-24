@@ -20,57 +20,307 @@ index.
 
 | Status | Meaning |
 | --- | --- |
-| **BLOCKED** | Cannot be implemented without a decision. No code guesses at it. |
+| **DECIDED + IMPLEMENTED** | Decision received, and the behaviour is built and tested. |
+| **DECIDED + IMPLEMENTATION PENDING** | Decision received and recorded here; the code does not yet do it. The old safe behaviour still stands in the meantime. |
+| **NOT APPLICABLE** | The institution does not do this. Nothing is built, and nothing needs to be. |
+| **BLOCKED BY BOT** | Waiting on a Bank of Tanzania interpretation. No code guesses at it. |
+| **BLOCKED BY ACCOUNTING POLICY** | The business rule is decided; the journal/ledger mapping is not. The domain record exists and carries enough to post correctly once the mapping is approved. |
 | **DEFERRED** | Could be implemented; deliberately is not. A design decision, not a gap. |
-| **ANSWERED** | Decision received and implemented. Kept for the record. |
+
+Nothing moves out of a BLOCKED status by inference or by the passage of time —
+only on a decision from somebody with the authority to make it, recorded below
+with what it was.
 
 ---
 
 ## Register
 
-| ID | Requirement | Status | Current behaviour | Decision required | From |
-| --- | --- | --- | --- | --- | --- |
-| SHARES-01 | Share par value | BLOCKED | Not implemented | Business decision | §13.5 |
-| SHARES-02 | Subscription rules | BLOCKED | Not implemented | Business decision | §13.5 |
-| SHARES-03 | Transferability | BLOCKED | Not implemented | Business decision | §13.5 |
-| SHARES-04 | Dividend declaration | BLOCKED | Not implemented | Business decision | §13.5 |
-| SHARES-05 | Withdrawability | BLOCKED | Not implemented | Business decision | §13.5 |
-| SHARES-06 | BOT MSP2-01 treatment of shares | BLOCKED | Shares line reports nil | BOT ruling | §13.5 |
-| GROUP-01 | Joint or several liability | BLOCKED | No group tables or code | Liability model | §13.6 |
-| GROUP-02 | Disbursement to group or to members | BLOCKED | Not implemented | Business decision | §13.6 |
-| GROUP-03 | Group guarantee rules | BLOCKED | Not implemented | Business decision | §13.6 |
-| GROUP-04 | Default handling for a group loan | BLOCKED | Not implemented | Business decision | §13.6 |
-| FEE-01 | What qualifies as a loan fee | BLOCKED | Allocator bucket fixed, allocates nil | Business decision | §13.8 |
-| FEE-02 | When a fee is charged | BLOCKED | Nothing charges a fee | Business decision | §13.8 |
-| FEE-03 | Whether a fee is refundable | BLOCKED | Not implemented | Business decision | §13.8 |
-| SETTLE-01 | Early-settlement discount | BLOCKED | No endpoint; ordinary repayments only | Business decision | §13.8 |
-| SETTLE-02 | Future-interest treatment on settlement | BLOCKED | No endpoint | Business decision | §13.8 |
-| SETTLE-03 | Penalty and fee treatment on settlement | BLOCKED | No endpoint | Business decision | §13.8 |
-| SETTLE-04 | Which date governs a settlement figure | BLOCKED | No endpoint | Business decision | §13.8 |
-| RESTRUCT-01 | Restructuring eligibility and approval | BLOCKED | Not implemented; no such loan state | Business decision | §13.8 |
-| RESTRUCT-02 | Treatment of principal, interest, penalties, fees | BLOCKED | Not implemented | Business decision | §13.8 |
-| RESTRUCT-03 | Old schedule handling and new schedule generation | BLOCKED | Not implemented | Business decision | §13.8 |
-| RESTRUCT-04 | Accounting and reporting treatment | BLOCKED | Not implemented | Business + BOT | §13.8 |
-| RESTRUCT-05 | Whether restructuring resets classification | BLOCKED | Not implemented | BOT ruling | §13.8 |
-| RECOVERY-01 | Accounting treatment of a recovery on a written-off loan | BLOCKED | Payment refused; `written_off` terminal | Accounting decision | §13.8 |
-| WRITEOFF-01 | How a loan is written off through the application | BLOCKED | No endpoint; status reachable only by direct database change | Business decision | — |
-| BOT-11.2 | Simple or effective annualisation | BLOCKED | Explicit parameter, `simple` default, echoed on the form | BOT ruling | §11.2 |
-| BOT-11.4 | Age-band reference date | BLOCKED | Required argument, never defaulted | BOT ruling | §11.4 |
-| BOT-11.5 | Housing loans 0–90 days overdue | BLOCKED | Unclassified and surfaced; never Current | BOT ruling | §11.5 |
-| BOT-11.8 | Calendar year or institution's fiscal year | BLOCKED | Required parameter, echoed as `yearToDateFrom` | BOT ruling | §11.8 |
-| BOT-11.8B | Whether a fiscal year must begin on a quarter boundary | BLOCKED | Any month 1–12 accepted; a non-aligned year can produce a window over twelve months, reported as it stands | BOT or business | §11.8 |
-| AUDIT-01 | Audit retention period | BLOCKED | Nothing is ever deleted | BOT requirement | — |
-| IDENTITY-01 | May one person hold accounts at two institutions | BLOCKED | Refused; email addresses globally unique | Business decision | — |
-| AUDIT-02 | Audit branch filtering | DEFERRED | No branch on an audit event; no filter offered | Only if an authoritative branch relationship appears | — |
-| AUDIT-03 | Audit date-range index | DEFERRED | No date filter; three existing access paths | Only if a documented query needs it | — |
-| USERS-01 | Role changes on an existing account | DEFERRED | Invitations assign a role; suspension available; no role-change endpoint | Last-administrator rule | — |
+| ID | Requirement | Status | Current behaviour | Outstanding |
+| --- | --- | --- | --- | --- |
+| SHARES-01 | Share par value | NOT APPLICABLE | No shares product exists or will | — |
+| SHARES-02 | Subscription rules | NOT APPLICABLE | No shares product exists or will | — |
+| SHARES-03 | Transferability | NOT APPLICABLE | No shares product exists or will | — |
+| SHARES-04 | Dividend declaration | NOT APPLICABLE | No shares product exists or will | — |
+| SHARES-05 | Withdrawability | NOT APPLICABLE | No shares product exists or will | — |
+| SHARES-06 | BOT MSP2-01 treatment of shares | DECIDED + IMPLEMENTED | MSP2-01 capital lines are fed by the statements module and report `0` where nil; no customer-share activity is fabricated | — |
+| GROUP-01 | Joint or several liability | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build to the joint-liability model below |
+| GROUP-02 | Disbursement to group or to members | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: one disbursement to the group |
+| GROUP-03 | Group guarantee rules | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: members jointly bear the whole obligation |
+| GROUP-04 | Default handling for a group loan | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: arrears and classification at group-loan level |
+| FEE-01 | What qualifies as a loan fee | DECIDED + IMPLEMENTATION PENDING | Allocator bucket fixed, allocates nil | Build the TZS 5,000 application fee as a separate receipt |
+| FEE-02 | When a fee is charged | DECIDED + IMPLEMENTATION PENDING | Nothing charges a fee | Build: cash, at application submission |
+| FEE-03 | Whether a fee is refundable | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: refunded on rejection, retained on approval |
+| FEE-04 | Ledger accounts for collection, retention and refund | BLOCKED BY ACCOUNTING POLICY | No fee is recorded yet | Chart-of-accounts mapping |
+| SETTLE-01 | Early-settlement discount | DECIDED + IMPLEMENTATION PENDING | No endpoint; ordinary repayments only | Build: no discount applies |
+| SETTLE-02 | Future-interest treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: interest through the settlement month, month granularity |
+| SETTLE-03 | Penalty and fee treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: all accrued penalties due; application fee excluded |
+| SETTLE-04 | Which date governs a settlement figure | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: the settlement month, never prorated by day |
+| RESTRUCT-01 | Restructuring eligibility and approval | DECIDED + IMPLEMENTATION PENDING | Not implemented; no such loan state | Build: within original term, Owner/Manager approves |
+| RESTRUCT-02 | Treatment of principal, interest, penalties, fees | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: new principal = remaining principal + unpaid interest + unpaid penalties |
+| RESTRUCT-03 | Old schedule handling and new schedule generation | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: old preserved and closed to repayment; new schedule from the original product terms |
+| RESTRUCT-04 | Accounting treatment of capitalised interest and penalties | BLOCKED BY ACCOUNTING POLICY | Not implemented | Journal mapping for capitalisation |
+| RESTRUCT-05 | Whether restructuring resets classification | DECIDED (policy recorded) | The new loan starts Current; see the caveat below | Implementation pending with RESTRUCT-01 |
+| RECOVERY-01 | Treatment of a recovery on a written-off loan | DECIDED + IMPLEMENTED | Recorded in `loan_recoveries`; the loan stays written off, the balance stays zero, and it is never a payment | — |
+| RECOVERY-02 | Ledger accounts for recovery income | BLOCKED BY ACCOUNTING POLICY | Recovery records exist and carry amount, date, method and loan | Journal mapping, and wiring MSP2-02 Sno 21 to consume them |
+| WRITEOFF-01 | How a loan is written off through the application | DECIDED + IMPLEMENTED | `POST /loans/:id/write-off`, Owner/Manager only, reason required, no automatic threshold | — |
+| WRITEOFF-02 | Ledger accounts for a write-off, provided-for versus not | BLOCKED BY ACCOUNTING POLICY | The record keeps principal and penalty separately, so either treatment can be posted later | Journal mapping; BOT distinguishes MSP2-02 Sno 14 from the provision line |
+| BOT-FORMAT-01 | Statutory zero values output as `0`, never blank | DECIDED + IMPLEMENTED | `asCellNumber` writes numeric `0` for a zero amount | — |
+| BOT-FORMAT-01A | Whether an MSP2-04 rate cell with no lending should be `0` or blank | BLOCKED BY BOT | Left blank — writing `0` would assert lending at 0% | BOT ruling |
+| BOT-FORMAT-02 | Monetary figures to the nearest shilling | DECIDED + IMPLEMENTED | Exact decimals written unscaled; an amount a cell cannot hold exactly is refused, never rounded | — |
+| BOT-11.2 | Simple or effective annualisation | BLOCKED BY BOT | Explicit parameter, `simple` default, echoed on the form | BOT ruling |
+| BOT-11.4 | Age-band reference date | BLOCKED BY BOT | Required argument, never defaulted | BOT ruling |
+| BOT-11.5 | Housing loans 0–90 days overdue | BLOCKED BY BOT | Unclassified and surfaced; never Current | BOT ruling |
+| BOT-11.8 | Calendar year or the institution fiscal year | BLOCKED BY BOT | Required parameter, echoed as `yearToDateFrom` | BOT ruling |
+| BOT-11.8B | Whether a fiscal year must begin on a quarter boundary | BLOCKED BY BOT | Any month 1–12 accepted; a non-aligned year can produce a window over twelve months, reported as it stands | BOT or business |
+| AUDIT-01 | Audit retention period | BLOCKED BY BOT | Nothing is ever deleted | BOT requirement |
+| IDENTITY-01 | May one person hold accounts at two institutions | BLOCKED BY BUSINESS | Refused; email addresses globally unique | Business decision |
+| AUDIT-02 | Audit branch filtering | DEFERRED | No branch on an audit event; no filter offered | Only if an authoritative branch relationship appears |
+| AUDIT-03 | Audit date-range index | DEFERRED | No date filter; three existing access paths | Only if a documented query needs it |
+| USERS-01 | Role changes on an existing account | DEFERRED | Invitations assign a role; suspension available; no role-change endpoint | Last-administrator rule |
+
+---
+
+---
+
+## Decisions received — 20 August 2026
+
+Recorded in full, including what each item's status was before, so the register
+reads as a history rather than a snapshot. Nothing below was inferred; each is
+the institution's stated policy, and where a decision leaves an accounting
+question open that is recorded too rather than filled in.
+
+### Shares — NOT APPLICABLE
+
+**Previous status.** SHARES-01…05 BLOCKED, awaiting par value, subscription,
+transferability, dividends and withdrawability.
+
+**Decision.** The institution is a **sole business**. It does not operate a
+member or shareholder shares product: no customer subscriptions, no par value,
+no transfers, no dividends, no redemption.
+
+**What this changes.** Nothing is built, and nothing needs to be. The five
+questions are not answered — they are *withdrawn*, because the product they
+describe does not exist here.
+
+**What it deliberately does not change.** MSP2-01 Sno 52 (Paid-up Ordinary Share
+Capital), Sno 53 (Paid-up Preference Shares) and Sno 56 (Share Premium) are the
+**institution's own equity capital**, not a customer product. They are entered
+through the statements module and continue to report whatever the institution's
+accounting data says. A sole business with no customer shares may still have
+paid-up capital, and assuming otherwise would understate equity. Where the
+figure genuinely is nil, the workbook writes `0` — see BOT-FORMAT-01.
+
+**Extensibility.** MFI Manager is architected for many institutions, so nothing
+generic was deleted to record one institution's position. `share.read` and
+`share.manage` remain in the permission catalogue, enforcing nothing, exactly as
+before. No capability flag was introduced: there is no shares module for a flag
+to switch off, and adding a column to `institutions` to describe the absence of
+a feature that does not exist would be schema for a capability nobody has — the
+fault this project records as R8 and has already had to repair twice.
+
+### Group lending — joint liability, the group is the borrower
+
+**Previous status.** GROUP-01…04 BLOCKED, awaiting the liability model.
+
+**Decision.**
+
+- The **group is the borrower**. Members belong to the group but receive no
+  individual sub-loan and no member-level balance.
+- Liability is **joint**: members collectively bear the whole obligation.
+- **One disbursement**, to the group account. Never split across members.
+- **One combined repayment**, one schedule, one balance.
+- A partly-paid instalment puts the **whole group loan** in arrears. No member
+  is individually overdue.
+- Classification is calculated at the **group-loan level**.
+- Members stay associated for membership, identification, audit and operational
+  management, and membership history must remain interpretable after it changes.
+
+**Status.** DECIDED + IMPLEMENTATION PENDING. No group tables exist yet, so the
+current behaviour is unchanged: a loan to a member of a group is an ordinary
+loan to that borrower. Nothing has been half-built.
+
+**Extensibility already confirmed.** `loans.client_id` is `NOT NULL` with a
+composite key into `clients`. The joint-liability model needs a `groups` table, a
+membership table with effective dating, a nullable `group_id` on `loans`, and
+`client_id` relaxed to nullable for a loan held by the group itself — all
+**additive**. No existing row is rewritten and no constraint is dropped.
+
+### Application/form fee — TZS 5,000
+
+**Previous status.** FEE-01…03 BLOCKED, awaiting a definition and a charging
+trigger.
+
+**Decision.** Exactly one application-stage charge: **TZS 5,000**, paid in cash
+when the applicant submits the loan forms. It is paid separately and is:
+
+- **not** deducted from disbursement;
+- **not** added to principal;
+- **not** interest-bearing;
+- **not** part of the repayment schedule;
+- **not** an outstanding balance the repayment allocator can reach.
+
+If the application is **approved** the institution retains it. If **rejected**
+it is refunded, and the collection record is kept — a refund is a second event,
+never a deletion of the first.
+
+**Status.** DECIDED + IMPLEMENTATION PENDING.
+
+**What stays true meanwhile, and after.** The allocator's fee bucket keeps its
+fixed position and continues to allocate **nil**. The TZS 5,000 never travels
+through repayment allocation, so no repayment — past or future — splits
+differently because of this decision. Pinned by regression test.
+
+**Accounting caveat — FEE-04, BLOCKED BY ACCOUNTING POLICY.** BOT's MSP2-02
+identifies *Fees* under non-interest income as fees charged in day-to-day
+operations, which is where a retained application fee plainly belongs. But the
+charge is refundable until the application is decided, so between collection and
+decision it is not income. No approved chart-of-accounts mapping exists for the
+holding, retention and refund entries, so none is invented. The operational
+workflow can still record and trace every collection, retention and refund; only
+the journal posting waits.
+
+### Early settlement
+
+**Previous status.** SETTLE-01…04 BLOCKED.
+
+**Decision.** A borrower may settle an active loan before maturity, paying:
+
+> outstanding principal + interest due through the settlement month + all
+> accrued and outstanding penalties
+
+- **No** early-settlement discount.
+- Interest is charged at **month granularity, never prorated by day**. Settling
+  on 1, 10 or 31 August all include the whole of August's applicable interest
+  and exclude September onwards.
+- All penalties already accrued are payable and are **not** waived.
+- The TZS 5,000 application fee is **not** part of a settlement quote; it was
+  handled at application.
+
+**Status.** DECIDED + IMPLEMENTATION PENDING. Ordinary repayments continue to
+work exactly as before, and there is still no settlement endpoint — which is the
+safe interim, because an oversized ordinary repayment would allocate against the
+*whole* remaining scheduled interest rather than interest through the settlement
+month. That is precisely why settlement has to be its own operation.
+
+### Restructuring
+
+**Previous status.** RESTRUCT-01…05 BLOCKED.
+
+**Decision.**
+
+- Any borrower may request it, but **only while the original loan is still
+  within its originally agreed term**. After the original maturity month has
+  passed, this route is unavailable.
+- Approval is **Owner/Manager** only, enforced server-side.
+- New principal = **remaining principal + unpaid accrued interest + unpaid
+  penalties**. Nothing is forgiven. (600,000 + 50,000 + 20,000 = 670,000.)
+- A **new loan** is created, reusing the original product's rate and term, with
+  a fresh schedule. Interest is charged on the new principal, including the
+  capitalised interest and penalties.
+- The **old loan is never deleted**, keeps its schedule, stops accepting
+  ordinary repayments, and records the link to its successor.
+- The new loan starts **Current** and does not inherit the old classification.
+
+**Status.** DECIDED + IMPLEMENTATION PENDING.
+
+**Regulatory caveat on RESTRUCT-05.** Starting a restructured loan at Current is
+the institution's approved operational policy and is recorded as such. No
+supplied BOT document addresses whether a restructured facility may reset its
+classification for MSP2-03. If BOT imposes a contradictory treatment, that is a
+conflict to surface — not a reason to silently override the approved policy, and
+not a licence to assume BOT agrees with it.
+
+**Accounting caveat — RESTRUCT-04, BLOCKED BY ACCOUNTING POLICY.** Capitalising
+unpaid interest and penalties into new principal recognises as an asset what was
+previously an accrual. The journal entries for that are not established by any
+supplied document, so they are not invented.
+
+### Write-off — DECIDED + IMPLEMENTED
+
+**Previous status.** WRITEOFF-01 BLOCKED, and recorded as a defect risk: the
+`written_off` status was reachable only by a direct database change.
+
+**Decision.**
+
+- Only the **Owner/Manager** may write a loan off.
+- There is **no** days-past-due threshold and **no** scheduled write-off. The
+  system may show delinquency to inform the judgement; it must never make it.
+- A **reason is required**.
+- On write-off: the borrower's live balance becomes **zero**, the loan becomes
+  `written_off`, interest and penalty accrual stop, ordinary repayment is
+  refused, and the history stays intact — including **the amount written off**,
+  which is not erased merely because the live balance is now zero.
+
+**Implemented.** `POST /loans/:id/write-off` behind `loan.write_off`, which only
+`institution_admin` holds. Migration 0027 adds `loan_write_offs`: one row per
+loan, principal and penalty kept separately, approver, reason and timestamp,
+append-only with no UPDATE or DELETE grant.
+
+**Accounting caveat — WRITEOFF-02, BLOCKED BY ACCOUNTING POLICY.** BOT
+distinguishes *bad debts written off not provided for* (MSP2-02 Sno 14) from
+*provision for bad and doubtful debts*, so not every write-off posts alike. The
+record keeps principal and penalty apart precisely so either treatment can be
+posted once the mapping is approved. No journal entry is written today.
+
+### Recovery on a written-off loan — DECIDED + IMPLEMENTED
+
+**Previous status.** RECOVERY-01 BLOCKED. Payments against a written-off loan
+were refused, which was the safe interim and remains true of *payments*.
+
+**Decision.** Money received after write-off is accepted, and:
+
+- is **not** an ordinary repayment;
+- does **not** reinstate the loan or recreate principal;
+- does **not** reopen the schedule;
+- leaves the loan `written_off` and the live balance at **zero**;
+- is recorded separately, may be partial, may happen repeatedly, and is
+  individually traceable.
+
+**Implemented.** `POST /loans/:id/recoveries` and `GET /loans/:id/recoveries`.
+Migration 0027 adds `loan_recoveries`, append-only, with a database trigger
+refusing a recovery against any loan that is not written off.
+
+**Why the separation is structural.** A recovery is not a row in `payments`, so
+it cannot move a balance or consume a schedule even by mistake. That is what
+stops the same shilling being reported twice — once as interest and principal
+through the repayment path, and again as recovery income. Pinned by a test that
+asserts a recovery creates no payment row.
+
+**Reporting caveat — RECOVERY-02.** BOT's MSP2-02 Sno 21, *Income from Recovery
+of Charged off Assets and Acquired Assets*, expressly includes recovered amounts
+previously written off, so that is where these belong. Wiring the compiler to
+consume `loan_recoveries` is pending together with the journal mapping, so that
+recoveries reach the return exactly once and from one source.
+
+### BOT output format — DECIDED + IMPLEMENTED
+
+**BOT-FORMAT-01.** BOT's general instructions require every statutory item with
+a zero value to be filled as zero, with no cell left blank. The workbook writer
+already converts an exact decimal to a cell number, so a zero amount is written
+as numeric `0`. Verified by test rather than assumed.
+
+**BOT-FORMAT-02.** Figures are reported to the nearest shilling with no scaling
+to thousands or millions. The writer emits the exact stored decimal and
+**refuses the export** — naming the figure — if a cell could not hold it
+exactly, rather than rounding silently. Internal precision is untouched;
+`NUMERIC(15,2)` remains the storage.
+
+**BOT-FORMAT-01A — BLOCKED BY BOT, newly raised.** MSP2-04's rate columns are
+left blank for a loan type with no lending, because the value is *absent*, not
+zero. Writing `0` there would state that the institution lends at 0% interest,
+which is false and materially so on a form whose subject is the interest-rate
+structure. BOT's "no cell blank" instruction and "do not fabricate" pull in
+opposite directions here, so the current behaviour is preserved and the question
+is raised rather than settled.
+
 
 ---
 
 ## The blocked items, in detail
 
-Each entry gives the exact question, what it blocks, why the current behaviour
-is the safe one, and what an answer must contain to be usable.
+Kept as written when each was still blocked, because the reasoning is the record
+of *why* the question mattered. Where a decision has since arrived it is above,
+and the status table is the current position.
 
 ### SHARES-01 … SHARES-06 — the shares module
 

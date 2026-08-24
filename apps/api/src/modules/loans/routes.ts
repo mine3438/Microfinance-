@@ -6,8 +6,12 @@ import {
   disburseLoanRequestSchema,
   loanListQuerySchema,
   loanProductSchema,
+  loanRecoverySchema,
   loanSchema,
   loanWithScheduleSchema,
+  loanWriteOffSchema,
+  recordRecoveryRequestSchema,
+  writeOffLoanRequestSchema,
   secureLoanRequestSchema,
   pageSchema,
   previewScheduleRequestSchema,
@@ -22,6 +26,13 @@ import { type AccessTokenService } from '../../auth/access-token.js';
 import { authenticate, principalOf, requirePermission } from '../../http/authentication.js';
 import { validationFailed } from '../../http/errors.js';
 import { type LoanRepository } from './loan-repository.js';
+import { type WriteOffRepository } from './write-off-repository.js';
+import {
+  getWriteOff,
+  listRecoveries,
+  recordRecovery,
+  writeOffLoan,
+} from './write-off-use-cases.js';
 import {
   createLoan,
   decideLoan,
@@ -37,10 +48,13 @@ import {
 const loanPageSchema = pageSchema(loanSchema);
 const productListSchema = z.array(loanProductSchema);
 const botLoanTypeListSchema = z.array(botLoanTypeSchema);
+const recoveryListSchema = z.array(loanRecoverySchema);
 
 export interface LoanRouteOptions {
   readonly loans: LoanRepository;
+  readonly writeOffs: WriteOffRepository;
   readonly tokens: AccessTokenService;
+  readonly now?: () => Date;
 }
 
 function productIdOf(request: FastifyRequest): string {
@@ -69,7 +83,8 @@ function loanIdOf(request: FastifyRequest): string {
  * database constraint refuses it again beneath that.
  */
 export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptions): void {
-  const { loans, tokens } = options;
+  const { loans, writeOffs, tokens } = options;
+  const now = options.now ?? ((): Date => new Date());
   const authenticated = authenticate(tokens);
 
   /**
@@ -280,5 +295,84 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
         ),
       );
     },
+  );
+
+  /**
+   * Write a loan off.
+   *
+   * `loan.write_off`, which only `institution_admin` holds — this system's
+   * Owner/Manager. There is deliberately no threshold parameter and no
+   * scheduled counterpart: the approved rule is that a person judges the debt
+   * unrecoverable, and a system that could reach this state on a timer would be
+   * taking that judgement.
+   */
+  app.post(
+    '/loans/:id/write-off',
+    { preHandler: [authenticated, requirePermission('loan.write_off')] },
+    async (request, reply): Promise<unknown> => {
+      const body = writeOffLoanRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'A write-off must say why the debt is unrecoverable.');
+      }
+
+      const written = await writeOffLoan(
+        principalOf(request),
+        loanIdOf(request),
+        body.data,
+        writeOffs,
+      );
+
+      void reply.status(201);
+      return loanWriteOffSchema.parse(written);
+    },
+  );
+
+  /** What was written off, after the live balance became zero. */
+  app.get(
+    '/loans/:id/write-off',
+    { preHandler: [authenticated, requirePermission('loan.read')] },
+    async (request): Promise<unknown> =>
+      loanWriteOffSchema.parse(
+        await getWriteOff(principalOf(request), loanIdOf(request), writeOffs),
+      ),
+  );
+
+  /**
+   * Record money received against a written-off loan.
+   *
+   * `payment.create`: it is a receipt, taken at the counter by the same people
+   * who take repayments. What it is *not* is a repayment — the loan stays
+   * written off, the balance stays zero, and this reaches MSP2-02's recovery
+   * line rather than interest and principal.
+   */
+  app.post(
+    '/loans/:id/recoveries',
+    { preHandler: [authenticated, requirePermission('payment.create')] },
+    async (request, reply): Promise<unknown> => {
+      const body = recordRecoveryRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That recovery cannot be recorded as entered.');
+      }
+
+      const recorded = await recordRecovery(
+        principalOf(request),
+        loanIdOf(request),
+        body.data,
+        writeOffs,
+        now,
+      );
+
+      void reply.status(201);
+      return loanRecoverySchema.parse(recorded);
+    },
+  );
+
+  app.get(
+    '/loans/:id/recoveries',
+    { preHandler: [authenticated, requirePermission('payment.read')] },
+    async (request): Promise<unknown> =>
+      recoveryListSchema.parse(
+        await listRecoveries(principalOf(request), loanIdOf(request), writeOffs),
+      ),
   );
 }

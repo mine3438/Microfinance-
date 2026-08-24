@@ -377,3 +377,96 @@ export const updateLoanProductRequestSchema = z
   .strict();
 
 export type UpdateLoanProductRequest = z.infer<typeof updateLoanProductRequestSchema>;
+
+/**
+ * Writing a loan off.
+ *
+ * Approved rules, recorded so nothing here is inferred: there is **no**
+ * days-past-due threshold and **no** scheduled job. A loan is written off when
+ * the Owner/Manager judges the debt no longer realistically recoverable, and
+ * that judgement is the only trigger. The system shows classification and
+ * arrears to inform the decision; it never takes it.
+ */
+export const writeOffLoanRequestSchema = z
+  .object({
+    /**
+     * Why the debt is judged unrecoverable.
+     *
+     * Required. A write-off with no reason is an unexplained disposal of an
+     * asset, and it is exactly what an inspection asks about first.
+     */
+    reason: requiredTextSchema(1000),
+  })
+  .strict();
+
+export type WriteOffLoanRequest = z.infer<typeof writeOffLoanRequestSchema>;
+
+/** What was written off, captured before the live balance became zero. */
+export const loanWriteOffSchema = z
+  .object({
+    id: uuidSchema,
+    loanId: uuidSchema,
+    loanCode: z.string().nullable(),
+    clientName: z.string(),
+
+    /**
+     * The balance at the instant of the decision, decomposed.
+     *
+     * Kept as parts rather than a single total because BOT's MSP2-02
+     * distinguishes bad debts written off from provisions, and because an
+     * accounting mapping cannot decompose a figure it was handed already summed.
+     */
+    principalWrittenOff: z.string(),
+    penaltyWrittenOff: z.string(),
+    totalWrittenOff: z.string(),
+
+    reason: z.string(),
+    approvedBy: uuidSchema,
+    approvedByName: z.string().nullable(),
+    writtenOffAt: isoTimestampSchema,
+  })
+  .strict();
+
+export type LoanWriteOff = z.infer<typeof loanWriteOffSchema>;
+
+/**
+ * Money received against a loan that has been written off.
+ *
+ * Not a repayment, and the contract keeps them apart deliberately. A recovery
+ * does not reinstate the loan, does not recreate principal, and does not reopen
+ * the schedule — the borrower's live balance stays at zero and the loan stays
+ * written off. Partial and repeated recoveries are both ordinary.
+ */
+export const recordRecoveryRequestSchema = z
+  .object({
+    amount: positiveMoneyAmountSchema,
+    /** When the money arrived. Defaults to today; a future date is refused. */
+    recoveredOn: isoDateSchema.optional(),
+    /** How it arrived — cash, transfer, whatever the institution writes. */
+    method: requiredTextSchema(100).optional(),
+    /** Receipt or transaction reference, where there is one. */
+    reference: requiredTextSchema(100).optional(),
+    notes: requiredTextSchema(500).optional(),
+  })
+  .strict();
+
+export type RecordRecoveryRequest = z.infer<typeof recordRecoveryRequestSchema>;
+
+export const loanRecoverySchema = z
+  .object({
+    id: uuidSchema,
+    loanId: uuidSchema,
+    loanCode: z.string().nullable(),
+    clientName: z.string(),
+    amount: z.string(),
+    recoveredOn: isoDateSchema,
+    method: z.string().nullable(),
+    reference: z.string().nullable(),
+    notes: z.string().nullable(),
+    recordedBy: uuidSchema,
+    recordedByName: z.string().nullable(),
+    createdAt: isoTimestampSchema,
+  })
+  .strict();
+
+export type LoanRecovery = z.infer<typeof loanRecoverySchema>;

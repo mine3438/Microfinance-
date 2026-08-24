@@ -64,6 +64,17 @@ export {
 } from './pagination.js';
 
 export {
+  loanRecoverySchema,
+  loanWriteOffSchema,
+  recordRecoveryRequestSchema,
+  writeOffLoanRequestSchema,
+  type LoanRecovery,
+  type LoanWriteOff,
+  type RecordRecoveryRequest,
+  type WriteOffLoanRequest,
+} from './loans.js';
+
+export {
   INVITATION_STATES,
   USER_STATUSES,
   acceptInvitationRequestSchema,

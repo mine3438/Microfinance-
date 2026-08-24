@@ -474,3 +474,50 @@ describe('GET /filings/:id/pdf', () => {
     expect(response.statusCode).toBe(404);
   });
 });
+
+/**
+ * BOT's general filling instructions, as regression requirements.
+ *
+ * Two rules from the supplied instruction manual, recorded in the decision
+ * register as BOT-FORMAT-01 and BOT-FORMAT-02. Both are already satisfied; both
+ * are asserted here so a later change to the writer cannot quietly break a
+ * filing rule that has nothing to do with the figures being computed.
+ */
+describe('BOT filling instructions', () => {
+  it('writes a zero item as 0, never as a blank cell (BOT-FORMAT-01)', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    const filed = await fileBalancedQuarter('5000000.00');
+
+    const workbook = await openWorkbook(
+      await request('GET', `/filings/${filed.id}/workbook`, accountantToken),
+    );
+
+    // MSP2-01 Sno 52, Paid-up Ordinary Share Capital, at row 39. This
+    // institution is a sole business with no customer shares product, and the
+    // fixture funds no share capital — so the figure is genuinely nil.
+    //
+    // BOT: "All items in statutory returns with zero values are filled as such
+    // and no cell is reported blank." A blank here is a rejected return; a
+    // fabricated figure is worse.
+    const shareCapital = workbook.getWorksheet('MSP2_01')?.getCell('C39').value;
+
+    expect(shareCapital).toBe(0);
+    expect(shareCapital).not.toBeNull();
+    expect(shareCapital).not.toBe('');
+  });
+
+  it('reports to the nearest shilling, unscaled (BOT-FORMAT-02)', async () => {
+    await setMspCode(accountant.institutionId, MSP_CODE);
+    const filed = await fileBalancedQuarter('7654321.00');
+
+    const workbook = await openWorkbook(
+      await request('GET', `/filings/${filed.id}/workbook`, accountantToken),
+    );
+
+    // BOT: "Figures in all statutory returns are reported to the nearest
+    // shilling (no rounding of figures in thousands or millions)." A writer
+    // that divided by 1,000 would put 7,654.321 here and understate the balance
+    // sheet by three orders of magnitude.
+    expect(workbook.getWorksheet('MSP2_01')?.getCell(CASH_CELL).value).toBe(7_654_321);
+  });
+});

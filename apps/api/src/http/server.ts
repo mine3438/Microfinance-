@@ -17,6 +17,7 @@ import { type SessionRepository } from '../modules/auth/session-repository.js';
 import { type ClientRepository } from '../modules/clients/client-repository.js';
 import { registerClientRoutes } from '../modules/clients/routes.js';
 import { type LoanRepository } from '../modules/loans/loan-repository.js';
+import { type WriteOffRepository } from '../modules/loans/write-off-repository.js';
 import { registerLoanRoutes } from '../modules/loans/routes.js';
 import { type PaymentRepository } from '../modules/payments/payment-repository.js';
 import { type FinanceRepository } from '../modules/finance/finance-repository.js';
@@ -64,6 +65,7 @@ export interface ServerDependencies {
   readonly sessions: SessionRepository;
   readonly clients: ClientRepository;
   readonly loans: LoanRepository;
+  readonly writeOffs: WriteOffRepository;
   readonly payments: PaymentRepository;
   readonly reports: ReportRepository;
   readonly finance: FinanceRepository;
@@ -104,6 +106,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     sessions,
     clients,
     loans,
+    writeOffs,
     payments,
     reports,
     finance,
@@ -273,7 +276,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     now,
   });
   registerClientRoutes(app, { clients, tokens });
-  registerLoanRoutes(app, { loans, tokens });
+  registerLoanRoutes(app, { loans, writeOffs, tokens, now });
   registerPaymentRoutes(app, { payments, tokens });
   registerFinanceRoutes(app, { finance, tokens });
   registerStatementRoutes(app, { statements, reports, tokens });
