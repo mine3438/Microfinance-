@@ -16,6 +16,7 @@ import { PostgresClientRepository } from './modules/clients/client-repository.js
 import { PostgresLoanRepository } from './modules/loans/loan-repository.js';
 import { PostgresWriteOffRepository } from './modules/loans/write-off-repository.js';
 import { PostgresApplicationFeeRepository } from './modules/loans/application-fee-repository.js';
+import { PostgresGroupRepository } from './modules/groups/group-repository.js';
 import { PostgresFinanceRepository } from './modules/finance/finance-repository.js';
 import { PostgresPaymentRepository } from './modules/payments/payment-repository.js';
 import { PostgresComplaintRepository } from './modules/complaints/complaint-repository.js';
@@ -72,6 +73,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const loans = new PostgresLoanRepository(database);
   const writeOffs = new PostgresWriteOffRepository(database);
   const applicationFees = new PostgresApplicationFeeRepository(database);
+  const groups = new PostgresGroupRepository(database);
   const payments = new PostgresPaymentRepository(database);
   const reports = new PostgresReportRepository(database);
   const finance = new PostgresFinanceRepository(database);
@@ -128,6 +130,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     loans,
     writeOffs,
     applicationFees,
+    groups,
     payments,
     reports,
     finance,

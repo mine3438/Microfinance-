@@ -64,6 +64,25 @@ export {
 } from './pagination.js';
 
 export {
+  GROUP_STATUSES,
+  addGroupMemberRequestSchema,
+  createGroupRequestSchema,
+  endGroupMembershipRequestSchema,
+  groupMemberQuerySchema,
+  groupMemberSchema,
+  groupSchema,
+  updateGroupRequestSchema,
+  type AddGroupMemberRequest,
+  type CreateGroupRequest,
+  type EndGroupMembershipRequest,
+  type Group,
+  type GroupMember,
+  type GroupMemberQuery,
+  type GroupStatus,
+  type UpdateGroupRequest,
+} from './groups.js';
+
+export {
   APPLICATION_FEE_AMOUNT,
   APPLICATION_FEE_STATES,
   applicationFeeSchema,

@@ -17,6 +17,7 @@ import { PostgresClientRepository } from '../src/modules/clients/client-reposito
 import { PostgresLoanRepository } from '../src/modules/loans/loan-repository.js';
 import { PostgresWriteOffRepository } from '../src/modules/loans/write-off-repository.js';
 import { PostgresApplicationFeeRepository } from '../src/modules/loans/application-fee-repository.js';
+import { PostgresGroupRepository } from '../src/modules/groups/group-repository.js';
 import { PostgresFinanceRepository } from '../src/modules/finance/finance-repository.js';
 import { PostgresPaymentRepository } from '../src/modules/payments/payment-repository.js';
 import { PostgresComplaintRepository } from '../src/modules/complaints/complaint-repository.js';
@@ -126,6 +127,7 @@ export async function startHarness(
     loans: new PostgresLoanRepository(database),
     writeOffs: new PostgresWriteOffRepository(database),
     applicationFees: new PostgresApplicationFeeRepository(database),
+    groups: new PostgresGroupRepository(database),
     payments: new PostgresPaymentRepository(database),
     reports: new PostgresReportRepository(database),
     finance: new PostgresFinanceRepository(database),

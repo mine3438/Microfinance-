@@ -43,10 +43,12 @@ with what it was.
 | SHARES-04 | Dividend declaration | NOT APPLICABLE | No shares product exists or will | — |
 | SHARES-05 | Withdrawability | NOT APPLICABLE | No shares product exists or will | — |
 | SHARES-06 | BOT MSP2-01 treatment of shares | DECIDED + IMPLEMENTED | MSP2-01 capital lines are fed by the statements module and report `0` where nil; no customer-share activity is fabricated | — |
-| GROUP-01 | Joint or several liability | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build to the joint-liability model below |
-| GROUP-02 | Disbursement to group or to members | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: one disbursement to the group |
-| GROUP-03 | Group guarantee rules | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: members jointly bear the whole obligation |
-| GROUP-04 | Default handling for a group loan | DECIDED + IMPLEMENTATION PENDING | No group tables or code | Build: arrears and classification at group-loan level |
+| GROUP-01 | Joint or several liability | DECIDED (policy recorded) | Joint. Groups and membership are built; lending to a group waits on GROUP-05 | Implementation pending with GROUP-05 |
+| GROUP-02 | Disbursement to group or to members | DECIDED (policy recorded) | One disbursement to the group | Implementation pending with GROUP-05 |
+| GROUP-03 | Group guarantee rules | DECIDED (policy recorded) | Members jointly bear the whole obligation | Implementation pending with GROUP-05 |
+| GROUP-04 | Default handling for a group loan | DECIDED (policy recorded) | Arrears and classification at group-loan level | Implementation pending with GROUP-05 |
+| GROUP-05 | How a group loan is reported on MSP2-03, 09 and 10 | BLOCKED BY BOT | Groups and membership exist; `loans` is untouched, so no group loan can be created | Sector, gender, age band and district for a borrower that is a group |
+| GROUP-06 | Groups and membership | DECIDED + IMPLEMENTED | `groups` and `group_members`; membership held as intervals so a past date is answerable | — |
 | FEE-01 | What qualifies as a loan fee | DECIDED + IMPLEMENTED | The TZS 5,000 application/form fee, in `loan_application_fees`; the allocator bucket keeps its position and still allocates nil | — |
 | FEE-02 | When a fee is charged | DECIDED + IMPLEMENTED | Cash, recorded against an application in draft or pending approval | — |
 | FEE-03 | Whether a fee is refundable | DECIDED + IMPLEMENTED | Retained on approval, refund_due on rejection, refunded by stamp that never erases the collection | — |
@@ -145,6 +147,64 @@ composite key into `clients`. The joint-liability model needs a `groups` table, 
 membership table with effective dating, a nullable `group_id` on `loans`, and
 `client_id` relaxed to nullable for a loan held by the group itself — all
 **additive**. No existing row is rewritten and no constraint is dropped.
+
+### GROUP-05 — how a group loan is reported to BOT
+
+**Status.** BLOCKED BY BOT. Raised while implementing the approved group-lending
+model, and it stops the lending half of it.
+
+**What was implemented.** `groups` and `group_members` (GROUP-06), with
+membership held as intervals so "who was jointly liable when this was advanced"
+stays answerable after people join and leave. `loans` is untouched, so no group
+loan can be created and nothing is half-built.
+
+**Why the lending half stopped.** Every MSP2 exposure query reaches a loan's
+borrower attributes by inner-joining `clients` on `loans.client_id`:
+
+| Form | What it reads from the borrower |
+| --- | --- |
+| MSP2-03 | `clients.sector_code` — sectoral classification of the loan book |
+| MSP2-09 | `clients.sector_code` and `clients.gender` — disbursements by gender |
+| MSP2-10 | `clients.date_of_birth` and district — borrowers by age band |
+| MSP2-03 | compulsory savings by sector, and written-off amounts by sector |
+
+Under the approved model the **group is the borrower** and members receive no
+sub-loan and no member-level balance. A group therefore has no single sector, no
+gender, no date of birth and no district — and no per-member amount to allocate
+one from.
+
+A loan with no `client_id` would be **silently excluded** from all of those
+queries, because they are inner joins. Not rejected, not flagged: absent. That
+understates the loan book on a return filed with the Bank of Tanzania, which is
+the same class of failure as R5 — quietly wrong numbers, filed.
+
+**What would have to be invented to proceed.** Any of these, and none is stated
+anywhere:
+
+1. **Sector.** Does a group carry its own sector, or is a group loan split
+   across the sectors of its members?
+2. **Gender.** MSP2-09 splits disbursements by gender. A mixed group has no
+   gender. Split by member composition, by count or by amount? Report under one
+   heading?
+3. **Age band.** MSP2-10 bands borrowers at 35. Same problem, same absence of a
+   rule.
+4. **Borrower count.** Is a group one borrower on MSP2-10, or as many borrowers
+   as it has members?
+5. **District.** Members may live in several.
+
+Splitting a group loan across members to answer these would be inventing a
+regulatory allocation rule — and it would also contradict GROUP-01, which says
+members do **not** receive artificial financial sub-balances.
+
+**Exact decision required.** For each of MSP2-03, MSP2-09 and MSP2-10: how a
+loan whose borrower is a group is reported. A ruling from the Bank of Tanzania,
+or an authoritative institutional practice they have accepted.
+
+**What happens when it arrives.** The change stays additive: a nullable
+`group_id` on `loans`, `client_id` relaxed to nullable, a check that exactly one
+is set, and the exposure queries taught to resolve borrower attributes for both
+shapes. No existing row is rewritten and no constraint is dropped, which is why
+building the entity now costs nothing later.
 
 ### Application/form fee — TZS 5,000
 

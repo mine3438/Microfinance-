@@ -19,6 +19,8 @@ import { registerClientRoutes } from '../modules/clients/routes.js';
 import { type LoanRepository } from '../modules/loans/loan-repository.js';
 import { type WriteOffRepository } from '../modules/loans/write-off-repository.js';
 import { type ApplicationFeeRepository } from '../modules/loans/application-fee-repository.js';
+import { type GroupRepository } from '../modules/groups/group-repository.js';
+import { registerGroupRoutes } from '../modules/groups/routes.js';
 import { registerLoanRoutes } from '../modules/loans/routes.js';
 import { type PaymentRepository } from '../modules/payments/payment-repository.js';
 import { type FinanceRepository } from '../modules/finance/finance-repository.js';
@@ -68,6 +70,7 @@ export interface ServerDependencies {
   readonly loans: LoanRepository;
   readonly writeOffs: WriteOffRepository;
   readonly applicationFees: ApplicationFeeRepository;
+  readonly groups: GroupRepository;
   readonly payments: PaymentRepository;
   readonly reports: ReportRepository;
   readonly finance: FinanceRepository;
@@ -110,6 +113,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     loans,
     writeOffs,
     applicationFees,
+    groups,
     payments,
     reports,
     finance,
@@ -279,6 +283,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     now,
   });
   registerClientRoutes(app, { clients, tokens });
+  registerGroupRoutes(app, { groups, tokens, now });
   registerLoanRoutes(app, { loans, writeOffs, applicationFees, tokens, now });
   registerPaymentRoutes(app, { payments, tokens });
   registerFinanceRoutes(app, { finance, tokens });
