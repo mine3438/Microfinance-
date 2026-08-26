@@ -550,3 +550,66 @@ export const refundApplicationFeeRequestSchema = z
   .strict();
 
 export type RefundApplicationFeeRequest = z.infer<typeof refundApplicationFeeRequestSchema>;
+
+/**
+ * Settling a loan before maturity.
+ *
+ * The approved rule: outstanding principal + interest due through the
+ * settlement month + all accrued and outstanding penalties. No discount,
+ * penalties not waived, and the application/form fee is not part of it.
+ *
+ * Interest is charged at **month granularity**. Settling on the 1st, the 10th
+ * or the 31st of a month all charge that whole month and exclude the months
+ * after it. Nothing is prorated by day.
+ */
+export const settlementQuoteSchema = z
+  .object({
+    loanId: uuidSchema,
+    settlementDate: isoDateSchema,
+    /** Last day of the settlement month. Interest is charged up to here. */
+    chargedThrough: isoDateSchema,
+
+    principal: z.string(),
+    interest: z.string(),
+    penalty: z.string(),
+    /** What the borrower pays. The three parts, exactly. */
+    total: z.string(),
+
+    /**
+     * Scheduled interest falling after the settlement month.
+     *
+     * Never charged, so never owed. Reported so a settlement statement can show
+     * what settling early saved, without anyone re-deriving it from a schedule.
+     */
+    interestNotCharged: z.string(),
+  })
+  .strict();
+
+export type SettlementQuote = z.infer<typeof settlementQuoteSchema>;
+
+export const settlementQuoteQuerySchema = z
+  .object({
+    /** The day the borrower settles. Only its month is used. Defaults to today. */
+    settlementDate: isoDateSchema.optional(),
+  })
+  .strict();
+
+export type SettlementQuoteQuery = z.infer<typeof settlementQuoteQuerySchema>;
+
+/**
+ * Recording the settlement.
+ *
+ * The amount is required and must equal the quote exactly. It could have been
+ * derived server-side and never asked for — but then a teller who counted a
+ * different sum would have no way to find out. Requiring it makes the quote and
+ * the cash agree before anything closes.
+ */
+export const settleLoanRequestSchema = z
+  .object({
+    amountPaid: positiveMoneyAmountSchema,
+    settlementDate: isoDateSchema.optional(),
+    notes: requiredTextSchema(500).optional(),
+  })
+  .strict();
+
+export type SettleLoanRequest = z.infer<typeof settleLoanRequestSchema>;

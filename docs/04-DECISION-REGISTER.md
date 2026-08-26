@@ -54,10 +54,10 @@ with what it was.
 | FEE-03 | Whether a fee is refundable | DECIDED + IMPLEMENTED | Retained on approval, refund_due on rejection, refunded by stamp that never erases the collection | — |
 | FEE-04 | Ledger accounts for collection, retention and refund | BLOCKED BY ACCOUNTING POLICY | Fees are recorded and traceable; no journal entry is posted | Chart-of-accounts mapping |
 | FEE-04a | Refund timing where a rejected application is revised and resubmitted | DECIDED + IMPLEMENTED | Charged once per application; a recorded rejection creates entitlement that survives rejected-to-draft and resubmission; at most one refund per collection | — |
-| SETTLE-01 | Early-settlement discount | DECIDED + IMPLEMENTATION PENDING | No endpoint; ordinary repayments only | Build: no discount applies |
-| SETTLE-02 | Future-interest treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: interest through the settlement month, month granularity |
-| SETTLE-03 | Penalty and fee treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: all accrued penalties due; application fee excluded |
-| SETTLE-04 | Which date governs a settlement figure | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: the settlement month, never prorated by day |
+| SETTLE-01 | Early-settlement discount | DECIDED + IMPLEMENTED | None. The quote is exactly principal + interest + penalty | — |
+| SETTLE-02 | Future-interest treatment on settlement | DECIDED + IMPLEMENTED | Interest through the settlement month; later months never charged, and reported as `interestNotCharged` | — |
+| SETTLE-03 | Penalty and fee treatment on settlement | DECIDED + IMPLEMENTED | Every accrued penalty payable, none waived; the application fee is not part of a quote | — |
+| SETTLE-04 | Which date governs a settlement figure | DECIDED + IMPLEMENTED | The settlement month. The 1st, 10th and 31st quote identically | — |
 | RESTRUCT-01 | Restructuring eligibility and approval | DECIDED + IMPLEMENTATION PENDING | Not implemented; no such loan state | Build: within original term, Owner/Manager approves |
 | RESTRUCT-02 | Treatment of principal, interest, penalties, fees | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: new principal = remaining principal + unpaid interest + unpaid penalties |
 | RESTRUCT-03 | Old schedule handling and new schedule generation | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: old preserved and closed to repayment; new schedule from the original product terms |

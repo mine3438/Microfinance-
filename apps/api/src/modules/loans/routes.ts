@@ -10,6 +10,9 @@ import {
   collectApplicationFeeRequestSchema,
   loanRecoverySchema,
   refundApplicationFeeRequestSchema,
+  settleLoanRequestSchema,
+  settlementQuoteQuerySchema,
+  settlementQuoteSchema,
   loanSchema,
   loanWithScheduleSchema,
   loanWriteOffSchema,
@@ -35,6 +38,8 @@ import {
   getApplicationFee,
   refundApplicationFee,
 } from './application-fee-use-cases.js';
+import { type SettlementRepository } from './settlement-repository.js';
+import { getSettlementQuote, settleLoan } from './settlement-use-cases.js';
 import { type WriteOffRepository } from './write-off-repository.js';
 import {
   getWriteOff,
@@ -63,6 +68,7 @@ export interface LoanRouteOptions {
   readonly loans: LoanRepository;
   readonly writeOffs: WriteOffRepository;
   readonly applicationFees: ApplicationFeeRepository;
+  readonly settlements: SettlementRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -93,7 +99,7 @@ function loanIdOf(request: FastifyRequest): string {
  * database constraint refuses it again beneath that.
  */
 export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptions): void {
-  const { loans, writeOffs, applicationFees, tokens } = options;
+  const { loans, writeOffs, applicationFees, settlements, tokens } = options;
   const now = options.now ?? ((): Date => new Date());
   const authenticated = authenticate(tokens);
 
@@ -449,6 +455,65 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
           now,
         ),
       );
+    },
+  );
+
+  /**
+   * What it costs to settle this loan today, or on a stated date.
+   *
+   * A read, so it is a GET and it changes nothing. The figure is recomputed on
+   * every call rather than stored: a quote taken an hour ago may have been
+   * overtaken by a penalty accrual or an ordinary repayment, and the settlement
+   * itself recomputes again before it closes anything.
+   */
+  app.get(
+    '/loans/:id/settlement/quote',
+    { preHandler: [authenticated, requirePermission('payment.read')] },
+    async (request): Promise<unknown> => {
+      const query = settlementQuoteQuerySchema.safeParse(request.query);
+      if (!query.success) {
+        throw validationFailed(query.error, 'That settlement date is not valid.');
+      }
+
+      return settlementQuoteSchema.parse(
+        await getSettlementQuote(
+          principalOf(request),
+          loanIdOf(request),
+          query.data,
+          settlements,
+          now,
+        ),
+      );
+    },
+  );
+
+  /**
+   * Settle the loan.
+   *
+   * Its own operation, not an oversized repayment. The ordinary allocator
+   * splits against everything a loan owes — which includes the whole remaining
+   * scheduled interest — so it would consume interest the approved rule says is
+   * never charged and leave principal outstanding.
+   */
+  app.post(
+    '/loans/:id/settlement',
+    { preHandler: [authenticated, requirePermission('payment.create')] },
+    async (request, reply): Promise<unknown> => {
+      const body = settleLoanRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That settlement cannot be recorded as entered.');
+      }
+
+      const settled = await settleLoan(
+        principalOf(request),
+        loanIdOf(request),
+        body.data,
+        settlements,
+        now,
+      );
+
+      void reply.status(201);
+      return settlementQuoteSchema.parse(settled);
     },
   );
 }

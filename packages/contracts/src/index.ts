@@ -83,6 +83,15 @@ export {
 } from './groups.js';
 
 export {
+  settleLoanRequestSchema,
+  settlementQuoteQuerySchema,
+  settlementQuoteSchema,
+  type SettleLoanRequest,
+  type SettlementQuote,
+  type SettlementQuoteQuery,
+} from './loans.js';
+
+export {
   APPLICATION_FEE_AMOUNT,
   APPLICATION_FEE_STATES,
   applicationFeeSchema,
