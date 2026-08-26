@@ -66,12 +66,19 @@ function formatDateOnly(value: Date): string {
  * Where the fee stands.
  *
  * Derived on read rather than stored, so it cannot disagree with the two facts
- * that actually govern it: whether the money was handed back, and what became
- * of the application.
+ * that actually govern it: whether the money was handed back, and whether a
+ * rejection was ever decided.
  *
- * `refund_due` keys on a *recorded* rejection rather than on the status,
- * because a rejected application is returned to the officer as a draft and the
- * status does not rest at `rejected`.
+ * FEE-04a, as decided: the fee is charged **once per application**, not once
+ * per submission. A formal rejection makes it refundable immediately and the
+ * subsequent rejected-to-draft transition does not erase that. Resubmitting the
+ * same application creates no new charge, so repeated decision cycles can never
+ * accumulate a second fee — and because there is at most one refund per
+ * collection, they can never accumulate a second refund either.
+ *
+ * The order of the branches below *is* the rule. `refund_due` is tested before
+ * `retained` precisely so that an application rejected once and later approved
+ * keeps the entitlement it earned.
  */
 export function feeStateOf(row: {
   refunded_on: Date | null;
@@ -82,16 +89,27 @@ export function feeStateOf(row: {
     return 'refunded';
   }
 
-  // Approved, disbursed, running or closed: the application succeeded, so the
+  // A formal rejection creates the entitlement, and nothing afterwards takes it
+  // away.
+  //
+  // Checked *before* the retained case, and keyed on the recorded decision
+  // rather than on `loan_status` — which is the whole point of FEE-04a.
+  // Rejection moves the application through `rejected` and on to `draft`
+  // (migration 0023), and a later resubmission moves it on again. Reading the
+  // status would erase an entitlement the borrower is owed the moment the
+  // officer picks the file back up.
+  //
+  // The entitlement is consumed by a refund, and there is at most one refund
+  // per collection — so repeated rejection cycles cannot manufacture repeated
+  // refunds out of a single TZS 5,000.
+  if (row.loan_rejection_reason !== null) {
+    return 'refund_due';
+  }
+
+  // No rejection was ever recorded and the application succeeded, so the
   // institution retains the fee.
   if (['approved', 'active', 'completed', 'written_off'].includes(row.loan_status)) {
     return 'retained';
-  }
-
-  // A rejection was recorded and the application has not been picked back up.
-  // Once it is resubmitted it is live again and the fee belongs to it.
-  if (row.loan_rejection_reason !== null && row.loan_status === 'draft') {
-    return 'refund_due';
   }
 
   return 'collected';

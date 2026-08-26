@@ -51,7 +51,7 @@ with what it was.
 | FEE-02 | When a fee is charged | DECIDED + IMPLEMENTED | Cash, recorded against an application in draft or pending approval | — |
 | FEE-03 | Whether a fee is refundable | DECIDED + IMPLEMENTED | Retained on approval, refund_due on rejection, refunded by stamp that never erases the collection | — |
 | FEE-04 | Ledger accounts for collection, retention and refund | BLOCKED BY ACCOUNTING POLICY | Fees are recorded and traceable; no journal entry is posted | Chart-of-accounts mapping |
-| FEE-04a | Refund timing where a rejected application is revised and resubmitted | BLOCKED BY BUSINESS | Refundable while the application sits as a rejected draft; refused once resubmitted | Whether a refund is due the moment a decision is reject |
+| FEE-04a | Refund timing where a rejected application is revised and resubmitted | DECIDED + IMPLEMENTED | Charged once per application; a recorded rejection creates entitlement that survives rejected-to-draft and resubmission; at most one refund per collection | — |
 | SETTLE-01 | Early-settlement discount | DECIDED + IMPLEMENTATION PENDING | No endpoint; ordinary repayments only | Build: no discount applies |
 | SETTLE-02 | Future-interest treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: interest through the settlement month, month granularity |
 | SETTLE-03 | Penalty and fee treatment on settlement | DECIDED + IMPLEMENTATION PENDING | No endpoint | Build: all accrued penalties due; application fee excluded |
@@ -179,6 +179,62 @@ decision it is not income. No approved chart-of-accounts mapping exists for the
 holding, retention and refund entries, so none is invented. The operational
 workflow can still record and trace every collection, retention and refund; only
 the journal posting waits.
+
+### FEE-04a — the fee is charged once per application
+
+**Previous status.** BLOCKED BY BUSINESS. Raised when the application fee was
+built, because the approved refund rule and the existing rejection workflow
+disagreed about what "rejected" means.
+
+**The conflict, kept here because it is why the decision was needed.** The rule
+said the fee is refunded when an application is rejected. In this system
+rejection is not a resting state: migration 0023 moves a rejected application
+through `rejected` and on to `draft` in one transaction so the officer can
+revise it, and `submit` does not clear the rejection reason. So
+`status = 'rejected'` never holds, and "has been rejected" is equally true of a
+live, resubmitted application. Any rule reading the status would grant the
+entitlement and take it away again as the file moved through the queue.
+
+The first implementation resolved this conservatively — refundable only while
+the application sat as a rejected draft — and registered the timing question
+rather than answering it.
+
+**Decision.**
+
+> The TZS 5,000 application/form fee is charged once per application. A formal
+> rejection makes the collected fee refundable regardless of the application's
+> subsequent rejected-to-draft transition. Resubmitting the same application
+> does not create another fee. Refunds must never exceed actual fee collections.
+
+**What changed in the code.** The `refund_due` derivation no longer looks at
+`loan_status` at all. It keys on the recorded rejection decision, and it is
+tested *before* the retained case so that an application rejected once and later
+approved keeps the entitlement it earned. The conservative status gate is gone.
+
+**The invariant that makes free resubmission safe.** Because a resubmission
+charges nothing, a naive rule would let one collection fund an unbounded number
+of refunds:
+
+> 5,000 collected → 5,000 refunded → resubmit free → rejected again → 5,000
+> refunded again
+
+That is money from nothing. Two structural facts prevent it. There is at most
+one fee row per application, enforced by `loan_application_fees_one_per_loan`;
+and a refund is a stamp on that row guarded by `refunded_at IS NULL` on the
+write, so a second refund matches no row. Total refunds for an application
+therefore cannot exceed total collections, whatever sequence of decisions
+happens — asserted directly, summed with `Money`, across a three-cycle test.
+
+**One consequence worth stating.** An application that was rejected once and
+later approved still carries the entitlement if nobody refunded it in between.
+That follows from the decision as written — eligibility rests on the rejection
+decision, not on the current status — and it errs towards the borrower being
+paid what a formal rejection entitled them to. It is bounded by the one-refund
+invariant, so the institution can never pay out more than it took.
+
+**Still separate: FEE-04.** The ledger mapping for holding, retaining and
+refunding the fee remains BLOCKED BY ACCOUNTING POLICY. Collections and refunds
+are fully recorded and traceable; no journal entry is posted.
 
 ### Early settlement
 

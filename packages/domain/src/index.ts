@@ -26,6 +26,14 @@ export type {
 } from './repayment/allocation.js';
 
 export {
+  endOfMonth,
+  quoteSettlement,
+  type ScheduledInterest,
+  type SettlementQuote,
+  type SettlementQuoteRequest,
+} from './repayment/settlement.js';
+
+export {
   AGE_BAND_LABELS,
   AGE_BAND_THRESHOLD_YEARS,
   ageBandAt,

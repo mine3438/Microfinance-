@@ -181,6 +181,33 @@ async function application(): Promise<Loan> {
   ).json<Loan>();
 }
 
+/**
+ * Every application fee ever collected against one application, summed.
+ *
+ * Summed with Money rather than Number: these assertions exist to prove an
+ * invariant about money, and a float sum could agree with a broken one.
+ */
+async function collectionsFor(loanId: string): Promise<Money> {
+  const rows = await harness.database.withTransaction(async (client) =>
+    client.query<{ amount: string }>(
+      'SELECT amount FROM loan_application_fees WHERE loan_id = $1',
+      [loanId],
+    ),
+  );
+  return Money.sum(rows.rows.map((row) => Money.fromDatabaseValue(row.amount)));
+}
+
+/** Every application fee actually handed back, summed. */
+async function refundsFor(loanId: string): Promise<Money> {
+  const rows = await harness.database.withTransaction(async (client) =>
+    client.query<{ amount: string }>(
+      'SELECT amount FROM loan_application_fees WHERE loan_id = $1 AND refunded_at IS NOT NULL',
+      [loanId],
+    ),
+  );
+  return Money.sum(rows.rows.map((row) => Money.fromDatabaseValue(row.amount)));
+}
+
 describe('collecting the fee', () => {
   it('records TZS 5,000 without being told the amount', async () => {
     const loan = await application();
@@ -443,5 +470,224 @@ describe('the collection record cannot be rewritten', () => {
         ]),
       ),
     ).rejects.toThrow(/cannot be amended/);
+  });
+});
+
+/**
+ * FEE-04a — charged once per application, not once per submission.
+ *
+ * The decided rule, and the reason it needed deciding: rejection in this system
+ * is not a resting state. Migration 0023 moves a rejected application through
+ * `rejected` and on to `draft` so the officer can revise it, and `submit` does
+ * not clear the rejection reason. Anything that read `status` to decide whether
+ * a refund was owed would hand the entitlement back and take it away again as
+ * the file moved through the queue.
+ *
+ * So entitlement is keyed on the recorded rejection decision, and is consumed
+ * by at most one refund per collection. Those two facts together are what stop
+ * a free resubmission cycle from manufacturing money.
+ */
+describe('FEE-04a: once per application', () => {
+  /** Take an application through submit and a rejection, leaving it as a draft. */
+  async function rejectOnce(loanId: string, reason = 'Security offered is insufficient.') {
+    await request('POST', `/loans/${loanId}/submit`, officerToken);
+    const decided = await request('POST', `/loans/${loanId}/decision`, managerToken, {
+      decision: 'reject',
+      reason,
+    });
+    expect(decided.statusCode).toBe(200);
+  }
+
+  const feeFor = async (loanId: string): Promise<ApplicationFee> =>
+    (await request('GET', `/loans/${loanId}/application-fee`, officerToken)).json<ApplicationFee>();
+
+  it('charges once and never refunds on a straightforward approval', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await request('POST', `/loans/${loan.id}/submit`, officerToken);
+    await request('POST', `/loans/${loan.id}/decision`, managerToken, { decision: 'approve' });
+
+    const fee = await feeFor(loan.id);
+
+    expect(fee.state).toBe('retained');
+    expect(fee.refundedOn).toBeNull();
+    expect((await collectionsFor(loan.id)).toDatabaseValue()).toBe('5000.00');
+    expect((await refundsFor(loan.id)).toDatabaseValue()).toBe('0.00');
+  });
+
+  it('keeps the entitlement after the rejected-to-draft transition', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+
+    // The status is back at `draft` — the officer's queue shows work to do —
+    // and the entitlement survives it, because it was earned by the decision.
+    const after = (await request('GET', `/loans/${loan.id}`, officerToken)).json<Loan>();
+    expect(after.status).toBe('draft');
+    expect((await feeFor(loan.id)).state).toBe('refund_due');
+  });
+
+  it('keeps the entitlement through a free resubmission', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+
+    await request('POST', `/loans/${loan.id}/submit`, officerToken);
+
+    // This is the case that a status-based rule got wrong: resubmitted, so the
+    // status is `pending_approval` again, and the money is still owed.
+    expect((await feeFor(loan.id)).state).toBe('refund_due');
+  });
+
+  it('charges nothing extra when a rejected application is revised and resubmitted', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+    await request('POST', `/loans/${loan.id}/application-fee/refund`, officerToken, {});
+
+    // Resubmit for free. A second collection is refused because the fee belongs
+    // to the application, not to the attempt.
+    await request('POST', `/loans/${loan.id}/submit`, officerToken);
+    const second = await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+
+    expect(second.statusCode).toBe(409);
+    expect((await collectionsFor(loan.id)).toDatabaseValue()).toBe('5000.00');
+  });
+
+  it('totals 5,000 collected and 5,000 refunded across a full reject-refund-approve cycle', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+    await request('POST', `/loans/${loan.id}/application-fee/refund`, officerToken, {});
+
+    await request('POST', `/loans/${loan.id}/submit`, officerToken);
+    const approved = await request('POST', `/loans/${loan.id}/decision`, managerToken, {
+      decision: 'approve',
+    });
+    expect(approved.statusCode).toBe(200);
+
+    // Nothing is recollected merely because the later attempt succeeded.
+    expect((await collectionsFor(loan.id)).toDatabaseValue()).toBe('5000.00');
+    expect((await refundsFor(loan.id)).toDatabaseValue()).toBe('5000.00');
+    expect((await feeFor(loan.id)).state).toBe('refunded');
+  });
+
+  it('does not create a second entitlement on a second rejection', async () => {
+    // The invariant that stops money being made from nothing: collect once,
+    // refund once, resubmit free, get rejected again — and there is no second
+    // 5,000 to hand back, because there was no second 5,000 taken.
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+    await request('POST', `/loans/${loan.id}/application-fee/refund`, officerToken, {});
+
+    await rejectOnce(loan.id, 'Still insufficient.');
+
+    const second = await request(
+      'POST',
+      `/loans/${loan.id}/application-fee/refund`,
+      officerToken,
+      {},
+    );
+
+    expect(second.statusCode).toBe(409);
+    expect((await refundsFor(loan.id)).toDatabaseValue()).toBe('5000.00');
+  });
+
+  it('never refunds more than was collected, however many cycles run', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+
+    for (const reason of ['First look.', 'Second look.', 'Third look.']) {
+      await rejectOnce(loan.id, reason);
+      await request('POST', `/loans/${loan.id}/application-fee/refund`, officerToken, {});
+    }
+
+    // Summed with Money, not with Number: this is the assertion that would let
+    // a rounding artefact hide a real imbalance.
+    const collected = await collectionsFor(loan.id);
+    const refunded = await refundsFor(loan.id);
+
+    expect(collected.toDatabaseValue()).toBe('5000.00');
+    expect(refunded.toDatabaseValue()).toBe('5000.00');
+    expect(refunded.lessThan(collected) || refunded.equals(collected)).toBe(true);
+  });
+
+  it('refuses a duplicate refund without recording a second financial event', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+
+    const first = await request(
+      'POST',
+      `/loans/${loan.id}/application-fee/refund`,
+      officerToken,
+      {},
+    );
+    const second = await request(
+      'POST',
+      `/loans/${loan.id}/application-fee/refund`,
+      officerToken,
+      {},
+    );
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(409);
+    expect((await refundsFor(loan.id)).toDatabaseValue()).toBe('5000.00');
+  });
+
+  it('lets at most one of two simultaneous refunds succeed', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+
+    // The guard is the `refunded_at IS NULL` predicate on the UPDATE, so the
+    // two contend on the write rather than on a check-then-act.
+    const [a, b] = await Promise.all([
+      request('POST', `/loans/${loan.id}/application-fee/refund`, officerToken, {}),
+      request('POST', `/loans/${loan.id}/application-fee/refund`, officerToken, {}),
+    ]);
+
+    const succeeded = [a, b].filter((response) => response.statusCode === 200);
+    expect(succeeded).toHaveLength(1);
+    expect((await refundsFor(loan.id)).toDatabaseValue()).toBe('5000.00');
+  });
+
+  it('refuses a refund from a caller who cannot handle money', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+
+    // The auditor reads everything and touches nothing.
+    const auditor = await seedUserIn(officer.institutionId, officer.branchId, ['auditor']);
+
+    expect(
+      (
+        await request(
+          'POST',
+          `/loans/${loan.id}/application-fee/refund`,
+          await tokenFor(auditor),
+          {},
+        )
+      ).statusCode,
+    ).toBe(403);
+  });
+
+  it('refuses a refund against another institution’s application', async () => {
+    const loan = await application();
+    await request('POST', `/loans/${loan.id}/application-fee`, officerToken, {});
+    await rejectOnce(loan.id);
+
+    const stranger = await seedUser(harness.database, { roles: ['institution_admin'] });
+
+    const response = await request(
+      'POST',
+      `/loans/${loan.id}/application-fee/refund`,
+      await tokenFor(stranger),
+      {},
+    );
+
+    expect(response.statusCode).toBe(404);
+    expect((await refundsFor(loan.id)).toDatabaseValue()).toBe('0.00');
   });
 });
