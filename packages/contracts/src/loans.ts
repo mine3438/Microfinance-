@@ -32,6 +32,14 @@ export const LOAN_STATUSES = [
   'active',
   'completed',
   'written_off',
+  /**
+   * Restructured into a successor.
+   *
+   * Terminal, and distinct from `completed`: nobody repaid a restructured loan,
+   * its debt moved to the loan that replaced it. The pair is linked by
+   * `loan_restructurings`, and the old loan keeps its schedule and payments.
+   */
+  'restructured',
 ] as const;
 export type LoanStatus = (typeof LOAN_STATUSES)[number];
 

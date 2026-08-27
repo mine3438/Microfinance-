@@ -45,7 +45,7 @@ let productId: string;
 let clientId: string;
 
 const PRINCIPAL = '1200000.00';
-const DISBURSED_ON = '2026-01-10';
+const TERM_MONTHS = 10;
 
 beforeAll(async () => {
   harness = await startHarness();
@@ -171,22 +171,48 @@ const request = async (
     ...(payload === undefined ? {} : { payload }),
   });
 
-/** A ten-month loan disbursed in January 2026, so it matures in November. */
-async function activeLoan(): Promise<LoanWithSchedule> {
+/**
+ * A calendar date a whole number of months from today.
+ *
+ * Every date in this suite is derived rather than pinned. The rule under test —
+ * "still within the originally agreed term" — is a statement about where today
+ * falls relative to a loan's maturity, so a fixture with fixed dates stops
+ * testing the rule the moment the calendar moves past it. That is exactly how
+ * the first version of this file went green locally and red in CI.
+ */
+function monthsFromToday(months: number, dayOfMonth?: number): string {
+  const now = new Date();
+  const shifted = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + months, dayOfMonth ?? 15),
+  );
+  return shifted.toISOString().slice(0, 10);
+}
+
+/** Today, as the API dates things. */
+const today = (): string => new Date().toISOString().slice(0, 10);
+
+/**
+ * A ten-month loan, disbursed `disbursedMonthsAgo` months ago.
+ *
+ * The default puts maturity four months ahead, so the loan is comfortably
+ * inside its term whenever this runs. Passing a larger number produces a loan
+ * whose term has already ended, which is what the eligibility tests need.
+ */
+async function activeLoan(disbursedMonthsAgo = 6): Promise<LoanWithSchedule> {
   const created = (
     await request('POST', '/loans', officerToken, {
       clientId,
       productId,
       principal: PRINCIPAL,
       monthlyRate: '0.0200',
-      termMonths: 10,
+      termMonths: TERM_MONTHS,
     })
   ).json<Loan>();
 
   await request('POST', `/loans/${created.id}/submit`, officerToken);
   await request('POST', `/loans/${created.id}/decision`, managerToken, { decision: 'approve' });
   const disbursed = await request('POST', `/loans/${created.id}/disbursement`, adminToken, {
-    disbursementDate: DISBURSED_ON,
+    disbursementDate: monthsFromToday(-disbursedMonthsAgo, 10),
   });
 
   if (disbursed.statusCode !== 200) {
@@ -202,7 +228,7 @@ const restructure = async (
 ): Promise<InjectResponse> =>
   request('POST', `/loans/${loanId}/restructuring`, token, {
     reason: 'Borrower’s harvest failed; rescheduling over a fresh term.',
-    effectiveOn: '2026-06-15',
+    effectiveOn: today(),
     ...body,
   });
 
@@ -346,22 +372,25 @@ describe('the old loan', () => {
 
 describe('eligibility', () => {
   it('refuses a request after the original maturity month', async () => {
-    const loan = await activeLoan();
+    // Disbursed eighteen months ago over ten months, so the agreed term ended
+    // about eight months back. Asking today is outside it.
+    const loan = await activeLoan(18);
 
-    // Disbursed January 2026 over ten months, so the agreed term ends in
-    // November 2026. December is outside it.
-    const response = await restructure(loan.id, adminToken, { effectiveOn: '2026-12-01' });
+    const response = await restructure(loan.id, adminToken, { effectiveOn: today() });
 
     expect(response.statusCode).toBe(422);
     expect(response.json<ErrorResponse>().error.message).toContain('original term');
   });
 
   it('allows a request inside the maturity month itself', async () => {
-    const loan = await activeLoan();
+    const loan = await activeLoan(18);
 
-    // Month granularity, matching settlement: any day of the maturity month
-    // counts as within the term.
-    const response = await restructure(loan.id, adminToken, { effectiveOn: '2026-11-30' });
+    // Maturity is ten months after a disbursement eighteen months ago, so the
+    // final instalment fell due eight months back. Month granularity, matching
+    // settlement: any day of that month counts as within the term.
+    const response = await restructure(loan.id, adminToken, {
+      effectiveOn: monthsFromToday(-8, 28),
+    });
 
     expect(response.statusCode).toBe(201);
   });
@@ -378,7 +407,7 @@ describe('eligibility', () => {
     const loan = await activeLoan();
 
     const response = await request('POST', `/loans/${loan.id}/restructuring`, adminToken, {
-      effectiveOn: '2026-06-15',
+      effectiveOn: today(),
     });
 
     expect(response.statusCode).toBe(400);
