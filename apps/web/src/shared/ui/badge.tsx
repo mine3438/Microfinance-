@@ -14,6 +14,11 @@ const TONES: Record<string, BadgeTone> = {
   active: 'success',
   completed: 'neutral',
   written_off: 'danger',
+  // Closed, and not a loss: the debt moved to a successor loan rather than
+  // being given up on. Given its own tone because the default is `neutral`,
+  // which is `completed`'s — and a restructured loan rendering exactly like a
+  // repaid one is the confusion the two separate statuses exist to prevent.
+  restructured: 'info',
   inactive: 'neutral',
 };
 
