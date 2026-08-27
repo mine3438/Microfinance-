@@ -44,10 +44,27 @@ Fully operational, tested, and reachable from the interface.
 | **Complaints** | Log, resolve by either route, refer onward. MSP2-06 is derived entirely from these dates. |
 | **BOT MSP2 reporting** | All ten quarterly forms, eighteen validation rules, Excel and PDF export, filing records. |
 | **Audit** | Every change to every business table, written by a database trigger, readable by holders of `audit.read`. |
+| **Application fee** | Collect the TZS 5,000 form fee in cash, retain it on approval, refund it on rejection. Charged once per application; the collection record survives the refund. |
+| **Early settlement** | Quote a settlement, then take it. Principal + interest through the settlement month + accrued penalties, no discount, future interest never charged. |
+| **Write-off** | Owner/Manager writes a loan off with a reason. Balance zeroed, accrual stopped, the amount written off kept. |
+| **Recovery** | Record money received after a write-off, without reinstating the loan or recreating principal. |
+| **Restructuring** | Roll remaining principal, unpaid interest and unpaid penalties into a successor loan on the original terms. Old loan kept, closed to repayment, linked to its successor. **See §7 before exposing.** |
+| **Groups** | Create groups, manage membership as intervals, read a roster or a borrower's groups as at any date. Group *lending* is blocked — see §7. |
 
 ---
 
 ## 2. Blocked — awaiting a business or regulatory decision
+
+> **Several subsections below have since been decided and built.** They are kept
+> as written, because the reasoning is the record of why each question mattered
+> and what the system did while it was open. `04-DECISION-REGISTER.md` is the
+> current position; where the two differ, the register is right.
+>
+> Superseded here: **2.2** group lending (decided; membership built, lending
+> still blocked on GROUP-05), **2.3** loan fees (decided and built), **2.4**
+> early settlement (decided and built), **2.5** restructuring (decided and
+> built), **2.6** recoveries (decided and built), and **2.1** shares (withdrawn
+> as not applicable).
 
 **Nothing in this section is implemented, and nothing in it is guessed.** Where
 the system must do *something*, the current behaviour is stated, and in every
@@ -415,3 +432,69 @@ a function, a policy and column grants; it alters no data and no existing
 column.
 
 No historical financial result can have changed.
+
+---
+
+## 7. What is safe to expose in the interface
+
+A backend operation being complete and tested is not the same as it being safe
+to put in front of staff. Two of the domains below reach a Bank of Tanzania
+return by a path nobody has ruled on, and one has no operation at all. Exposing
+those would let an institution create records it cannot correctly report.
+
+The distinction that matters is **whether using the feature can put a wrong
+figure on a filed return, or a figure whose treatment nobody has agreed.**
+
+### Safe to expose
+
+| Domain | Why it is safe |
+| --- | --- |
+| **Staff invitations** | No financial effect. Creates accounts, nothing else. |
+| **Audit trail** | Read-only. |
+| **Borrowers, branches, loan products** | Unchanged, and in use. |
+| **Loans, repayments, penalties, savings** | Unchanged, and in use. |
+| **Groups and membership** | Administrative only. No group can hold a loan, so no group reaches any MSP2 form. |
+| **Application fee** | Recorded and traced entirely outside the loan. It never becomes principal, never earns interest, and never enters the repayment allocator, so no return moves when one is collected or refunded. The *ledger posting* is still blocked (FEE-04), but that blocks bookkeeping, not the operational record. |
+| **Early settlement** | Closes a loan for a figure computed by the approved rule, recorded as an ordinary payment row. MSP2-02 already sums interest income from payments, so a settlement reports exactly like any other receipt — because that is what it is. |
+| **Write-off** | The write-off amount is captured before the balance is zeroed, and MSP2-03's written-off column already reads the domain event this raises. |
+| **Recovery** | Recorded in its own table, never as a payment, so it cannot be double-counted as repayment income. |
+
+Two caveats that do **not** block exposure, but should be understood by whoever
+turns these on:
+
+- **Write-off and recovery post no ledger entries** (WRITEOFF-02, RECOVERY-02).
+  The operational records are complete and carry principal and penalty
+  separately, so the eventual treatment can be posted against write-offs that
+  have already happened. Until then, bookkeeping for them is manual.
+- **The application fee is the same** (FEE-04). Collections and refunds are
+  fully traceable; no journal entry is written.
+
+### Must remain disabled
+
+| Domain | Blocker | What goes wrong if exposed |
+| --- | --- | --- |
+| **Group lending** — lending to a group | **GROUP-05** | There is no endpoint, so this is currently disabled by construction rather than by configuration. Were one added, every MSP2 exposure query reaches a borrower's sector, gender, age and district through `loans.client_id`. A group has none of them, so a group loan would be **silently dropped** from MSP2-03, MSP2-09 and MSP2-10 — understating the loan book on a return filed with BOT. |
+| **Restructuring** | **RESTRUCT-06** | The operation is complete and correct at the loan level, but the successor carries a disbursement date, and MSP2-09 counts every loan whose disbursement date falls in the quarter. No cash moves in a restructuring, so each one **may overstate reported disbursements**. Nobody has ruled on whether BOT counts a refinanced facility as a disbursement. |
+
+**Restructuring is the one that needs a deliberate decision before go-live.**
+Unlike group lending it is fully built and reachable, so it is disabled only if
+somebody chooses to disable it. The safe options, in order of preference:
+
+1. Get the BOT ruling on RESTRUCT-06. It is one question.
+2. Withhold the permission until then. Restructuring is guarded by
+   `loan.write_off`, which only `institution_admin` holds — so an institution
+   can simply not use it, but nothing stops them.
+3. Expose it and accept that MSP2-09 will include restructured facilities,
+   knowing the `loan_restructurings` link makes them identifiable and
+   excludable retrospectively once the ruling arrives.
+
+Option 3 is defensible only if the institution knows it is choosing it. It is
+not this system's decision to make on their behalf, which is why nothing here
+excludes them automatically.
+
+### Nothing has a screen yet
+
+All six new domains are API-only. No web interface exists for write-off,
+recovery, the application fee, groups, settlement or restructuring. That is
+ordinary outstanding work rather than a blocked dependency — but it means
+"exposing" any of them is a decision still to be taken, not one already made.
