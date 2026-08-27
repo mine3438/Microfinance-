@@ -41,7 +41,7 @@ import {
   refundApplicationFee,
 } from './application-fee-use-cases.js';
 import { type RestructuringRepository } from './restructuring-repository.js';
-import { restructureLoan } from './restructuring-use-cases.js';
+import { getRestructuring, restructureLoan } from './restructuring-use-cases.js';
 import { type SettlementRepository } from './settlement-repository.js';
 import { getSettlementQuote, settleLoan } from './settlement-use-cases.js';
 import { type WriteOffRepository } from './write-off-repository.js';
@@ -553,5 +553,21 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
       void reply.status(201);
       return loanRestructuringSchema.parse(restructured);
     },
+  );
+
+  /**
+   * The restructuring this loan was part of, from either side.
+   *
+   * Answers it for the old loan and for its successor, because an operator
+   * holding either half of the pair needs the same record. Without this,
+   * `loan_restructurings` was a table the application wrote and never read.
+   */
+  app.get(
+    '/loans/:id/restructuring',
+    { preHandler: [authenticated, requirePermission('loan.read')] },
+    async (request): Promise<unknown> =>
+      loanRestructuringSchema.parse(
+        await getRestructuring(principalOf(request), loanIdOf(request), restructurings),
+      ),
   );
 }

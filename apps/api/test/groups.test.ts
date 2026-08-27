@@ -420,3 +420,57 @@ describe('tenant isolation', () => {
     expect(response.statusCode).toBe(404);
   });
 });
+
+describe('the groups a borrower belongs to', () => {
+  it('lists them from the borrower’s side', async () => {
+    const first = await makeGroup();
+    const second = await makeGroup();
+    await request('POST', `/groups/${first.id}/members`, officerToken, { clientId: clientA });
+    await request('POST', `/groups/${second.id}/members`, officerToken, { clientId: clientA });
+
+    const listed = (await request('GET', `/clients/${clientA}/groups`, officerToken)).json<
+      GroupMember[]
+    >();
+
+    const ids = listed.map((member) => member.groupId);
+    expect(ids).toContain(first.id);
+    expect(ids).toContain(second.id);
+  });
+
+  it('drops a group once the borrower has left it', async () => {
+    const group = await makeGroup();
+    await request('POST', `/groups/${group.id}/members`, officerToken, {
+      clientId: clientB,
+      joinedOn: '2026-02-01',
+    });
+    await request('POST', `/groups/${group.id}/members/${clientB}/departure`, officerToken, {
+      leftOn: '2026-06-30',
+    });
+
+    const now = (await request('GET', `/clients/${clientB}/groups`, officerToken)).json<
+      GroupMember[]
+    >();
+    expect(now.map((member) => member.groupId)).not.toContain(group.id);
+
+    // …but still there as at a date inside the interval, which is the whole
+    // point of holding membership as intervals.
+    const then = (
+      await request('GET', `/clients/${clientB}/groups?asAt=2026-03-15`, officerToken)
+    ).json<GroupMember[]>();
+    expect(then.map((member) => member.groupId)).toContain(group.id);
+  });
+
+  it('refuses a borrower who is not registered here', async () => {
+    expect((await request('GET', `/clients/${randomUUID()}/groups`, officerToken)).statusCode).toBe(
+      404,
+    );
+  });
+
+  it('refuses another institution’s borrower', async () => {
+    const stranger = await seedUser(harness.database, { roles: ['institution_admin'] });
+
+    expect(
+      (await request('GET', `/clients/${clientA}/groups`, await tokenFor(stranger))).statusCode,
+    ).toBe(404);
+  });
+});

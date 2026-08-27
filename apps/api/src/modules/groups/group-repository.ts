@@ -127,6 +127,19 @@ export interface GroupRepository {
     groupId: string,
     asAt: string | null,
   ): Promise<GroupMember[]>;
+  /**
+   * The groups one borrower belongs to, now or on a date.
+   *
+   * The reverse of {@link GroupRepository.members}, and the query that
+   * `group_members_institution_client_idx` was created to serve. Until this
+   * existed, that index answered no question the application ever asked.
+   */
+  groupsForClient(
+    institutionId: string,
+    userId: string,
+    clientId: string,
+    asAt: string | null,
+  ): Promise<GroupMember[]>;
   addMember(
     institutionId: string,
     userId: string,
@@ -267,6 +280,30 @@ export class PostgresGroupRepository implements GroupRepository {
                   AND (m.left_on IS NULL OR m.left_on >= $2)
                 ORDER BY c.full_name`,
               [groupId, asAt],
+            );
+      return rows.rows.map(toMember);
+    });
+  }
+
+  public async groupsForClient(
+    institutionId: string,
+    userId: string,
+    clientId: string,
+    asAt: string | null,
+  ): Promise<GroupMember[]> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const rows =
+        asAt === null
+          ? await client.query<MemberRow>(
+              MEMBER_PROJECTION +
+                ' WHERE m.client_id = $1 AND m.left_on IS NULL ORDER BY m.joined_on',
+              [clientId],
+            )
+          : await client.query<MemberRow>(
+              MEMBER_PROJECTION +
+                ' WHERE m.client_id = $1 AND m.joined_on <= $2' +
+                ' AND (m.left_on IS NULL OR m.left_on >= $2) ORDER BY m.joined_on',
+              [clientId, asAt],
             );
       return rows.rows.map(toMember);
     });

@@ -489,3 +489,75 @@ describe('doing it twice', () => {
     expect(after.outstandingBalance).toBe(PRINCIPAL);
   });
 });
+
+describe('reading a restructuring back', () => {
+  it('answers from the old loan', async () => {
+    const loan = await activeLoan();
+    const record = (await restructure(loan.id)).json<LoanRestructuring>();
+
+    const read = await request('GET', `/loans/${loan.id}/restructuring`, officerToken);
+
+    expect(read.statusCode).toBe(200);
+    expect(read.json<LoanRestructuring>().newPrincipal).toBe(record.newPrincipal);
+  });
+
+  it('answers from the successor too', async () => {
+    const loan = await activeLoan();
+    const record = (await restructure(loan.id)).json<LoanRestructuring>();
+
+    // Either half of the pair reaches the same record. An operator looking at
+    // the new loan needs to know what it replaced.
+    const read = await request('GET', `/loans/${record.newLoanId}/restructuring`, officerToken);
+
+    expect(read.statusCode).toBe(200);
+    expect(read.json<LoanRestructuring>().oldLoanId).toBe(loan.id);
+  });
+
+  it('reports a loan that was never restructured as having none', async () => {
+    const loan = await activeLoan();
+
+    expect((await request('GET', `/loans/${loan.id}/restructuring`, officerToken)).statusCode).toBe(
+      404,
+    );
+  });
+
+  it('refuses another institution’s restructuring', async () => {
+    const loan = await activeLoan();
+    await restructure(loan.id);
+    const stranger = await seedUser(harness.database, { roles: ['institution_admin'] });
+
+    expect(
+      (await request('GET', `/loans/${loan.id}/restructuring`, await tokenFor(stranger)))
+        .statusCode,
+    ).toBe(404);
+  });
+});
+
+describe('the loan record names its counterpart', () => {
+  it('points the old loan at its successor and the successor back', async () => {
+    const loan = await activeLoan();
+    const record = (await restructure(loan.id)).json<LoanRestructuring>();
+
+    const old = (await request('GET', `/loans/${loan.id}`, officerToken)).json<Loan>();
+    const successor = (
+      await request('GET', `/loans/${record.newLoanId}`, officerToken)
+    ).json<Loan>();
+
+    // A restructured loan has a zero balance and a closed schedule. Without the
+    // successor named on it, the record is a dead end.
+    expect(old.restructuredIntoLoanId).toBe(record.newLoanId);
+    expect(old.restructuredFromLoanId).toBeNull();
+
+    expect(successor.restructuredFromLoanId).toBe(loan.id);
+    expect(successor.restructuredIntoLoanId).toBeNull();
+  });
+
+  it('leaves both null on an ordinary loan', async () => {
+    const loan = await activeLoan();
+
+    const read = (await request('GET', `/loans/${loan.id}`, officerToken)).json<Loan>();
+
+    expect(read.restructuredIntoLoanId).toBeNull();
+    expect(read.restructuredFromLoanId).toBeNull();
+  });
+});

@@ -38,6 +38,8 @@ interface LoanRow {
   disbursed_by: string | null;
   disbursement_date: Date | null;
   outstanding_balance: string | null;
+  restructured_into_loan_id: string | null;
+  restructured_from_loan_id: string | null;
   compulsory_savings_secured: string;
   created_at: Date;
   updated_at: Date;
@@ -67,11 +69,19 @@ const LOAN_PROJECTION = `
          l.principal, l.monthly_rate, l.interest_method, l.term_months,
          l.status, l.submitted_by, l.submitted_at, l.decided_by, l.decided_at,
          l.rejection_reason, l.disbursed_by, l.disbursement_date,
-         l.outstanding_balance, l.compulsory_savings_secured, l.created_at, l.updated_at
+         l.outstanding_balance, l.compulsory_savings_secured, l.created_at, l.updated_at,
+         successor.new_loan_id AS restructured_into_loan_id,
+         predecessor.old_loan_id AS restructured_from_loan_id
     FROM loans l
     JOIN branches b ON b.id = l.branch_id
     JOIN clients  c ON c.id = l.client_id
-    JOIN loan_products p ON p.id = l.product_id`;
+    JOIN loan_products p ON p.id = l.product_id
+    -- Both directions of a restructuring, so a loan is never a dead end. A
+    -- restructured loan has a zero balance and a closed schedule; without the
+    -- successor named on it, nothing on the record says where the debt went.
+    -- Unique on both sides by constraint, so neither join can multiply rows.
+    LEFT JOIN loan_restructurings successor   ON successor.old_loan_id = l.id
+    LEFT JOIN loan_restructurings predecessor ON predecessor.new_loan_id = l.id`;
 
 function formatDateOnly(value: Date): string {
   const year = String(value.getFullYear()).padStart(4, '0');
@@ -96,6 +106,8 @@ function toLoan(row: LoanRow): Loan {
     interestMethod: row.interest_method,
     termMonths: row.term_months,
     status: row.status,
+    restructuredIntoLoanId: row.restructured_into_loan_id,
+    restructuredFromLoanId: row.restructured_from_loan_id,
     submittedBy: row.submitted_by,
     submittedAt: row.submitted_at?.toISOString() ?? null,
     decidedBy: row.decided_by,

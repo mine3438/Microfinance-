@@ -152,3 +152,31 @@ export async function restructureLoan(
 
   return recorded;
 }
+
+/**
+ * The restructuring a loan was part of, from either side.
+ *
+ * Its own reader because `loan_restructurings` was otherwise a table the
+ * application wrote and never read — the same shape of defect this project has
+ * already repaired twice, in `audit_logs` and in `invitations`. The link on the
+ * loan tells you *that* it happened; this says what was carried across.
+ */
+export async function getRestructuring(
+  principal: Principal,
+  loanId: string,
+  repository: RestructuringRepository,
+): Promise<LoanRestructuring> {
+  const subject = await repository.subject(principal.institutionId, principal.userId, loanId);
+
+  if (subject === null || !canActOnBranch(principal, subject.branchId)) {
+    throw notFound('No such loan.');
+  }
+
+  const found = await repository.findFor(principal.institutionId, principal.userId, loanId);
+
+  if (found === null) {
+    throw notFound('That loan has not been restructured.');
+  }
+
+  return found;
+}

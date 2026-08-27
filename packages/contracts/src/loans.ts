@@ -114,6 +114,17 @@ export const loanSchema = z
     termMonths: z.number().int().positive(),
 
     status: z.enum(LOAN_STATUSES),
+    /**
+     * The successor this loan was restructured into, if it was.
+     *
+     * Surfaced on the loan rather than left only in `loan_restructurings`,
+     * because a loan in the `restructured` state is otherwise a dead end: the
+     * balance is zero, the schedule is closed, and nothing on the record says
+     * where the debt went.
+     */
+    restructuredIntoLoanId: uuidSchema.nullable(),
+    /** The loan this one replaced, if it is itself a successor. */
+    restructuredFromLoanId: uuidSchema.nullable(),
 
     submittedBy: uuidSchema.nullable(),
     submittedAt: isoTimestampSchema.nullable(),

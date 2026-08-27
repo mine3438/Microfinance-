@@ -210,3 +210,26 @@ export async function endMembership(
 
   return ended;
 }
+
+/**
+ * The groups a borrower belongs to.
+ *
+ * The reverse of {@link listMembers}. An officer looking at a borrower needs to
+ * know which groups they are in — under joint liability that is the list of
+ * obligations they share — and asking it group-by-group does not scale past a
+ * handful.
+ */
+export async function listGroupsForClient(
+  principal: Principal,
+  clientId: string,
+  asAt: string | undefined,
+  groups: GroupRepository,
+): Promise<GroupMember[]> {
+  const exists = await groups.clientExists(principal.institutionId, principal.userId, clientId);
+
+  if (!exists) {
+    throw notFound('No such borrower.');
+  }
+
+  return groups.groupsForClient(principal.institutionId, principal.userId, clientId, asAt ?? null);
+}

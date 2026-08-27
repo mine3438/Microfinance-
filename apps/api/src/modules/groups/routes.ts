@@ -21,6 +21,7 @@ import {
   endMembership,
   getGroup,
   listGroups,
+  listGroupsForClient,
   listMembers,
   updateGroup,
 } from './use-cases.js';
@@ -178,6 +179,32 @@ export function registerGroupRoutes(app: FastifyInstance, options: GroupRouteOpt
           body.data,
           groups,
           now,
+        ),
+      );
+    },
+  );
+
+  /**
+   * Which groups a borrower belongs to.
+   *
+   * Lives under `/clients` because that is what a caller has in hand when they
+   * ask. `?asAt=` reads it as at a date, like the roster does.
+   */
+  app.get(
+    '/clients/:id/groups',
+    { preHandler: [authenticated, requirePermission('client.read')] },
+    async (request): Promise<unknown> => {
+      const query = groupMemberQuerySchema.safeParse(request.query);
+      if (!query.success) {
+        throw validationFailed(query.error, 'Those membership options are not valid.');
+      }
+
+      return memberListSchema.parse(
+        await listGroupsForClient(
+          principalOf(request),
+          idOf(request, 'id', 'borrower'),
+          query.data.asAt,
+          groups,
         ),
       );
     },

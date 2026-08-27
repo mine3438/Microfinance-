@@ -101,6 +101,13 @@ export interface RestructuringRepository {
     userId: string,
     loanId: string,
   ): Promise<RestructuringSubject | null>;
+  /**
+   * The restructuring a loan was part of, from either side.
+   *
+   * Looked up by old *or* new loan id, because an operator holding either half
+   * of the pair needs the same record.
+   */
+  findFor(institutionId: string, userId: string, loanId: string): Promise<LoanRestructuring | null>;
   /** Close the old loan, open the new one, link them. One transaction. */
   restructure(
     institutionId: string,
@@ -197,6 +204,21 @@ export class PostgresRestructuringRepository implements RestructuringRepository 
    * lending. The link in `loan_restructurings` is what will let the compiler
    * exclude them once that is decided.
    */
+  public async findFor(
+    institutionId: string,
+    userId: string,
+    loanId: string,
+  ): Promise<LoanRestructuring | null> {
+    return this.database.withTenantTransaction({ institutionId, userId }, async (client) => {
+      const rows = await client.query<RestructuringRow>(
+        RESTRUCTURING_PROJECTION + ' WHERE r.old_loan_id = $1 OR r.new_loan_id = $1',
+        [loanId],
+      );
+      const row = rows.rows[0];
+      return row === undefined ? null : toRestructuring(row);
+    });
+  }
+
   public async restructure(
     institutionId: string,
     userId: string,
