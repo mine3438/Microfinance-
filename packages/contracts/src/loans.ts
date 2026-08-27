@@ -613,3 +613,55 @@ export const settleLoanRequestSchema = z
   .strict();
 
 export type SettleLoanRequest = z.infer<typeof settleLoanRequestSchema>;
+
+/**
+ * Restructuring a loan into a successor.
+ *
+ * The approved rules: any borrower may request it, but only while the loan is
+ * still within its **originally agreed term**; only the Owner/Manager approves;
+ * and the new principal is what the old loan still owed —
+ *
+ *     remaining principal + unpaid accrued interest + unpaid penalties
+ *
+ * Nothing is forgiven. The old loan is never deleted, keeps its schedule, stops
+ * accepting ordinary repayments, and records the link to its successor. The new
+ * loan reuses the original terms and starts classified Current.
+ */
+export const restructureLoanRequestSchema = z
+  .object({
+    /** Why the loan is being restructured. Required, like a write-off's. */
+    reason: requiredTextSchema(1000),
+    /** The day the restructuring takes effect. Defaults to today. */
+    effectiveOn: isoDateSchema.optional(),
+  })
+  .strict();
+
+export type RestructureLoanRequest = z.infer<typeof restructureLoanRequestSchema>;
+
+export const loanRestructuringSchema = z
+  .object({
+    id: uuidSchema,
+    oldLoanId: uuidSchema,
+    newLoanId: uuidSchema,
+
+    /**
+     * What was carried across, decomposed.
+     *
+     * Kept as three figures rather than one, because the accounting treatment
+     * for capitalising interest and penalties is not yet defined and a total
+     * cannot be decomposed after the fact.
+     */
+    principalCarried: z.string(),
+    interestCapitalised: z.string(),
+    penaltiesCapitalised: z.string(),
+    newPrincipal: z.string(),
+
+    reason: z.string(),
+    requestedBy: uuidSchema,
+    approvedBy: uuidSchema,
+    approvedByName: z.string().nullable(),
+    approvedAt: isoTimestampSchema,
+  })
+  .strict();
+
+export type LoanRestructuring = z.infer<typeof loanRestructuringSchema>;

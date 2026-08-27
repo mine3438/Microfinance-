@@ -58,11 +58,11 @@ with what it was.
 | SETTLE-02 | Future-interest treatment on settlement | DECIDED + IMPLEMENTED | Interest through the settlement month; later months never charged, and reported as `interestNotCharged` | — |
 | SETTLE-03 | Penalty and fee treatment on settlement | DECIDED + IMPLEMENTED | Every accrued penalty payable, none waived; the application fee is not part of a quote | — |
 | SETTLE-04 | Which date governs a settlement figure | DECIDED + IMPLEMENTED | The settlement month. The 1st, 10th and 31st quote identically | — |
-| RESTRUCT-01 | Restructuring eligibility and approval | DECIDED + IMPLEMENTATION PENDING | Not implemented; no such loan state | Build: within original term, Owner/Manager approves |
-| RESTRUCT-02 | Treatment of principal, interest, penalties, fees | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: new principal = remaining principal + unpaid interest + unpaid penalties |
-| RESTRUCT-03 | Old schedule handling and new schedule generation | DECIDED + IMPLEMENTATION PENDING | Not implemented | Build: old preserved and closed to repayment; new schedule from the original product terms |
+| RESTRUCT-01 | Restructuring eligibility and approval | DECIDED + IMPLEMENTED | Permitted only within the original maturity month; `loan.write_off`, held by institution_admin alone | — |
+| RESTRUCT-02 | Treatment of principal, interest, penalties, fees | DECIDED + IMPLEMENTED | New principal = remaining principal + unpaid interest + unpaid penalties, computed by the settlement quote so the two cannot disagree | — |
+| RESTRUCT-03 | Old schedule handling and new schedule generation | DECIDED + IMPLEMENTED | Old loan moves to `restructured`, keeps its schedule and payments, refuses repayment; successor gets a fresh schedule on the old terms | — |
 | RESTRUCT-04 | Accounting treatment of capitalised interest and penalties | BLOCKED BY ACCOUNTING POLICY | Not implemented | Journal mapping for capitalisation |
-| RESTRUCT-05 | Whether restructuring resets classification | DECIDED (policy recorded) | The new loan starts Current; see the caveat below | Implementation pending with RESTRUCT-01 |
+| RESTRUCT-05 | Whether restructuring resets classification | DECIDED + IMPLEMENTED | The successor starts Current and inherits no delinquency; see the BOT caveat below | — |
 | RECOVERY-01 | Treatment of a recovery on a written-off loan | DECIDED + IMPLEMENTED | Recorded in `loan_recoveries`; the loan stays written off, the balance stays zero, and it is never a payment | — |
 | RECOVERY-02 | Ledger accounts for recovery income | BLOCKED BY ACCOUNTING POLICY | Recovery records exist and carry amount, date, method and loan | Journal mapping, and wiring MSP2-02 Sno 21 to consume them |
 | WRITEOFF-01 | How a loan is written off through the application | DECIDED + IMPLEMENTED | `POST /loans/:id/write-off`, Owner/Manager only, reason required, no automatic threshold | — |
@@ -75,6 +75,7 @@ with what it was.
 | BOT-11.5 | Housing loans 0–90 days overdue | BLOCKED BY BOT | Unclassified and surfaced; never Current | BOT ruling |
 | BOT-11.8 | Calendar year or the institution fiscal year | BLOCKED BY BOT | Required parameter, echoed as `yearToDateFrom` | BOT ruling |
 | BOT-11.8B | Whether a fiscal year must begin on a quarter boundary | BLOCKED BY BOT | Any month 1–12 accepted; a non-aligned year can produce a window over twelve months, reported as it stands | BOT or business |
+| RESTRUCT-06 | Whether MSP2-09 counts a restructured facility as a disbursement | BLOCKED BY BOT | The successor carries the restructuring date, so MSP2-09 counts it; no cash moves, so this may overstate lending | BOT ruling |
 | AUDIT-01 | Audit retention period | BLOCKED BY BOT | Nothing is ever deleted | BOT requirement |
 | IDENTITY-01 | May one person hold accounts at two institutions | BLOCKED BY BUSINESS | Refused; email addresses globally unique | Business decision |
 | AUDIT-02 | Audit branch filtering | DEFERRED | No branch on an audit event; no filter offered | Only if an authoritative branch relationship appears |

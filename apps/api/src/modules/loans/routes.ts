@@ -10,6 +10,8 @@ import {
   collectApplicationFeeRequestSchema,
   loanRecoverySchema,
   refundApplicationFeeRequestSchema,
+  loanRestructuringSchema,
+  restructureLoanRequestSchema,
   settleLoanRequestSchema,
   settlementQuoteQuerySchema,
   settlementQuoteSchema,
@@ -38,6 +40,8 @@ import {
   getApplicationFee,
   refundApplicationFee,
 } from './application-fee-use-cases.js';
+import { type RestructuringRepository } from './restructuring-repository.js';
+import { restructureLoan } from './restructuring-use-cases.js';
 import { type SettlementRepository } from './settlement-repository.js';
 import { getSettlementQuote, settleLoan } from './settlement-use-cases.js';
 import { type WriteOffRepository } from './write-off-repository.js';
@@ -69,6 +73,7 @@ export interface LoanRouteOptions {
   readonly writeOffs: WriteOffRepository;
   readonly applicationFees: ApplicationFeeRepository;
   readonly settlements: SettlementRepository;
+  readonly restructurings: RestructuringRepository;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -99,7 +104,7 @@ function loanIdOf(request: FastifyRequest): string {
  * database constraint refuses it again beneath that.
  */
 export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptions): void {
-  const { loans, writeOffs, applicationFees, settlements, tokens } = options;
+  const { loans, writeOffs, applicationFees, settlements, restructurings, tokens } = options;
   const now = options.now ?? ((): Date => new Date());
   const authenticated = authenticate(tokens);
 
@@ -514,6 +519,39 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
 
       void reply.status(201);
       return settlementQuoteSchema.parse(settled);
+    },
+  );
+
+  /**
+   * Restructure the loan into a successor.
+   *
+   * `loan.write_off`, which only `institution_admin` holds — this system's
+   * Owner/Manager, and the same permission the penalty accrual uses for the
+   * same stated reason: it is the one seeded permission representing authority
+   * to change what a borrower owes without a payment behind it.
+   *
+   * Nothing is forgiven. The new principal is what the old loan still owed, and
+   * the old loan is kept, closed to repayment, and linked to its successor.
+   */
+  app.post(
+    '/loans/:id/restructuring',
+    { preHandler: [authenticated, requirePermission('loan.write_off')] },
+    async (request, reply): Promise<unknown> => {
+      const body = restructureLoanRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw validationFailed(body.error, 'That restructuring cannot be recorded as entered.');
+      }
+
+      const restructured = await restructureLoan(
+        principalOf(request),
+        loanIdOf(request),
+        body.data,
+        restructurings,
+        now,
+      );
+
+      void reply.status(201);
+      return loanRestructuringSchema.parse(restructured);
     },
   );
 }

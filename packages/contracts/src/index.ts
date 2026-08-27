@@ -83,6 +83,13 @@ export {
 } from './groups.js';
 
 export {
+  loanRestructuringSchema,
+  restructureLoanRequestSchema,
+  type LoanRestructuring,
+  type RestructureLoanRequest,
+} from './loans.js';
+
+export {
   settleLoanRequestSchema,
   settlementQuoteQuerySchema,
   settlementQuoteSchema,

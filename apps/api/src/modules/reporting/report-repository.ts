@@ -376,7 +376,7 @@ export class PostgresReportRepository implements ReportRepository {
             WHERE l.compulsory_savings_secured > 0
               AND l.disbursement_date IS NOT NULL
               AND l.disbursement_date <= $1
-              AND l.status NOT IN ('completed', 'written_off', 'rejected')
+              AND l.status NOT IN ('completed', 'written_off', 'rejected', 'restructured')
             GROUP BY c.sector_code`,
           [period.endDate],
         ),

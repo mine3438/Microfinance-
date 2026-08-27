@@ -18,6 +18,7 @@ import { PostgresWriteOffRepository } from './modules/loans/write-off-repository
 import { PostgresApplicationFeeRepository } from './modules/loans/application-fee-repository.js';
 import { PostgresGroupRepository } from './modules/groups/group-repository.js';
 import { PostgresSettlementRepository } from './modules/loans/settlement-repository.js';
+import { PostgresRestructuringRepository } from './modules/loans/restructuring-repository.js';
 import { PostgresFinanceRepository } from './modules/finance/finance-repository.js';
 import { PostgresPaymentRepository } from './modules/payments/payment-repository.js';
 import { PostgresComplaintRepository } from './modules/complaints/complaint-repository.js';
@@ -76,6 +77,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
   const applicationFees = new PostgresApplicationFeeRepository(database);
   const groups = new PostgresGroupRepository(database);
   const settlements = new PostgresSettlementRepository(database);
+  const restructurings = new PostgresRestructuringRepository(database);
   const payments = new PostgresPaymentRepository(database);
   const reports = new PostgresReportRepository(database);
   const finance = new PostgresFinanceRepository(database);
@@ -134,6 +136,7 @@ export async function composeApplication(environment: Environment): Promise<Appl
     applicationFees,
     groups,
     settlements,
+    restructurings,
     payments,
     reports,
     finance,
