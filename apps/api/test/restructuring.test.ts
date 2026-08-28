@@ -7,9 +7,12 @@ import {
   type LoanWithSchedule,
 } from '@mfi/contracts';
 import { hashPassword } from '@mfi/identity';
+import { periodContaining } from '@mfi/domain';
 import { Money } from '@mfi/money';
 import { type Response as InjectResponse } from 'light-my-request';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { PostgresReportRepository } from '../src/modules/reporting/report-repository.js';
 
 import {
   DEFAULT_TEST_PASSWORD,
@@ -198,10 +201,13 @@ const today = (): string => new Date().toISOString().slice(0, 10);
  * inside its term whenever this runs. Passing a larger number produces a loan
  * whose term has already ended, which is what the eligibility tests need.
  */
-async function activeLoan(disbursedMonthsAgo = 6): Promise<LoanWithSchedule> {
+async function activeLoan(
+  disbursedMonthsAgo = 6,
+  borrowerId: string = clientId,
+): Promise<LoanWithSchedule> {
   const created = (
     await request('POST', '/loans', officerToken, {
-      clientId,
+      clientId: borrowerId,
       productId,
       principal: PRINCIPAL,
       monthlyRate: '0.0200',
@@ -559,5 +565,66 @@ describe('the loan record names its counterpart', () => {
 
     expect(read.restructuredIntoLoanId).toBeNull();
     expect(read.restructuredFromLoanId).toBeNull();
+  });
+});
+
+describe('what a restructured loan reports as exposure', () => {
+  /**
+   * A borrower of their own, because MSP2-03 aggregates by client and this
+   * assertion is about a total. Sharing the suite's borrower would mix in every
+   * other fixture loan and turn a precise figure into an approximate one.
+   */
+  const freshBorrower = async (): Promise<string> => {
+    const existing = (await request('GET', `/clients/${clientId}`, officerToken)).json<{
+      districtCode: string;
+      sectorCode: string;
+    }>();
+
+    return (
+      await request('POST', '/clients', officerToken, {
+        fullName: `Reporting Borrower ${randomUUID().slice(0, 8)}`,
+        gender: 'female',
+        dateOfBirth: '1990-02-02',
+        phone: '0716444555',
+        districtCode: existing.districtCode,
+        sectorCode: existing.sectorCode,
+      })
+    ).json<{ id: string }>().id;
+  };
+
+  /**
+   * The old loan stops being exposure the day the new one is advanced.
+   *
+   * This is the one place a restructuring could silently double the reported
+   * loan book. `loans.outstanding_balance` is zeroed on the predecessor, but
+   * MSP2-03 does not read that column: it reads the balance carried on the last
+   * payment, and a restructuring writes no payment. So without an explicit
+   * handover the predecessor keeps reporting the balance it had before its last
+   * repayment, next to a successor carrying the very same money.
+   *
+   * Nothing here depends on the unresolved RESTRUCT-06, which is about whether
+   * BOT counts a restructuring as a *disbursement* on MSP2-09. This is only
+   * about not counting one debt twice.
+   */
+  it('hands its balance to the successor rather than reporting both', async () => {
+    const borrowerId = await freshBorrower();
+    const loan = await activeLoan(6, borrowerId);
+    const record = (await restructure(loan.id)).json<LoanRestructuring>();
+
+    const period = periodContaining(today());
+    const snapshot = await new PostgresReportRepository(harness.database).snapshot(
+      officer.institutionId,
+      officer.userId,
+      period,
+      `${String(period.year)}-01-01`,
+    );
+
+    const mine = snapshot.classifiedExposures.filter((e) => e.clientId === borrowerId);
+
+    // One row, not two. The count is the substance of the test: before the
+    // handover existed this returned the predecessor and the successor, and
+    // they summed to very nearly twice the money the borrower actually owed.
+    expect(mine).toHaveLength(1);
+    expect(mine[0]?.outstanding.toString()).toBe(record.newPrincipal);
   });
 });

@@ -107,6 +107,22 @@ const EXPOSURES_AS_AT = `
      WHERE event_type = 'loan.written_off'
        AND occurred_at::date <= $1
   ),
+  restructured AS (
+    -- A restructured loan hands its balance to its successor on the day the
+    -- successor is advanced. The loans row has its outstanding_balance
+    -- zeroed then, but this query reads balances from payments, and a
+    -- restructuring writes no payment. So without this the predecessor keeps
+    -- reporting the balance it had before its last payment, alongside a
+    -- successor carrying the same money. Keyed on the successor disbursement
+    -- date rather than the approval timestamp, so the handover is exact:
+    -- before that date the old loan is the exposure, from it the new one is,
+    -- and neither a gap nor an overlap can open in an earlier quarter.
+    SELECT r.old_loan_id AS loan_id
+      FROM loan_restructurings r
+      JOIN loans successor ON successor.id = r.new_loan_id
+     WHERE successor.disbursement_date IS NOT NULL
+       AND successor.disbursement_date <= $1
+  ),
   cumulative AS (
     SELECT s.loan_id, s.due_date,
            sum(s.total_due) OVER (
@@ -146,6 +162,7 @@ const EXPOSURES_AS_AT = `
    WHERE l.disbursement_date IS NOT NULL
      AND l.disbursement_date <= $1
      AND l.id NOT IN (SELECT loan_id FROM written_off)
+     AND l.id NOT IN (SELECT loan_id FROM restructured)
      AND COALESCE(lb.balance_after, l.principal) > 0`;
 
 /** Everything one compilation needs. */
