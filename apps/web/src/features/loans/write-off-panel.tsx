@@ -42,21 +42,31 @@ export function WriteOffPanel({
 }): ReactNode {
   const session = useSession();
 
+  /**
+   * Whether this panel belongs on the loan at all, decided by status alone.
+   *
+   * A loan that has been written off has that status, and only an active loan
+   * can become one — so the loan itself answers this, and the panel does not
+   * appear, vanish and reappear as the request resolves. Deriving it from the
+   * response instead would also mean a loan whose write-off failed to load
+   * silently rendered as one that was never written off.
+   */
+  const relevant = loan.status === 'active' || loan.status === 'written_off';
+  const writtenOff = loan.status === 'written_off';
+
   const query = useQuery({
     queryKey: ['write-off', loan.id],
     queryFn: () => loanEvents.writeOff(loan.id),
-    enabled: session.can('loan.read'),
+    enabled: session.can('loan.read') && relevant,
   });
 
-  // Nothing to show on a loan that is neither written off nor eligible to be.
-  const eligible = loan.status === 'active';
-  if (!eligible && query.data == null) {
+  if (!relevant) {
     return null;
   }
 
   return (
     <>
-      <Panel title="Write-off" tone={loan.status === 'written_off' ? 'danger' : 'neutral'}>
+      <Panel title="Write-off" tone={writtenOff ? 'danger' : 'neutral'}>
         {query.isPending && <Spinner label="Loading the write-off record" />}
         {query.error !== null && <ErrorNotice error={query.error} />}
 
@@ -68,7 +78,7 @@ export function WriteOffPanel({
           ))}
       </Panel>
 
-      {query.data !== null && query.data !== undefined && <RecoveriesPanel loan={loan} />}
+      {writtenOff && <RecoveriesPanel loan={loan} />}
     </>
   );
 }
