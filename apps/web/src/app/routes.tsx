@@ -6,6 +6,9 @@ import { AcceptInvitationPage } from '../features/staff/accept-invitation-page.j
 import { StaffPage } from '../features/staff/staff-page.js';
 import { SignInPage } from '../features/auth/sign-in-page.js';
 import { ClientsPage } from '../features/clients/clients-page.js';
+import { ClientGroupsPage } from '../features/groups/client-groups-page.js';
+import { GroupPage } from '../features/groups/group-page.js';
+import { GroupsPage } from '../features/groups/groups-page.js';
 import { ComplaintsPage } from '../features/complaints/complaints-page.js';
 import { NewClientPage } from '../features/clients/new-client-page.js';
 import { LoanPage } from '../features/loans/loan-page.js';
@@ -60,6 +63,34 @@ export function AppRoutes(): ReactNode {
           element={
             <RequirePermission permission="client.create">
               <NewClientPage />
+            </RequirePermission>
+          }
+        />
+
+        {/* Groups are a borrower-side record, so they are guarded by the borrower
+            permissions the API guards them with. There is no group-lending route
+            here and no endpoint behind one: GROUP-05 is unresolved. */}
+        <Route
+          path="/groups"
+          element={
+            <RequirePermission permission="client.read">
+              <GroupsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/groups/:id"
+          element={
+            <RequirePermission permission="client.read">
+              <GroupPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/clients/:id/groups"
+          element={
+            <RequirePermission permission="client.read">
+              <ClientGroupsPage />
             </RequirePermission>
           }
         />

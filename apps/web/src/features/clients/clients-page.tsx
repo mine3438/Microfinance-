@@ -101,6 +101,7 @@ export function ClientsPage(): ReactNode {
                       <th scope="col">Branch</th>
                       <th scope="col">Registered</th>
                       <th scope="col">Status</th>
+                      <th scope="col">Groups</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -115,6 +116,9 @@ export function ClientsPage(): ReactNode {
                         <td>{formatDate(client.createdAt.slice(0, 10))}</td>
                         <td>
                           <StatusBadge status={client.status} />
+                        </td>
+                        <td>
+                          <Link to={`/clients/${client.id}/groups`}>Groups</Link>
                         </td>
                       </tr>
                     ))}

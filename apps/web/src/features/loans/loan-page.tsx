@@ -9,7 +9,6 @@ import {
   formatMoney,
   formatMoneyWithCurrency,
   formatMonthlyRate,
-  formatStatus,
 } from '../../shared/lib/format.js';
 import { StatusBadge } from '../../shared/ui/badge.js';
 import { ErrorNotice } from '../../shared/ui/error-notice.js';
@@ -17,6 +16,9 @@ import { Field } from '../../shared/ui/field.js';
 import { Panel } from '../../shared/ui/panel.js';
 import { Spinner } from '../../shared/ui/spinner.js';
 import { PaymentsPanel } from '../payments/payments-panel.js';
+import { ApplicationFeePanel } from './application-fee-panel.js';
+import { SettlementPanel } from './settlement-panel.js';
+import { WriteOffPanel } from './write-off-panel.js';
 import { useSession } from '../auth/session.js';
 
 /**
@@ -137,6 +139,8 @@ function LoanDetail({ loan }: { loan: LoanWithSchedule }): ReactNode {
             </p>
           </Panel>
 
+          <ApplicationFeePanel loan={loan} />
+
           <Panel title="What happens next">
             {loan.status === 'draft' && session.can('loan.create') && (
               <>
@@ -241,11 +245,33 @@ function LoanDetail({ loan }: { loan: LoanWithSchedule }): ReactNode {
               </>
             )}
 
-            {(loan.status === 'rejected' ||
-              loan.status === 'completed' ||
-              loan.status === 'written_off') && (
+            {loan.status === 'rejected' && (
               <p className="muted">
-                This loan is {formatStatus(loan.status).toLowerCase()}. Nothing further follows.
+                This application was rejected. It can be revised and resubmitted; no second
+                application fee is charged.
+              </p>
+            )}
+
+            {loan.status === 'completed' && (
+              <p className="muted">This loan is repaid. Nothing further follows.</p>
+            )}
+
+            {/* Written off is not 'nothing further': the debt is not forgiven, and money
+                received afterwards is recorded as a recovery rather than a repayment. */}
+            {loan.status === 'written_off' && (
+              <p className="muted">
+                This loan has been written off. It takes no further repayments; anything received is
+                recorded as a recovery.
+              </p>
+            )}
+
+            {/* Restructuring is withheld pending RESTRUCT-06, so this status can only
+                appear on a record made before it was withheld, or through a deployment
+                that has enabled it deliberately. It still has to render. */}
+            {loan.status === 'restructured' && (
+              <p className="muted">
+                This loan was restructured into a successor. It is closed to repayment and was not
+                repaid.
               </p>
             )}
           </Panel>
@@ -295,6 +321,10 @@ function LoanDetail({ loan }: { loan: LoanWithSchedule }): ReactNode {
           {(loan.status === 'active' || loan.status === 'completed') && (
             <PaymentsPanel loan={loan} onChanged={refresh} />
           )}
+
+          <SettlementPanel loan={loan} onSettled={refresh} />
+
+          <WriteOffPanel loan={loan} onChanged={refresh} />
         </div>
       </div>
     </div>

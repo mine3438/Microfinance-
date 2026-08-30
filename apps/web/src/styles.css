@@ -203,6 +203,20 @@ code,
   font-size: 1rem;
 }
 
+/*
+ * A heading inside a panel body, under the panel own title.
+ * Smaller than the panel title so the two levels do not compete, and spaced
+ * above rather than below so it groups with what follows it.
+ */
+.panel__subtitle {
+  margin: 1.1rem 0 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .panel__body {
   padding: 1.1rem;
 }
@@ -247,6 +261,17 @@ code,
 
 .row--muted td {
   color: var(--ink-muted);
+}
+
+/*
+ * The line a breakdown adds up to — the settlement total under its three
+ * parts. Ruled off above rather than merely bolded, so the figure the borrower
+ * hands over is distinguishable from the components at a glance.
+ */
+.row--total th,
+.row--total td {
+  border-top: 2px solid var(--line);
+  padding-top: 0.6rem;
 }
 
 /*

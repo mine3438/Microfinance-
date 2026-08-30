@@ -374,3 +374,55 @@ describe('designating a head office', () => {
     expect(theirs.filter((entry) => entry.isHeadOffice)).toHaveLength(1);
   });
 });
+
+describe('restructuring is not mounted unless it is enabled (RESTRUCT-06 open)', () => {
+  /**
+   * The harness for this suite takes the production default, so the flag is
+   * off. What is asserted is that the operation is *absent*, not forbidden.
+   *
+   * The distinction is the point. A 403 would mean the endpoint is there and
+   * this caller lacks something — which a permission change, a role edit or a
+   * new admin could undo without anyone revisiting RESTRUCT-06. A 404 means
+   * there is nothing to authorise, so no combination of credentials reaches it.
+   *
+   * The administrator is used deliberately: `loan.write_off` is the permission
+   * the endpoint would require, so this is the caller that *would* succeed if
+   * the guard were only an authorisation check.
+   */
+  it('answers as an unknown path to the caller who holds the permission', async () => {
+    const { loanId } = await disbursedLoan('900000.00');
+
+    const attempt = await request('POST', `/loans/${loanId}/restructuring`, adminToken, {
+      reason: 'Attempting the operation that is withheld pending RESTRUCT-06.',
+    });
+
+    expect(attempt.statusCode).toBe(404);
+    expect(attempt.json<ErrorResponse>().error.code).not.toBe('FORBIDDEN');
+  });
+
+  it('does not read one back either', async () => {
+    const { loanId } = await disbursedLoan('900000.00');
+
+    expect((await request('GET', `/loans/${loanId}/restructuring`, adminToken)).statusCode).toBe(
+      404,
+    );
+  });
+
+  /**
+   * The neighbouring operations stay reachable.
+   *
+   * Withdrawing restructuring must not withdraw write-off, which shares
+   * `loan.write_off` and is safe to expose. If the guard had been implemented
+   * by removing the permission from the role, this is the test that would have
+   * caught it.
+   */
+  it('leaves write-off, which shares the same permission, working', async () => {
+    const { loanId } = await disbursedLoan('900000.00');
+
+    const written = await request('POST', `/loans/${loanId}/write-off`, adminToken, {
+      reason: 'Unrecoverable after the borrower ceased trading.',
+    });
+
+    expect(written.statusCode).toBe(201);
+  });
+});

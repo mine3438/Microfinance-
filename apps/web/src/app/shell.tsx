@@ -19,6 +19,7 @@ export function Shell(): ReactNode {
           {/* Nav entries follow permissions, so a role never sees a link to a
               page that would refuse it. The API refuses regardless. */}
           {session.can('client.read') && <NavLink to="/clients">Borrowers</NavLink>}
+          {session.can('client.read') && <NavLink to="/groups">Groups</NavLink>}
           {session.can('loan.read') && <NavLink to="/loans">Loans</NavLink>}
           {session.can('loan.read') && <NavLink to="/portfolio">Portfolio</NavLink>}
           {session.can('expense.read') && <NavLink to="/finance">Finance</NavLink>}

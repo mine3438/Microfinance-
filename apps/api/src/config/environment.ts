@@ -153,6 +153,33 @@ const environmentSchema = z.object({
    */
   WEB_BASE_URL: z.url({ error: 'WEB_BASE_URL must be an absolute URL.' }).optional(),
 
+  /**
+   * Whether the restructuring endpoint is mounted at all.
+   *
+   * Defaults **off**, and the route is not registered when it is off — a
+   * disabled feature answers 404, not 403, because there is nothing there to
+   * be forbidden from.
+   *
+   * The reason is RESTRUCT-06, not security. Restructuring is built, tested and
+   * correct at the loan level, but a successor carries a disbursement date and
+   * MSP2-09 counts every loan disbursed in the quarter, while no cash moves in
+   * a restructuring. Nobody has ruled on whether BOT counts a refinanced
+   * facility as a disbursement, so an institution using this in production
+   * could file a return overstating disbursements.
+   *
+   * A flag rather than deleted code, and a flag rather than a permission: the
+   * implementation is proven and must stay that way for the day the ruling
+   * arrives, and `loan.write_off` means "may judge a debt", which is not the
+   * question being answered here. Removing the permission from the role would
+   * also disable write-off, which is safe to expose.
+   *
+   * Turn it on only once RESTRUCT-06 is decided and MSP2-09 reflects it.
+   */
+  RESTRUCTURING_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

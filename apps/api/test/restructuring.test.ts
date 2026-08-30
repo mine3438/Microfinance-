@@ -51,7 +51,10 @@ const PRINCIPAL = '1200000.00';
 const TERM_MONTHS = 10;
 
 beforeAll(async () => {
-  harness = await startHarness();
+  // The endpoints are unmounted unless this is set (RESTRUCT-06). This suite
+  // exists to keep the implementation proven while production keeps it off;
+  // `safe-refusals.test.ts` covers the default, where the route is absent.
+  harness = await startHarness({ RESTRUCTURING_ENABLED: 'true' });
 
   officer = await seedUser(harness.database, { roles: ['loan_officer'] });
   officerToken = await tokenFor(officer);

@@ -104,10 +104,31 @@ import {
   type SavingsTransaction,
   type RoleCode,
   type SessionUser,
+  applicationFeeSchema,
+  groupMemberSchema,
+  groupSchema,
+  loanRecoverySchema,
+  loanWriteOffSchema,
+  settlementQuoteSchema,
+  type AddGroupMemberRequest,
+  type ApplicationFee,
+  type CollectApplicationFeeRequest,
+  type CreateGroupRequest,
+  type EndGroupMembershipRequest,
+  type Group,
+  type GroupMember,
+  type LoanRecovery,
+  type LoanWriteOff,
+  type RecordRecoveryRequest,
+  type RefundApplicationFeeRequest,
+  type SettleLoanRequest,
+  type SettlementQuote,
+  type UpdateGroupRequest,
+  type WriteOffLoanRequest,
 } from '@mfi/contracts';
 import { z } from 'zod';
 
-import { apiRequest } from './client.js';
+import { ApiRequestError, apiRequest } from './client.js';
 
 /**
  * Every call this client makes, named.
@@ -141,6 +162,9 @@ const lineListSchema = z.array(msp2_02LineSchema);
 const institutionListSchema = z.array(financialInstitutionSchema);
 const bankAccountListSchema = z.array(bankAccountSchema);
 const bankBalanceListSchema = z.array(bankAccountBalanceSchema);
+const groupListSchema = z.array(groupSchema);
+const memberListSchema = z.array(groupMemberSchema);
+const recoveryListSchema = z.array(loanRecoverySchema);
 
 /**
  * A statement view.
@@ -171,6 +195,28 @@ function query(parameters: Record<string, string | number | undefined>): string 
   }
   const rendered = search.toString();
   return rendered === '' ? '' : `?${rendered}`;
+}
+
+/**
+ * Treat a 404 as 'there is none', and nothing else.
+ *
+ * Several records here are optional by nature: an application nobody has
+ * charged has no fee, a live loan has no write-off. The API answers 404 for
+ * those, which is correct, but a component rendering `null` reads better than
+ * one branching on an error object.
+ *
+ * Only 404 is swallowed. A 403 turned into `null` would render 'no fee' to
+ * someone who simply may not see it, which is a lie the user cannot detect.
+ */
+async function absentAsNull<T>(pending: Promise<T>): Promise<T | null> {
+  try {
+    return await pending;
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export const auth = {
@@ -764,6 +810,175 @@ export const invitations = {
       method: 'POST',
       body: request,
       authenticated: false,
+    });
+  },
+};
+
+/**
+ * Lending groups, and who belongs to them.
+ *
+ * Administrative only. There is deliberately no call here that lends to a
+ * group: GROUP-05 is unresolved, every MSP2 exposure query reaches a borrower's
+ * sector, gender, age and district through `loans.client_id`, and a group has
+ * none of them. The API has no such endpoint either — this is not a client-side
+ * omission.
+ */
+export const groups = {
+  async list(): Promise<Group[]> {
+    return apiRequest('/groups', groupListSchema);
+  },
+
+  async get(id: string): Promise<Group> {
+    return apiRequest(`/groups/${id}`, groupSchema);
+  },
+
+  async create(request: CreateGroupRequest): Promise<Group> {
+    return apiRequest('/groups', groupSchema, { method: 'POST', body: request });
+  },
+
+  /** Rename a group, or close it. Only what is sent is changed. */
+  async update(id: string, request: UpdateGroupRequest): Promise<Group> {
+    return apiRequest(`/groups/${id}`, groupSchema, { method: 'PATCH', body: request });
+  },
+
+  /**
+   * The roster, now or as it stood on a date.
+   *
+   * `asAt` is what makes an older record legible: it returns the intervals open
+   * on that day rather than the ones open today.
+   */
+  async members(id: string, asAt?: string): Promise<GroupMember[]> {
+    return apiRequest(`/groups/${id}/members${query({ asAt })}`, memberListSchema);
+  },
+
+  async addMember(id: string, request: AddGroupMemberRequest): Promise<GroupMember> {
+    return apiRequest(`/groups/${id}/members`, groupMemberSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /**
+   * Record that a member has left.
+   *
+   * Closes the interval; it does not delete the membership. The period someone
+   * was in a group is part of what makes an earlier record legible, so the API
+   * models a departure rather than a removal, and so does this call.
+   */
+  async endMembership(
+    id: string,
+    clientId: string,
+    request: EndGroupMembershipRequest = {},
+  ): Promise<GroupMember> {
+    return apiRequest(`/groups/${id}/members/${clientId}/departure`, groupMemberSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /** The groups one borrower belongs to — the reverse of {@link groups.members}. */
+  async forClient(clientId: string, asAt?: string): Promise<GroupMember[]> {
+    return apiRequest(`/clients/${clientId}/groups${query({ asAt })}`, memberListSchema);
+  },
+};
+
+/**
+ * The application/form fee, its refund, early settlement, write-off and
+ * recovery.
+ *
+ * Grouped as one object because they share a subject — money that moves around
+ * a loan without being an instalment of it — and because keeping them out of
+ * `loans` and `payments` mirrors the API, where none of them is a repayment.
+ */
+export const loanEvents = {
+  /**
+   * The fee on this application, or `null` when none has been taken.
+   *
+   * A 404 is the ordinary answer for an application nobody has charged yet, so
+   * it is translated to `null` rather than surfaced as a failure. Any other
+   * refusal is rethrown: an authorisation problem must not render as "no fee".
+   */
+  async applicationFee(loanId: string): Promise<ApplicationFee | null> {
+    return absentAsNull(apiRequest(`/loans/${loanId}/application-fee`, applicationFeeSchema));
+  },
+
+  /**
+   * Record the cash collection.
+   *
+   * No amount is sent. The charge is fixed policy, the server holds the figure,
+   * and a client that could state it is a client through which a typo becomes
+   * the fee.
+   */
+  async collectApplicationFee(
+    loanId: string,
+    request: CollectApplicationFeeRequest = {},
+  ): Promise<ApplicationFee> {
+    return apiRequest(`/loans/${loanId}/application-fee`, applicationFeeSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /** Record that the money was physically handed back. */
+  async refundApplicationFee(
+    loanId: string,
+    request: RefundApplicationFeeRequest = {},
+  ): Promise<ApplicationFee> {
+    return apiRequest(`/loans/${loanId}/application-fee/refund`, applicationFeeSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /**
+   * What settling today would cost.
+   *
+   * The only place this app obtains a settlement figure. Nothing in the browser
+   * adds the three parts together or works out which months are charged — the
+   * server computes it with the same code the settlement itself re-runs before
+   * closing anything.
+   */
+  async settlementQuote(loanId: string, settlementDate?: string): Promise<SettlementQuote> {
+    return apiRequest(
+      `/loans/${loanId}/settlement/quote${query({ settlementDate })}`,
+      settlementQuoteSchema,
+    );
+  },
+
+  /** Take the settlement and close the loan. */
+  async settle(loanId: string, request: SettleLoanRequest): Promise<Payment> {
+    return apiRequest(`/loans/${loanId}/settlement`, paymentSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /** What was written off, or `null` when the loan has not been. */
+  async writeOff(loanId: string): Promise<LoanWriteOff | null> {
+    return absentAsNull(apiRequest(`/loans/${loanId}/write-off`, loanWriteOffSchema));
+  },
+
+  async recordWriteOff(loanId: string, request: WriteOffLoanRequest): Promise<LoanWriteOff> {
+    return apiRequest(`/loans/${loanId}/write-off`, loanWriteOffSchema, {
+      method: 'POST',
+      body: request,
+    });
+  },
+
+  /**
+   * Money received after a write-off.
+   *
+   * Not a repayment, and kept away from `payments` for that reason. A recovery
+   * does not reinstate the loan, recreate principal or reopen the schedule.
+   */
+  async recoveries(loanId: string): Promise<LoanRecovery[]> {
+    return apiRequest(`/loans/${loanId}/recoveries`, recoveryListSchema);
+  },
+
+  async recordRecovery(loanId: string, request: RecordRecoveryRequest): Promise<LoanRecovery> {
+    return apiRequest(`/loans/${loanId}/recoveries`, loanRecoverySchema, {
+      method: 'POST',
+      body: request,
     });
   },
 };

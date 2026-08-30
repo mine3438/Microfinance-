@@ -74,6 +74,14 @@ export interface LoanRouteOptions {
   readonly applicationFees: ApplicationFeeRepository;
   readonly settlements: SettlementRepository;
   readonly restructurings: RestructuringRepository;
+  /**
+   * Whether the restructuring endpoints are mounted.
+   *
+   * Off by default, and off means absent: the routes are never registered, so
+   * they answer 404 the way any unknown path does. See RESTRUCT-06 and the
+   * `RESTRUCTURING_ENABLED` note in `config/environment.ts`.
+   */
+  readonly restructuringEnabled?: boolean | undefined;
   readonly tokens: AccessTokenService;
   readonly now?: () => Date;
 }
@@ -107,6 +115,8 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
   const { loans, writeOffs, applicationFees, settlements, restructurings, tokens } = options;
   const now = options.now ?? ((): Date => new Date());
   const authenticated = authenticate(tokens);
+
+  const restructuringEnabled = options.restructuringEnabled ?? false;
 
   /**
    * BOT's loan type taxonomy.
@@ -533,6 +543,21 @@ export function registerLoanRoutes(app: FastifyInstance, options: LoanRouteOptio
    * Nothing is forgiven. The new principal is what the old loan still owed, and
    * the old loan is kept, closed to repayment, and linked to its successor.
    */
+  /**
+   * Restructuring is mounted only when it is explicitly enabled.
+   *
+   * Not a permission check and not a hidden button — the routes do not exist
+   * when the flag is off, so no client, script or curl can reach the operation
+   * however it authenticates. RESTRUCT-06 is unresolved: a successor carries a
+   * disbursement date and MSP2-09 counts loans disbursed in the quarter, while
+   * no cash moves in a restructuring, so an institution filing a return could
+   * overstate disbursements. The implementation below stays intact and tested
+   * against a harness that sets the flag; production leaves it off until the
+   * ruling arrives.
+   */
+  if (!restructuringEnabled) {
+    return;
+  }
   app.post(
     '/loans/:id/restructuring',
     { preHandler: [authenticated, requirePermission('loan.write_off')] },

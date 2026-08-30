@@ -298,6 +298,7 @@ export async function buildServer(dependencies: ServerDependencies): Promise<Fas
     restructurings,
     tokens,
     now,
+    restructuringEnabled: environment.RESTRUCTURING_ENABLED,
   });
   registerPaymentRoutes(app, { payments, tokens });
   registerFinanceRoutes(app, { finance, tokens });

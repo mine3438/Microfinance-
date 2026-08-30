@@ -492,9 +492,41 @@ Option 3 is defensible only if the institution knows it is choosing it. It is
 not this system's decision to make on their behalf, which is why nothing here
 excludes them automatically.
 
-### Nothing has a screen yet
+### The screens, and what they deliberately lack
 
-All six new domains are API-only. No web interface exists for write-off,
-recovery, the application fee, groups, settlement or restructuring. That is
-ordinary outstanding work rather than a blocked dependency — but it means
-"exposing" any of them is a decision still to be taken, not one already made.
+Five of the six domains now have a web interface: **groups and membership**,
+the **application fee and its refund**, **early settlement**, **write-off** and
+**recovery**. Each follows the rule above — every authoritative figure is
+rendered from the response that carried it, and nothing in the browser
+computes a settlement, a balance, a write-off amount or a refund entitlement.
+
+The sixth, restructuring, has no screen, and it is no longer reachable at all.
+
+### How restructuring is withheld
+
+Hiding a button would not have been enough. The endpoints existed and any
+holder of `loan.write_off` — every `institution_admin` — could have reached
+them with a script or a shell, whatever the interface showed. So the guard is
+on the server:
+
+- **`RESTRUCTURING_ENABLED`** is a configuration value that defaults to
+  `false`. When it is off, `registerLoanRoutes` returns before it registers
+  either restructuring route.
+- **Off means absent, not forbidden.** The routes do not exist, so they answer
+  404 like any unknown path. A 403 would have meant the operation was there and
+  the caller lacked something — which a role edit or a new administrator could
+  undo without anyone revisiting RESTRUCT-06.
+- **No permission was changed.** `loan.write_off` also governs write-off, which
+  is safe to expose; withdrawing it would have disabled both. A test asserts
+  write-off still works while restructuring 404s, so that shortcut cannot be
+  taken later by accident.
+- **The implementation is untouched.** `restructuring.test.ts` runs against a
+  harness that sets the flag, so the domain logic stays proven for the day the
+  ruling arrives. `safe-refusals.test.ts` covers the production default.
+- **The client cannot call it either.** There is no endpoint binding, no route
+  and no navigation entry, and `blocked-features.test.tsx` scans the whole
+  source tree to keep it that way — a screen added later cannot quietly become
+  the first half of exposing it.
+
+Group lending needs no such flag: there is no endpoint to withhold, and the
+same source-level test asserts no group identifier ever reaches the loan module.
