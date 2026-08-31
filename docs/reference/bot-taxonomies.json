@@ -1,0 +1,1264 @@
+{
+ "sectors": [
+  "Agriculture",
+  "Fishing",
+  "Forest",
+  "Hunting",
+  "Financial Intermediaries",
+  "Mining and Quarrying",
+  "Manufacturing",
+  "Building and Construction",
+  "Real Estate",
+  "Leasing",
+  "Transport and Communication",
+  "Trade",
+  "Tourism",
+  "Hotels and Restaurants",
+  "Warehousing and Storage",
+  "Electricity",
+  "Gas",
+  "Water",
+  "Education",
+  "Health",
+  "Other Services",
+  "Personal (Private)"
+ ],
+ "loan_types": [
+  {
+   "row": 14,
+   "label": "Business Group Loans"
+  },
+  {
+   "row": 15,
+   "label": "Business Solidarity/Small Group Loans"
+  },
+  {
+   "row": 16,
+   "label": "Business Individual Loans"
+  },
+  {
+   "row": 17,
+   "label": "Agriculture Loans"
+  },
+  {
+   "row": 18,
+   "label": "Housing Microfinance Loans"
+  },
+  {
+   "row": 19,
+   "label": "Microleasing/Hire purchase Loans"
+  },
+  {
+   "row": 20,
+   "label": "Loans to Other Microfinance Service Providers (e.g. SACCOS)"
+  },
+  {
+   "row": 21,
+   "label": "Micro Insurance Loans"
+  },
+  {
+   "row": 22,
+   "label": "Education Loan"
+  },
+  {
+   "row": 23,
+   "label": "Salaried Loans"
+  },
+  {
+   "row": 24,
+   "label": "(a) Government Employees"
+  },
+  {
+   "row": 25,
+   "label": "(b) Non-Government Employees"
+  },
+  {
+   "row": 26,
+   "label": "Emergence Loans"
+  },
+  {
+   "row": 27,
+   "label": "Other Micro Loans"
+  }
+ ],
+ "provisioning_standard": [
+  {
+   "band": "0-5 days",
+   "rate": 0.01
+  },
+  {
+   "band": "6-30 days",
+   "rate": 0.05
+  },
+  {
+   "band": "31-60 days",
+   "rate": 0.25
+  },
+  {
+   "band": "61-90 days",
+   "rate": 0.5
+  },
+  {
+   "band": "> 90 days",
+   "rate": 1.0
+  }
+ ],
+ "provisioning_housing": [
+  {
+   "band": "91-180 days",
+   "rate": 0.25
+  },
+  {
+   "band": "181-360 days",
+   "rate": 0.5
+  },
+  {
+   "band": "> 360 days",
+   "rate": 1.0
+  }
+ ],
+ "classification_columns": [
+  "Current Amount",
+  "ESM",
+  "Substandard",
+  "Doubtful",
+  "Loss"
+ ],
+ "complaint_natures": [
+  "Interest Rate",
+  "Agreements",
+  "Repayments",
+  "Loan Statement",
+  "Loan Processing",
+  "Others"
+ ],
+ "complaint_rows": [
+  "Number of complaints at the beginning of the quarter",
+  "New complaints received during the quarter",
+  "Complaints resolved during the quarter by the institution",
+  "Complaints resolved during the quarter by other parties (eg Courts, Bank of Tanzania, FCC)",
+  "Unresolved complaints at the end of the quarter(1+2-3-4)",
+  "Unresolved complaints referred to Bank of Tanzania",
+  "Unresolved complaints referred to Fair Competition Commission",
+  "Unresolved complaints referred to Courts",
+  "Unresolved complaints referred to Other Parties"
+ ],
+ "banks_list_A": [
+  "NIL",
+  "ABSA BANK TANZANIA LIMITED",
+  "ACCESSBANK (TANZANIA) LIMITED",
+  "AFRICAN BANKING CORPORATION (T) LTD",
+  "AKIBA COMMERCIAL BANK LTD",
+  "ALIOS FINANCE TANZANIA LIMITED",
+  "AMANA BANK LIMITED",
+  "AZANIA BANK LIMITED",
+  "BANK OF BARODA TANZANIA LIMITED",
+  "BANK OF INDIA (TANZANIA) LIMITED",
+  "BANK OF TANZANIA",
+  "BOA BANK",
+  "CANARA BANK TANZANIA LIMITED",
+  "CHINA COMMERCIAL BANK LIMITED",
+  "CHINA DASHENG BANK LIMITED",
+  "CITIBANK (T) LTD",
+  "COMMERCIAL BANK OF AFRICA (T) LIMITED",
+  "CRDB BANK PLC",
+  "DCB COMMERCIAL BANK PLC",
+  "DIAMOND TRUST BANK (T) LTD.",
+  "ECOBANK TANZANIA LIMITED",
+  "EFC M.F.B TANZANIA LIMITED",
+  "EQUITY BANK TANZANIA LIMITED",
+  "EXIM BANK TANZANIA LIMITED",
+  "FINCA M.F.B TANZANIA LIMITED",
+  "FIRST HOUSING FINANCE (TANZANIA) LIMITED",
+  "FIRST NATIONAL BANK TANZANIA LIMITED",
+  "GUARANTY TRUST BANK (TANZANIA) LIMITED",
+  "HABIB AFRICAN BANK",
+  "HAKIKA MICROFINANCE BANK LIMITED",
+  "I & M BANK TANZANIA LIMITED",
+  "INTERNATIONAL COMMERCIAL BANK  (T) LTD.",
+  "KCB BANK TANZANIA LIMITED",
+  "KILIMANJARO COOPERATIVE BANK",
+  "LETSHEGO BANK (T) LIMITED",
+  "MAENDELEO BANK PLC",
+  "MKOMBOZI COMMERCIAL BANK LIMITED",
+  "MUFINDI COMMUNITY BANK LTD",
+  "MWALIMU COMMERCIAL BANK PUBLIC LIMITED COMPANY",
+  "MWANGA RURAL COMMUNITY BANK",
+  "NATIONAL MICROFINANCE BANK (T) LTD.",
+  "NBC LIMITED",
+  "NIC BANK TANZANIA LIMITED",
+  "PEOPLES BANK OF ZANZIBAR",
+  "STANBIC BANK (T) LTD",
+  "STANDARD CHARTERED BANK (T) LTD",
+  "TANDAHIMBA COMMUNITY BANK LTD",
+  "TANZANIA AGRICULTURAL DEVELOPMENT BANK",
+  "TANZANIA MORTGAGE REFINANCE COMPANY LTD",
+  "TANZANIA POSTAL BANK",
+  "TIB CORPORATE FINANCE LIMITED",
+  "TIB DEVELOPMENT BANK LIMITED",
+  "UCHUMI COMMERCIAL BANK LIMITED",
+  "UNITED BANK FOR AFRICA",
+  "VISION FUND TANZANIA M.F.C LIMITED",
+  "YETU MICROFINANCE PLC"
+ ],
+ "banks_list_B_agent": [
+  "NIL",
+  "ABSA BANK TANZANIA LIMITED",
+  "ACCESSBANK (TANZANIA) LIMITED",
+  "AFRICAN BANKING CORPORATION (T) LTD",
+  "AKIBA COMMERCIAL BANK LTD",
+  "AMANA BANK LIMITED",
+  "AZANIA BANK LIMITED",
+  "BANK OF BARODA TANZANIA LIMITED",
+  "BANK OF INDIA (TANZANIA) LIMITED",
+  "BOA BANK",
+  "CANARA BANK TANZANIA LIMITED",
+  "CHINA COMMERCIAL BANK LIMITED",
+  "CHINA DASHENG BANK LIMITED",
+  "CITIBANK (T) LTD",
+  "COMMERCIAL BANK OF AFRICA (T) LIMITED",
+  "CRDB BANK PLC",
+  "DCB COMMERCIAL BANK PLC",
+  "DIAMOND TRUST BANK (T) LTD.",
+  "ECOBANK TANZANIA LIMITED",
+  "EFC M.F.B TANZANIA LIMITED",
+  "EQUITY BANK TANZANIA LIMITED",
+  "EXIM BANK TANZANIA LIMITED",
+  "FINCA M.F.B TANZANIA LIMITED",
+  "FIRST NATIONAL BANK TANZANIA LIMITED",
+  "GUARANTY TRUST BANK (TANZANIA) LIMITED",
+  "HABIB AFRICAN BANK",
+  "HAKIKA MICROFINANCE BANK LIMITED",
+  "I & M BANK TANZANIA LIMITED",
+  "INTERNATIONAL COMMERCIAL BANK  (T) LTD.",
+  "KCB BANK TANZANIA LIMITED",
+  "KILIMANJARO COOPERATIVE BANK",
+  "LETSHEGO BANK (T) LIMITED",
+  "MAENDELEO BANK PLC",
+  "MKOMBOZI COMMERCIAL BANK LIMITED",
+  "MUFINDI COMMUNITY BANK LTD",
+  "MWALIMU COMMERCIAL BANK PUBLIC LIMITED COMPANY",
+  "MWANGA RURAL COMMUNITY BANK",
+  "NATIONAL MICROFINANCE BANK (T) LTD.",
+  "NBC LIMITED",
+  "NIC BANK TANZANIA LIMITED",
+  "PEOPLES BANK OF ZANZIBAR",
+  "STANBIC BANK (T) LTD",
+  "STANDARD CHARTERED BANK (T) LTD",
+  "TANDAHIMBA COMMUNITY BANK LTD",
+  "TANZANIA AGRICULTURAL DEVELOPMENT BANK",
+  "TANZANIA POSTAL BANK",
+  "TIB CORPORATE FINANCE LIMITED",
+  "TIB DEVELOPMENT BANK LIMITED",
+  "UCHUMI COMMERCIAL BANK LIMITED",
+  "UNITED BANK FOR AFRICA",
+  "VISION FUND TANZANIA M.F.C LIMITED",
+  "YETU MICROFINANCE PLC"
+ ],
+ "mnos": [
+  "MPESA",
+  "AIRTEL MONEY",
+  "T-PESA",
+  "HALOPESA",
+  "TIGOPESA",
+  "ZPESA"
+ ],
+ "msp2_07_sections": {
+  "banks_tz": "rows 15-42",
+  "msps": "rows 45-58",
+  "mnos": "rows 61-66",
+  "banks_abroad": "rows 72-77"
+ },
+ "geography": [
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Arusha",
+   "districts": [
+    "Arusha CC",
+    "Arusha DC",
+    "Karatu",
+    "Longido DC",
+    "Meru",
+    "Monduli",
+    "Ngorongoro"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Dar Es Salaam",
+   "districts": [
+    "Ilala MC",
+    "Kigamboni MC",
+    "Kinondoni MC",
+    "Temeke MC",
+    "Ubungo MC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Dodoma",
+   "districts": [
+    "Bahi DC",
+    "Chamwino DC",
+    "Chemba DC",
+    "Dodoma CC",
+    "Kondoa DC",
+    "Kondoa TC",
+    "Kongwa DC",
+    "Mpwapwa DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Geita",
+   "districts": [
+    "Bukombe",
+    "Chato DC",
+    "Geita DC",
+    "Geita TC",
+    "Mbogwe DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Iringa",
+   "districts": [
+    "Iringa DC",
+    "Iringa MC",
+    "Kilolo DC",
+    "Mafinga TC",
+    "Mufindi DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Kagera",
+   "districts": [
+    "Biharamulo DC",
+    "Bukoba DC",
+    "Bukoba MC",
+    "Karagwe DC",
+    "Kyerwa DC",
+    "Missenyi DC",
+    "Muleba DC",
+    "Ngara DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Katavi",
+   "districts": [
+    "Mlele DC",
+    "Mpanda DC",
+    "Mpanda MC",
+    "Mpimbwe DC",
+    "Nsimbo DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Kigoma",
+   "districts": [
+    "Buhigwe DC",
+    "Kakonko DC",
+    "Kasulu DC",
+    "Kasulu TC",
+    "Kibondo DC",
+    "Kigoma DC",
+    "Kigoma MC",
+    "Uvinza DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Kilimanjaro",
+   "districts": [
+    "Hai DC",
+    "Moshi DC",
+    "Moshi MC",
+    "Mwanga DC",
+    "Rombo DC",
+    "Same DC",
+    "Siha DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Lindi",
+   "districts": [
+    "Kilwa DC",
+    "Lindi DC",
+    "Lindi MC",
+    "Liwale DC",
+    "Nachingwea DC",
+    "Ruangwa DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Manyara",
+   "districts": [
+    "Babati DC",
+    "Babati TC",
+    "Hanang DC",
+    "Kiteto DC",
+    "Mbulu DC",
+    "Mbulu TC",
+    "Simanjiro DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Mara",
+   "districts": [
+    "Bunda DC",
+    "Bunda TC",
+    "Butiama DC",
+    "Musoma DC",
+    "Musoma MC",
+    "Rorya DC",
+    "Serengeti DC",
+    "Tarime DC",
+    "Tarime TC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Mbeya",
+   "districts": [
+    "Busokelo DC",
+    "Chunya DC",
+    "Kyela DC",
+    "Mbarali DC",
+    "Mbeya CC",
+    "Mbeya DC",
+    "Rungwe DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Morogoro",
+   "districts": [
+    "Gairo DC",
+    "Ifakara TC",
+    "Kilombero DC",
+    "Kilosa DC",
+    "Morogoro DC",
+    "Morogoro MC",
+    "Mvomero DC",
+    "Ulanga DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Mtwara",
+   "districts": [
+    "Masasi DC",
+    "Masasi TC",
+    "Mtwara DC",
+    "Mtwara MC",
+    "Nanyamba TC",
+    "Nanyumbu DC",
+    "Newala DC",
+    "Newala TC",
+    "Tandahimba DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Mwanza",
+   "districts": [
+    "Buchosa DC",
+    "Ilemela MC",
+    "Kwimba DC",
+    "Magu DC",
+    "Misungwi DC",
+    "Sengerema DC",
+    "Ukerewe DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Njombe",
+   "districts": [
+    "Ludewa DC",
+    "Makambako TC",
+    "Makete DC",
+    "Njombe DC",
+    "Njombe TC",
+    "Wanging'ombe DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Pwani",
+   "districts": [
+    "Bagamoyo DC",
+    "Chalinze DC",
+    "Kibaha DC",
+    "Kibaha TC",
+    "Kibiti DC",
+    "Kisarawe DC",
+    "Mafia DC",
+    "Mkuranga DC",
+    "Rufiji DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Rukwa",
+   "districts": [
+    "Kalambo DC",
+    "Nkasi DC",
+    "Sumbawanga DC",
+    "Sumbawanga MC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Ruvuma",
+   "districts": [
+    "Madaba DC",
+    "Mbinga DC",
+    "Mbinga TC",
+    "Namtumbo DC",
+    "Nyasa DC",
+    "Songea DC",
+    "Songea MC",
+    "Tunduru DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Shinyanga",
+   "districts": [
+    "Kahama TC",
+    "Kishapu DC",
+    "Msalala DC",
+    "Shinyanga DC",
+    "Shinyanga MC",
+    "Ushetu DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Simiyu",
+   "districts": [
+    "Bariadi DC",
+    "Bariadi TC",
+    "Busega DC",
+    "Itilima DC",
+    "Maswa DC",
+    "Meatu DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Singida",
+   "districts": [
+    "Ikungi DC",
+    "Iramba DC",
+    "Itigi DC",
+    "Manyoni DC",
+    "Mkalama DC",
+    "Singida DC",
+    "Singida MC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Songwe",
+   "districts": [
+    "Ileje DC",
+    "Mbozi DC",
+    "Momba DC",
+    "Songwe DC",
+    "Tunduma TC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Tabora",
+   "districts": [
+    "Igunga DC",
+    "Kaliua DC",
+    "Nzega DC",
+    "Nzega TC",
+    "Sikonge DC",
+    "Tabora DC",
+    "Tabora MC",
+    "Urambo DC"
+   ]
+  },
+  {
+   "area": "A. Mainland Tanzania",
+   "region": "Tanga",
+   "districts": [
+    "Bumbuli DC",
+    "Handeni DC",
+    "Handeni TC",
+    "Kilindi DC",
+    "Korogwe DC",
+    "Korogwe TC",
+    "Lushoto DC",
+    "Mbulu DC",
+    "Mkinga Dc",
+    "Muheza DC",
+    "Pangani DC",
+    "Tanga CC"
+   ]
+  },
+  {
+   "area": "B. Zanzibar",
+   "region": "Kusini Pemba",
+   "districts": [
+    "Chakechake",
+    "Mkoani"
+   ]
+  },
+  {
+   "area": "B. Zanzibar",
+   "region": "Kaskazini Pemba",
+   "districts": [
+    "Micheweni",
+    "Wete"
+   ]
+  },
+  {
+   "area": "B. Zanzibar",
+   "region": "Mjini Magharibi Unguja",
+   "districts": [
+    "Magharibi A",
+    "Magharibi B",
+    "Mjini"
+   ]
+  },
+  {
+   "area": "B. Zanzibar",
+   "region": "Kaskazini Unguja",
+   "districts": [
+    "Kaskazini A",
+    "Kaskazini B"
+   ]
+  },
+  {
+   "area": "B. Zanzibar",
+   "region": "Kusini Unguja",
+   "districts": [
+    "Kati",
+    "Kusini"
+   ]
+  }
+ ],
+ "msp2_10_dimensions": {
+  "age_bands": [
+   "Up to 35 Years",
+   "Above 35 Years"
+  ],
+  "genders": [
+   "Female",
+   "Male"
+  ],
+  "measures": [
+   "Number of Branches",
+   "Number of Employees",
+   "Compulsory savings",
+   "Number of Borrowers",
+   "Number of Loans",
+   "Outstanding Loans"
+  ]
+ },
+ "msp2_01_lines": [
+  {
+   "sno": "1",
+   "label": "1. CASH AND CASH EQUIVALENTS (sum a:d)",
+   "formula": "=SUM(C15:C16,C19:C20)"
+  },
+  {
+   "sno": "2",
+   "label": "(a) Cash in Hand",
+   "formula": null
+  },
+  {
+   "sno": "3",
+   "label": "(b) Balances with  Banks and Financial Institutions (sum i:ii)",
+   "formula": "=SUM(C17:C18)"
+  },
+  {
+   "sno": "4",
+   "label": "(i) Non-Agent Banking  Balances",
+   "formula": null
+  },
+  {
+   "sno": "5",
+   "label": "(ii) Agent-Banking Balances",
+   "formula": null
+  },
+  {
+   "sno": "6",
+   "label": "(c ) Balances with Microfinance Service Providers",
+   "formula": null
+  },
+  {
+   "sno": "7",
+   "label": "(d) MNOs Float  Balances",
+   "formula": null
+  },
+  {
+   "sno": "8",
+   "label": "2. INVESTMENT IN DEBT SECURITIES - NET (Sum a:d minus e)",
+   "formula": "=SUM(C22:C25)-C26"
+  },
+  {
+   "sno": "9",
+   "label": "(a )Treasury Bills",
+   "formula": null
+  },
+  {
+   "sno": "10",
+   "label": "(b) Other Government Securities",
+   "formula": null
+  },
+  {
+   "sno": "11",
+   "label": "(c) Private Securities",
+   "formula": null
+  },
+  {
+   "sno": "12",
+   "label": "(d) Others",
+   "formula": null
+  },
+  {
+   "sno": "13",
+   "label": "(e) Allowance for Probable Losses (Deduction)",
+   "formula": null
+  },
+  {
+   "sno": "14",
+   "label": "3. EQUITY INVESTMENTS - NET (a - b)",
+   "formula": "=C28-C29"
+  },
+  {
+   "sno": "15",
+   "label": "(a) Equity Investment",
+   "formula": null
+  },
+  {
+   "sno": "16",
+   "label": "(b) Allowance for Probable Losses (Deduction)",
+   "formula": null
+  },
+  {
+   "sno": "17",
+   "label": "4. LOANS - NET (sum a:d less e)",
+   "formula": "=C31+C32+C33+C34-C35"
+  },
+  {
+   "sno": "18",
+   "label": "(a) Loans to Clients",
+   "formula": null
+  },
+  {
+   "sno": "19",
+   "label": "(b) Loan to Staff and Related Parties",
+   "formula": null
+  },
+  {
+   "sno": "20",
+   "label": "(c)Loans to other Microfinance Service Providers",
+   "formula": null
+  },
+  {
+   "sno": "21",
+   "label": "(d) Accrued Interest on Loans",
+   "formula": null
+  },
+  {
+   "sno": "22",
+   "label": "(e) Allowances for Probable Losses (Deduction)",
+   "formula": null
+  },
+  {
+   "sno": "23",
+   "label": "5. PROPERTY, PLANT AND EQUIPMENT -NET (a -b)",
+   "formula": "=C37-C38"
+  },
+  {
+   "sno": "24",
+   "label": "(a) Property, Plant and Equipment",
+   "formula": null
+  },
+  {
+   "sno": "25",
+   "label": "(b) Accumulated Depreciation (Deduction)",
+   "formula": null
+  },
+  {
+   "sno": "26",
+   "label": "6. OTHER ASSETS (sum a:e less f)",
+   "formula": "=SUM(C40:C44)-C45"
+  },
+  {
+   "sno": "27",
+   "label": "(a) Receivables",
+   "formula": null
+  },
+  {
+   "sno": "28",
+   "label": "(b) Prepaid Expenses",
+   "formula": null
+  },
+  {
+   "sno": "29",
+   "label": "(c )Deffered Tax Assets",
+   "formula": null
+  },
+  {
+   "sno": "30",
+   "label": "(d )Intangible Assets",
+   "formula": null
+  },
+  {
+   "sno": "31",
+   "label": "(e) Miscellaneous Assets",
+   "formula": null
+  },
+  {
+   "sno": "32",
+   "label": "(f) Allowance for Probable Losses  (Deduction)",
+   "formula": null
+  },
+  {
+   "sno": "33",
+   "label": "7. TOTAL ASSETS",
+   "formula": "=C14+C21+C27+C30+C36+C39"
+  },
+  {
+   "sno": "34",
+   "label": "8. LIABILITIES",
+   "formula": null
+  },
+  {
+   "sno": "35",
+   "label": "9.  BORROWINGS (sum a:b)",
+   "formula": "=C49+C55"
+  },
+  {
+   "sno": "36",
+   "label": "(a)Borrowings in Tanzania (sum i:v)",
+   "formula": "=SUM(C50:C54)"
+  },
+  {
+   "sno": "37",
+   "label": "(i) Borrowings from Banks and Financial Institutions",
+   "formula": null
+  },
+  {
+   "sno": "38",
+   "label": "(ii) Borrowings from Other Microfinance Service Providers",
+   "formula": null
+  },
+  {
+   "sno": "39",
+   "label": "(iii) Borrowing from Shareholders",
+   "formula": null
+  },
+  {
+   "sno": "40",
+   "label": "(iv) Borrowing from Public through Debt Securities",
+   "formula": null
+  },
+  {
+   "sno": "41",
+   "label": "(v) Other Borrowings",
+   "formula": null
+  },
+  {
+   "sno": "42",
+   "label": "(b)Borrowings from Abroad (sum i:iii)",
+   "formula": "=SUM(C56:C58)"
+  },
+  {
+   "sno": "43",
+   "label": "(i) Borrowings from Banks and Financial Institutions",
+   "formula": null
+  },
+  {
+   "sno": "44",
+   "label": "(ii) Borrowing from Shareholders",
+   "formula": null
+  },
+  {
+   "sno": "45",
+   "label": "(iii) Other Borrowings",
+   "formula": null
+  },
+  {
+   "sno": "46",
+   "label": "10. CASH COLLATERAL/LOAN INSURANCE GUARANTEES/COMPULSORY SAVINGS",
+   "formula": null
+  },
+  {
+   "sno": "47",
+   "label": "11.TAX PAYABLES",
+   "formula": null
+  },
+  {
+   "sno": "48",
+   "label": "12. DIVIDEND PAYABLES",
+   "formula": null
+  },
+  {
+   "sno": "49",
+   "label": "13. OTHER PAYABLES AND ACCRUALS",
+   "formula": null
+  },
+  {
+   "sno": "50",
+   "label": "14. TOTAL LIABILITIES (sum 9:13)",
+   "formula": "=C48+C59+C60+C61+C62"
+  },
+  {
+   "sno": "51",
+   "label": "15. TOTAL CAPITAL (sum a:i)",
+   "formula": "=SUM(C65:C73)"
+  },
+  {
+   "sno": "52",
+   "label": "(a) Paid-up Ordinary Share Capital",
+   "formula": null
+  },
+  {
+   "sno": "53",
+   "label": "(b) Paid-up Preference Shares",
+   "formula": null
+  },
+  {
+   "sno": "54",
+   "label": "(c) Capital Grants",
+   "formula": null
+  },
+  {
+   "sno": "55",
+   "label": "(d) Donations",
+   "formula": null
+  },
+  {
+   "sno": "56",
+   "label": "(e) Share Premium",
+   "formula": null
+  },
+  {
+   "sno": "57",
+   "label": "(f) General Reserves",
+   "formula": null
+  },
+  {
+   "sno": "58",
+   "label": "(g) Retained Earnings",
+   "formula": null
+  },
+  {
+   "sno": "59",
+   "label": "(h) Profit/Loss",
+   "formula": null
+  },
+  {
+   "sno": "60",
+   "label": "(i) Other Reserves",
+   "formula": null
+  },
+  {
+   "sno": "61",
+   "label": "16. TOTAL LIABILITIES AND CAPITAL (14+15)",
+   "formula": "=C63+C64"
+  }
+ ],
+ "msp2_02_lines": [
+  {
+   "sno": "1",
+   "label": "1. INTEREST INCOME",
+   "formula": "=SUM(C15:C19)"
+  },
+  {
+   "sno": "2",
+   "label": "a. Interest - Loans to Clients",
+   "formula": null
+  },
+  {
+   "sno": "3",
+   "label": "b. Interest - Loans to Microfinance Service Providers",
+   "formula": null
+  },
+  {
+   "sno": "4",
+   "label": "c. Interest - Investments in Govt Securities",
+   "formula": null
+  },
+  {
+   "sno": "5",
+   "label": "d. Interest - Bank Deposits",
+   "formula": null
+  },
+  {
+   "sno": "6",
+   "label": "e. Interest - Others",
+   "formula": null
+  },
+  {
+   "sno": "7",
+   "label": "2. INTEREST EXPENSE",
+   "formula": "=SUM(C21:C25)"
+  },
+  {
+   "sno": "8",
+   "label": "a. Interest - Borrowings  from Banks & Financial Institutions in Tanzania",
+   "formula": null
+  },
+  {
+   "sno": "9",
+   "label": "b. Interest - Borrowing from Microfinance Service Providers in Tanzania",
+   "formula": null
+  },
+  {
+   "sno": "10",
+   "label": "c. Interest - Borrowings from Abroad",
+   "formula": null
+  },
+  {
+   "sno": "11",
+   "label": "d. Interest - Borrowing from Shareholders",
+   "formula": null
+  },
+  {
+   "sno": "12",
+   "label": "e. Interest - Others",
+   "formula": null
+  },
+  {
+   "sno": "13",
+   "label": "3. NET INTEREST INCOME (1 less 2)",
+   "formula": "=C14-C20"
+  },
+  {
+   "sno": "14",
+   "label": "4. BAD DEBTS WRITTEN OFF NOT PROVIDED FOR",
+   "formula": null
+  },
+  {
+   "sno": "15",
+   "label": "5. PROVISION FOR BAD AND DOUBTFUL DEBTS",
+   "formula": null
+  },
+  {
+   "sno": "16",
+   "label": "6. NON-INTEREST INCOME",
+   "formula": "=SUM(C30:C35)"
+  },
+  {
+   "sno": "17",
+   "label": "a. Commisions",
+   "formula": null
+  },
+  {
+   "sno": "18",
+   "label": "b.  Fees",
+   "formula": null
+  },
+  {
+   "sno": "19",
+   "label": "c.  Rental Income on Premises",
+   "formula": null
+  },
+  {
+   "sno": "20",
+   "label": "d.  Dividends on Equity Investment",
+   "formula": null
+  },
+  {
+   "sno": "21",
+   "label": "e.  Income from Recovery of Charged off Assets and Acquired Assets",
+   "formula": null
+  },
+  {
+   "sno": "22",
+   "label": "f.  Other Income",
+   "formula": null
+  },
+  {
+   "sno": "23",
+   "label": "7. NON-INTEREST EXPENSES",
+   "formula": "=SUM(C37:C52)"
+  },
+  {
+   "sno": "24",
+   "label": "a. Managements' Salaries and Benefits",
+   "formula": null
+  },
+  {
+   "sno": "25",
+   "label": "b. Employees' Salaries and Benefits",
+   "formula": null
+  },
+  {
+   "sno": "26",
+   "label": "c. Wages",
+   "formula": null
+  },
+  {
+   "sno": "27",
+   "label": "d. Pensions Contributions",
+   "formula": null
+  },
+  {
+   "sno": "28",
+   "label": "e. Skills and Development Levy",
+   "formula": null
+  },
+  {
+   "sno": "29",
+   "label": "f. Rental Expense on Premises and Equipment",
+   "formula": null
+  },
+  {
+   "sno": "30",
+   "label": "g. Depreciation - Premises and Equipment",
+   "formula": null
+  },
+  {
+   "sno": "31",
+   "label": "h. Amortization - Leasehold Rights and Equipments",
+   "formula": null
+  },
+  {
+   "sno": "32",
+   "label": "i. Foreclosure  and Litigation Expenses",
+   "formula": null
+  },
+  {
+   "sno": "33",
+   "label": "j. Management Fees",
+   "formula": null
+  },
+  {
+   "sno": "34",
+   "label": "k. Auditors Fees",
+   "formula": null
+  },
+  {
+   "sno": "35",
+   "label": "l. Taxes",
+   "formula": null
+  },
+  {
+   "sno": "36",
+   "label": "m. License Fees",
+   "formula": null
+  },
+  {
+   "sno": "37",
+   "label": "n. Insurance",
+   "formula": null
+  },
+  {
+   "sno": "38",
+   "label": "o. Utilities Expenses",
+   "formula": null
+  },
+  {
+   "sno": "39",
+   "label": "p. Other Non-Interest Expenses",
+   "formula": null
+  },
+  {
+   "sno": "40",
+   "label": "8. NET INCOME / (LOSS) BEFORE INCOME TAX (3+6 Less 4,5 and 7)",
+   "formula": "=C26+C29-SUM(C27:C28,C36)"
+  },
+  {
+   "sno": "41",
+   "label": "9. INCOME TAX PROVISION",
+   "formula": null
+  },
+  {
+   "sno": "42",
+   "label": "10. NET INCOME / (LOSS) AFTER INCOME TAX (8 less 9)",
+   "formula": "=C53-C54"
+  }
+ ],
+ "validations": [
+  {
+   "form": "MSP2-01",
+   "rule": "Sno33 (Total Assets) = Sno61 (Total Liabilities and Capital)"
+  },
+  {
+   "form": "MSP2-02",
+   "rule": "Sno42 YTD (Net Income after Tax) = MSP2-01 Sno59 (Profit/Loss)"
+  },
+  {
+   "form": "MSP2-03",
+   "rule": "Sno67 col C (Total Borrowers) = MSP2-04 Sno15 col C (Total Borrowers)"
+  },
+  {
+   "form": "MSP2-04",
+   "rule": "Sno15 col D (Total Outstanding) = MSP2-01 Sno17 (Loans-Net) + Sno22 (Allowance)"
+  },
+  {
+   "form": "MSP2-05",
+   "rule": "Sno2=MSP2-01 Sno2; Sno3=MSP2-01 Sno3; Sno4=MSP2-01 Sno6; Sno5=MSP2-01 Sno7"
+  },
+  {
+   "form": "MSP2-05",
+   "rule": "Liquid Asset Ratio = A/B; Required Minimum = 5% of Total Assets"
+  },
+  {
+   "form": "MSP2-06",
+   "rule": "For each row: col C (Number) = sum of nature columns E..J"
+  },
+  {
+   "form": "MSP2-06",
+   "rule": "Sno5 (Unresolved at end) = Sno1 + Sno2 - Sno3 - Sno4"
+  },
+  {
+   "form": "MSP2-07",
+   "rule": "Sno30 col H = MSP2-01 Sno37 (Borrowings from Banks/FI in TZ)"
+  },
+  {
+   "form": "MSP2-07",
+   "rule": "Sno46 col E = MSP2-01 Sno6; Sno46 col H = MSP2-01 Sno38"
+  },
+  {
+   "form": "MSP2-07",
+   "rule": "Sno56 col E = MSP2-01 Sno7 (MNO float)"
+  },
+  {
+   "form": "MSP2-07",
+   "rule": "Sno57 col E = MSP2-01 Sno3 + Sno6 + Sno7"
+  },
+  {
+   "form": "MSP2-07",
+   "rule": "Sno65 col H = MSP2-01 Sno43 (Borrowings from Banks abroad)"
+  },
+  {
+   "form": "MSP2-07",
+   "rule": "Sno66 col E = MSP2-01 Sno3 (Balances with Banks)"
+  },
+  {
+   "form": "MSP2-08",
+   "rule": "Sno30 (Total agent banking balances) = MSP2-01 Sno5 (Agent-Banking Balances)"
+  },
+  {
+   "form": "MSP2-10",
+   "rule": "Sno229 col E (Grand total compulsory savings) = MSP2-01 Sno46 (Cash Collateral/Loan Insurance/Compulsory Savings)"
+  },
+  {
+   "form": "MSP2-03",
+   "rule": "Per sector: Total Outstanding = Current + ESM + Substandard + Doubtful + Loss"
+  },
+  {
+   "form": "MSP2-03",
+   "rule": "NPL ratio = (Substandard + Doubtful + Loss) / Total Outstanding * 100"
+  }
+ ]
+}

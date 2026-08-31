@@ -1,0 +1,51 @@
+{
+  "name": "mfi-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Microfinance management and Bank of Tanzania MSP2 regulatory reporting platform",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "typecheck": "tsc --build --force && pnpm -r --if-present typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r --if-present test",
+    "test:coverage": "pnpm -r --if-present test:coverage",
+    "db:migrate": "pnpm --filter @mfi/migrator build && node packages/migrator/dist/cli.js migrate",
+    "db:status": "pnpm --filter @mfi/migrator build && node packages/migrator/dist/cli.js status",
+    "db:verify": "pnpm --filter @mfi/migrator build && node packages/migrator/dist/cli.js verify",
+    "classify": "pnpm --filter @mfi/api build && node apps/api/dist/jobs/classify-main.js",
+    "accrue-penalties": "pnpm --filter @mfi/api build && node apps/api/dist/jobs/accrue-penalties-main.js",
+    "services:up": "./scripts/services.sh up",
+    "services:down": "./scripts/services.sh down",
+    "verify": "pnpm format:check && pnpm build && pnpm lint && pnpm typecheck && pnpm test",
+    "seed:dev": "node scripts/seed-dev.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@mfi/identity": "workspace:*",
+    "@mfi/migrator": "workspace:*",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "pdfkit": "^0.19.1",
+    "pg": "^8.22.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

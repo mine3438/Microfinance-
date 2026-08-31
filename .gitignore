@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test output
+coverage/
+.vitest/
+
+# Environment — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Local service state
+.data/
+*.log
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Redis snapshot, written into the working directory when redis-server is
+# started here for the test suites.
+dump.rdb

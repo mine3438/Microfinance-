@@ -1,0 +1,40 @@
+# Local development services.
+#
+# Postgres is pinned to 16 to match the target deployment: `NUMERIC` semantics
+# and RLS behaviour are what the financial and tenancy tests assert against, so
+# the local version must not drift from production.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mfi-postgres
+    environment:
+      POSTGRES_USER: mfi
+      POSTGRES_PASSWORD: mfi_local_dev
+      POSTGRES_DB: mfi_manager
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U mfi -d mfi_manager']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: mfi-redis
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:

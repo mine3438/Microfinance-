@@ -1,0 +1,45 @@
+{
+  "name": "@mfi/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "HTTP interface. Translates requests into use cases and use-case results into responses; holds no business rules of its own.",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "dev": "node --watch --experimental-strip-types src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc -p tsconfig.json",
+    "pretest": "pnpm --filter \"@mfi/api^...\" build",
+    "classify": "node dist/jobs/classify-main.js",
+    "accrue-penalties": "node dist/jobs/accrue-penalties-main.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/cors": "^11.1.0",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/rate-limit": "^11.2.0",
+    "@mfi/contracts": "workspace:*",
+    "@mfi/db": "workspace:*",
+    "@mfi/domain": "workspace:*",
+    "@mfi/identity": "workspace:*",
+    "@mfi/money": "workspace:*",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.11.3",
+    "ioredis": "^5.11.1",
+    "jose": "^6.2.8",
+    "pdfkit": "^0.19.1",
+    "pg": "^8.22.0",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@mfi/migrator": "workspace:*",
+    "@types/pdfkit": "^0.17.6",
+    "@types/pg": "^8.11.10",
+    "light-my-request": "^6.6.0"
+  }
+}
