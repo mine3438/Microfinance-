@@ -64,231 +64,247 @@ const SECTIONS = [
     blurb:
       'Policy decisions belonging to the microfinance service provider. None can be ' +
       'inferred from the supplied documentation, and each governs money owed by or to ' +
-      'a borrower.',
+      'a borrower, or who may hold an account.',
     questions: [
-      {
-        ref: 'SHARES-01…06 · §13.5',
-        title: 'Shares',
-        question:
-          'What is the par value of a share? What rules govern subscription? Are shares ' +
-          'transferable between members? What is the dividend declaration process? Are ' +
-          'shares withdrawable?',
-        why:
-          'Shares are members’ capital. Treating a withdrawable share as permanent capital ' +
-          'overstates capital adequacy; declaring a dividend under the wrong rule distributes ' +
-          'money that was not earned.',
-        blocks:
-          'The shares module entirely. The permissions share.read and share.manage exist and ' +
-          'enforce nothing.',
-        current:
-          'Nothing is built — no table, no screen, no arithmetic. The MSP2 shares line reports ' +
-          'nil, which is correct: the institution holds no shares in this system. There is no ' +
-          'partial implementation to mislead anyone.',
-        needs: 'All five answers, plus the Bank of Tanzania’s expected treatment on MSP2-01.',
-      },
-      {
-        ref: 'GROUP-01…04 · §13.6',
-        title: 'Group lending',
-        question:
-          'Is liability fully joint, or several? Does a group loan disburse to the group or ' +
-          'to members individually? What are the group guarantee rules? How is a default ' +
-          'handled?',
-        why:
-          'Liability decides who owes what after a default, which decides classification and ' +
-          'provisioning, which decides the whole of MSP2-03 for those loans.',
-        blocks: 'Groups entirely — membership, joint-liability arithmetic, group disbursement.',
-        current:
-          'No group tables and no group code. A loan to a member of a group is an ordinary loan ' +
-          'to that borrower, which is accurate under several liability and would need revisiting ' +
-          'under joint liability. BOT’s loan-type taxonomy already carries group headings, so ' +
-          'such a loan can be reported; what does not exist is any group entity.',
-        needs: 'The liability model first. The other three answers follow from it.',
-      },
-      {
-        ref: 'FEE-01…03 · §13.8',
-        title: 'Loan fees',
-        question:
-          'What qualifies as a fee? When is it charged? Is it refundable? How does it interact ' +
-          'with settlement and repayment?',
-        why:
-          'A fee is money the borrower owes that is neither interest nor principal, so it ' +
-          'changes both the outstanding balance and the income statement.',
-        blocks: 'Fee accrual. Nothing charges a fee.',
-        current:
-          'The payment allocator has a fee bucket in a fixed position — second, after penalties ' +
-          'and before interest — and it allocates nil. The position is deliberate and must not ' +
-          'move: introducing the bucket later at a different point in the order would ' +
-          'retrospectively change how every payment already recorded would have been split.',
-        needs: 'A definition of a fee and a charging trigger. The bucket is already in place.',
-      },
-      {
-        ref: 'SETTLE-01…04 · §13.8',
-        title: 'Early settlement',
-        question:
-          'Does a settlement discount apply? What happens to future interest, to accrued ' +
-          'penalties, and to fees? Which date governs the settlement figure?',
-        why:
-          'Future-interest treatment alone can change a settlement figure by the entire ' +
-          'remaining interest of the loan.',
-        blocks: 'Any “settle this loan today” operation.',
-        current:
-          'No settlement endpoint exists. A borrower paying off early records ordinary ' +
-          'repayments, which reduce the balance exactly as they otherwise would. Nothing is ' +
-          'waived and nothing is discounted, because no rule says anything should be.',
-        needs:
-          'All five answers. A partial answer produces a partial settlement figure, which is ' +
-          'worse than none.',
-      },
-      {
-        ref: 'RESTRUCT-01…05 · §13.8',
-        title: 'Restructuring',
-        question:
-          'What makes a loan eligible? Who approves it? What happens to accrued interest, to ' +
-          'penalties, to fees, and to outstanding principal? What becomes of the old schedule, ' +
-          'and how is the new one generated? What is the accounting treatment? What is the ' +
-          'reporting treatment?',
-        why: 'A restructure rewrites a live loan’s schedule. Done without a rule, it rewrites history.',
-        blocks: 'Any restructure operation.',
-        current:
-          'Nothing exists — no partial workflow that could half-apply and leave a loan ' +
-          'inconsistent. The loan status machine has no restructured state and no transition ' +
-          'to one.',
-        needs:
-          'All nine answers, plus the Bank of Tanzania’s view on whether a restructured loan ' +
-          'resets its classification.',
-      },
-      {
-        ref: 'RECOVERY-01 · WRITEOFF-01',
-        title: 'Write-offs and recoveries',
-        question:
-          'Is a recovery on a written-off loan a repayment, separate income, or a reinstatement ' +
-          'of the loan? And separately: who may write a loan off, at what point, and what ' +
-          'happens to accrued interest, penalties and any provision already raised?',
-        why:
-          'It decides which line of MSP2-02 the money appears on, and whether the loan returns ' +
-          'to the book.',
-        blocks:
-          'Recording a recovery — and writing a loan off at all. There is no write-off ' +
-          'operation in the application; the status is reachable only by a direct database ' +
-          'change. The two are one decision.',
-        current:
-          'A payment against a written-off loan is refused, with a message naming the status. ' +
-          'Written-off is terminal in the status machine — there is no transition out of it. A ' +
-          'recovery therefore cannot be quietly recorded as an ordinary repayment, which would ' +
-          'put money on a return under a heading nobody chose.',
-        needs:
-          'The accounting treatment, then a dedicated operation. Not a relaxation of the ' +
-          'current refusal. Note that BOT’s own MSP2-02 taxonomy already carries both a ' +
-          'bad-debts-written-off line (Sno 14) and an income-from-recovery line (Sno 21), ' +
-          'which suggests income rather than repayment — but says nothing about whether the ' +
-          'loan is reinstated or the borrower’s balance moves.',
-      },
       {
         ref: 'IDENTITY-01',
         title: 'Cross-institution staff identity',
-        question: 'May one person hold staff accounts at two different institutions?',
+        question:
+          'May one person hold accounts at two institutions on this platform, using the ' +
+          'same email address?',
         why:
-          'Email identifies a user at login, before any institution is known, so the address ' +
-          'must be unique across the whole system. An address therefore belongs to exactly one ' +
-          'institution, for all time.',
-        blocks: 'Nothing today. It is a limit somebody will eventually meet.',
+          'Email addresses are the sign-in identifier and are globally unique, so today the ' +
+          'second institution cannot invite someone the first has already onboarded. Relaxing ' +
+          'it means one credential reaching two institutions’ data, which is a tenancy ' +
+          'decision, not a convenience.',
+        blocks: 'Nothing that exists. It sets whether an invitation can ever be issued twice.',
         current:
-          'Inviting an address that already has an account anywhere is refused. Within the ' +
-          'institution the refusal is specific and useful. Across institutions it is a generic ' +
-          'conflict that names no table, no institution and no person.',
+          'Refused. Email addresses are globally unique, and the second invitation is declined ' +
+          'with a message saying so rather than silently creating a duplicate identity.',
         needs:
-          'If the answer is yes: a membership table separating identity from institution. That ' +
-          'is a schema and login change, not a small one.',
+          'A yes or no. If yes, the sign-in identifier has to become the pair of email and ' +
+          'institution, which is a schema change and not a setting.',
+      },
+    ],
+  },
+  {
+    title: 'Questions for the institution’s accountant',
+    blurb:
+      'The business rule in each case is already decided and built. What is missing is only ' +
+      'the journal mapping — which accounts each event posts to. None of these needs the ' +
+      'Bank of Tanzania: they can be answered in-house, and until they are, the bookkeeping ' +
+      'for four working features is manual.',
+    questions: [
+      {
+        ref: 'FEE-04 · §13.8',
+        title: 'Application fee — collection, retention and refund',
+        question:
+          'Which accounts does the TZS 5,000 application fee post to when it is collected, ' +
+          'when it is retained on approval, and when it is refunded after a rejection?',
+        why:
+          'MSP2-02 identifies Fees under non-interest income as fees charged in day-to-day ' +
+          'operations, which is where a retained fee plainly belongs. But the fee is ' +
+          'refundable until the application is decided, so between collection and decision it ' +
+          'is not income — it is money held.',
+        blocks: 'The journal posting only. Nothing else waits on this.',
+        current:
+          'Every collection and refund is recorded and traceable, with the collection record ' +
+          'kept intact when a refund is made. No journal entry is written and none is claimed ' +
+          'on screen.',
+        needs:
+          'A chart-of-accounts mapping for three events: money taken, money retained as ' +
+          'income, money handed back.',
+      },
+      {
+        ref: 'WRITEOFF-02 · §13.8',
+        title: 'Write-off — provided-for versus not',
+        question:
+          'Which accounts does a write-off post to, and does the treatment differ for the ' +
+          'part already provided for?',
+        why:
+          'BOT distinguishes bad debts written off (MSP2-02, Sno 14) from the provision line. ' +
+          'A write-off posted as though nothing had been provided would double-count the loss.',
+        blocks: 'The journal posting only. Write-off itself works and is in use.',
+        current:
+          'The write-off record keeps principal and penalty separately and captures both at ' +
+          'the instant of the decision, so either treatment can be posted afterwards against ' +
+          'write-offs that have already happened.',
+        needs:
+          'A journal mapping, and a statement of whether the provided-for portion is treated ' +
+          'differently from the rest.',
+      },
+      {
+        ref: 'RECOVERY-02 · §13.8',
+        title: 'Recovery income on a written-off loan',
+        question: 'Which accounts does money recovered after a write-off post to?',
+        why:
+          'MSP2-02 carries a recoveries line (Sno 21). A recovery is not repayment income — ' +
+          'the debt it relates to has already been written off — so posting it as a repayment ' +
+          'would overstate interest income and understate recoveries.',
+        blocks: 'The journal posting, and wiring MSP2-02 Sno 21 to consume these records.',
+        current:
+          'Recoveries are recorded in their own table with amount, date, method and loan, ' +
+          'never as payments. The loan stays written off and no balance is restored.',
+        needs: 'A journal mapping, and confirmation that Sno 21 is the intended line.',
+      },
+      {
+        ref: 'RESTRUCT-04 · §13.8',
+        title: 'Capitalised interest and penalties on a restructuring',
+        question:
+          'Which accounts does the capitalisation of unpaid interest and penalties into a new ' +
+          'principal post to?',
+        why:
+          'Capitalising recognises as an asset what was previously an accrual. No supplied ' +
+          'document establishes the entries for that.',
+        blocks:
+          'The journal posting. Restructuring is also withheld for a separate reason — see ' +
+          'RESTRUCT-06.',
+        current:
+          'The restructuring record keeps principal carried, interest capitalised and ' +
+          'penalties capitalised as three separate figures, because a total cannot be ' +
+          'decomposed after the fact.',
+        needs: 'A journal mapping for capitalisation.',
       },
     ],
   },
   {
     title: 'Questions for the Bank of Tanzania',
     blurb:
-      'Interpretation questions about the MSP2 return. Each is held as an explicit parameter ' +
-      'and the convention actually used is printed on the compiled form, so whichever answer ' +
-      'arrives, what was filed remains auditable.',
+      'Each of these decides a figure on a filed return. Where the answer is unknown the ' +
+      'system either refuses to guess or requires the caller to state the assumption ' +
+      'explicitly, so that no return is compiled on an invented rule.',
     questions: [
+      {
+        ref: 'GROUP-05 · §13.6',
+        title: 'How a group loan is reported',
+        question:
+          'On MSP2-03, MSP2-09 and MSP2-10, what sector, gender, age band and district does ' +
+          'a loan report when the borrower is a group rather than a person?',
+        why:
+          'Every exposure query reaches those four attributes through the individual borrower ' +
+          'on the loan. A group has no single sector, gender, age or district, so a group loan ' +
+          'would be silently dropped from all three forms — understating the loan book on a ' +
+          'filed return.',
+        blocks:
+          'Lending to a group. The liability model itself is decided: the group is the ' +
+          'borrower, liability is joint, one disbursement, one schedule, one balance.',
+        current:
+          'Groups and membership are built and in use as an administrative record. The loans ' +
+          'table is untouched — there is no group borrower and no endpoint that lends to one — ' +
+          'so no group loan can exist to be misreported.',
+        needs:
+          'Either the four attributes for a group borrower, or a rule for deriving them from ' +
+          'the membership, or confirmation that group loans report on a different basis.',
+      },
+      {
+        ref: 'RESTRUCT-06 · §13.8',
+        title: 'Is a restructured facility a disbursement?',
+        question:
+          'Does MSP2-09 count a restructured facility as a disbursement in the quarter it ' +
+          'takes effect, when no cash moves?',
+        why:
+          'MSP2-09 counts every loan whose disbursement date falls in the quarter. A ' +
+          'restructuring creates a successor loan carrying a disbursement date, but no money ' +
+          'leaves the institution — so counting it would overstate lending.',
+        blocks:
+          'Putting restructuring in front of staff. The operation itself is built and tested.',
+        current:
+          'Restructuring is withheld rather than exposed. The endpoints are not mounted unless ' +
+          'a deployment sets RESTRUCTURING_ENABLED, which defaults to off, so they answer as ' +
+          'an unknown path — absent, not merely forbidden. There is no screen for it. The ' +
+          'restructuring link is recorded, so any facility already restructured stays ' +
+          'identifiable and can be excluded retrospectively once this is answered.',
+        needs:
+          'A yes or no. This is the single question standing between a finished, tested ' +
+          'feature and production use.',
+      },
+      {
+        ref: 'BOT-FORMAT-01A',
+        title: 'MSP2-04 rate cells where there is no lending',
+        question:
+          'Should an MSP2-04 interest-rate cell be reported as 0 or left blank when the ' +
+          'institution did no lending of that type in the quarter?',
+        why:
+          'They are not the same statement. Writing 0 asserts that lending took place at a ' +
+          'rate of zero per cent; blank says there was none to report.',
+        blocks: 'Nothing else. It is a presentation rule for one form.',
+        current:
+          'Left blank, because a blank cell cannot be misread as a claim about a rate, and 0 ' +
+          'can.',
+        needs: 'A ruling on which the Bank expects.',
+      },
       {
         ref: 'BOT-11.2',
         title: 'Rate annualisation',
         question:
-          'Are MSP2-04 rates read as simple (monthly × 12) or effective ((1 + monthly)¹² − 1)?',
+          'Is an annualised rate the simple monthly rate times twelve, or the effective rate ' +
+          'compounded?',
         why:
-          'At 5% a month the two differ by nearly twenty percentage points — 60% against ' +
-          '79.59%. The wrong convention misstates every rate on the form.',
-        blocks: 'Nothing. Both conventions are implemented.',
+          'On a 3% monthly rate the two differ by more than six percentage points — 36% simple ' +
+          'against 42.58% effective. That difference is reported to the Bank.',
+        blocks: 'Nothing. The convention is an explicit parameter rather than a hidden choice.',
         current:
-          'An explicit query parameter, simple by default, and the convention used is printed ' +
-          'on the compiled return. The choice is visible on the filed form rather than buried ' +
-          'in the compiler.',
-        needs:
-          'One answer. The parameter stays either way — it is what makes the answer auditable.',
+          'Simple annualisation by default, and the convention used is echoed on the form ' +
+          'alongside the figure, so a reader can see which was applied.',
+        needs: 'A ruling naming the convention.',
       },
       {
         ref: 'BOT-11.4',
         title: 'Age-band reference date',
-        question: 'As at which date is a borrower’s age measured for MSP2-10’s demographic bands?',
+        question:
+          'Is a borrower’s age band taken at the reporting date, at disbursement, or at some ' +
+          'other date?',
         why:
-          'A borrower who turns 36 during a quarter falls in a different band depending on the ' +
-          'date chosen.',
-        blocks: 'Nothing. The date is a required argument.',
+          'A borrower who turns 36 during a quarter falls in a different band depending on ' +
+          'which date is used, and MSP2-10 reports by band.',
+        blocks: 'Nothing. The date is a required argument, never defaulted.',
         current:
-          'Nothing defaults it, so no caller can accidentally measure age as at today when the ' +
-          'return covers a quarter that ended months ago.',
-        needs: 'The reference date. The parameter already exists to receive it.',
+          'The caller must state the reference date. Nothing assumes one, so a return cannot ' +
+          'be compiled on an unstated assumption.',
+        needs: 'The date the Bank intends.',
       },
       {
         ref: 'BOT-11.5',
         title: 'Housing loans under 91 days overdue',
-        question:
-          'BOT’s housing microfinance provisioning schedule begins at 91 days and defines no ' +
-          'band below it. How should a housing loan 0–90 days overdue be classified?',
+        question: 'How is a housing loan classified when it is between 0 and 90 days overdue?',
         why:
-          'Every other loan type has a band covering its first ninety days. Housing does not, ' +
-          'so there is no rule to apply.',
-        blocks: 'Classification of housing loans in their first ninety days of arrears.',
+          'BOT’s housing provisioning schedule begins at 91 days and defines nothing below ' +
+          'it. There is no Current column on the form for such a loan.',
+        blocks: 'Nothing. Such loans are surfaced rather than placed.',
         current:
-          'Such a loan is NOT classified, and is never folded into Current. It is surfaced on ' +
-          'its own row so the gap reaches an operator. Quietly calling it performing would ' +
-          'understate provisions and file a wrong MSP2-03.',
-        needs: 'A ruling. Until then the gap stays visible, which is the point.',
+          'Left unclassified and reported as a refusal, with the loans named. They are never ' +
+          'folded into Current, because no published schedule puts them there.',
+        needs: 'The classification and provisioning rate for that band.',
       },
       {
         ref: 'BOT-11.8 · BOT-11.8B',
         title: 'Fiscal year for the year-to-date column',
         question:
-          'Does MSP2-02’s year-to-date column mean the calendar year or the institution’s own ' +
+          'Does the year-to-date column run from the calendar year or the institution’s ' +
           'fiscal year? And must a fiscal year begin on a quarter boundary?',
         why:
-          'The second half of this question is not academic. A fiscal year starting on a ' +
-          'quarter boundary keeps every year-to-date window at twelve months or fewer. A start ' +
-          'month that does not — December, say — makes one quarter straddle the boundary and ' +
-          'produces a THIRTEEN-month window: Q4 2026 would run from 1 December 2025 to 31 ' +
-          'December 2026.',
-        blocks: 'Nothing. Both are expressible.',
+          'A fiscal year starting in a month that is not a quarter boundary produces a ' +
+          'year-to-date window that does not align with the quarters being reported.',
+        blocks: 'Nothing. The window is a required parameter and is echoed on the return.',
         current:
-          'Entries are dated rather than bucketed by quarter, so the same rows aggregate both ' +
-          'ways. The fiscal year start is a required parameter, never defaulted, and the window ' +
-          'actually used is reported on the form as “year to date from”. The thirteen-month ' +
-          'case is left exactly as it is and pinned by test, because choosing a rule for ' +
-          'non-aligned fiscal years would be inventing an answer.',
-        needs:
-          'One answer on the year, plus a note on whether a fiscal year must begin on a quarter ' +
-          'boundary.',
+          'The caller states the start of the window, and the value used is reported back as ' +
+          'part of the return. Any month is accepted; a non-aligned year produces a window ' +
+          'that is stated rather than silently adjusted.',
+        needs: 'Which year governs, and whether a non-quarter start is permitted.',
       },
       {
         ref: 'AUDIT-01',
         title: 'Audit retention period',
-        question: 'How long must an institution retain its audit trail?',
+        question:
+          'How long must audit records be retained, and is there a maximum beyond which they ' +
+          'must be destroyed?',
         why:
-          'Implementing deletion is a one-way door. Records removed on a schedule this system ' +
-          'invented cannot be recovered for an inspection that asks for them.',
+          'Retention is a supervisory requirement. Deleting too early destroys evidence; ' +
+          'keeping data that must be destroyed is its own breach.',
         blocks: 'Nothing. Retention is simply not implemented.',
         current:
-          'Nothing is ever deleted. There is no purge job, no archival and no retention setting. ' +
-          'The audit table has no update or delete policy for any role, so entries cannot be ' +
-          'amended or removed even by the application.',
+          'Nothing is ever deleted. The audit table has no update or delete policy for any ' +
+          'role, so entries cannot be amended or removed even by the application.',
         needs:
           'The retention period. Note that keeping everything is the safe default and is the ' +
           'current behaviour.',
@@ -296,9 +312,25 @@ const SECTIONS = [
     ],
   },
 ];
+/**
+ * How many questions, and how many register entries they carry.
+ *
+ * Counted rather than written down. The previous cover said “Twelve questions,
+ * carrying thirty-one entries” long after six of them had been answered — a
+ * document that misstates its own size invites doubt about the rest of it.
+ */
+const QUESTION_COUNT = SECTIONS.reduce((total, section) => total + section.questions.length, 0);
+
+const ENTRY_COUNT = SECTIONS.flatMap((section) => section.questions).reduce(
+  (total, question) =>
+    total +
+    question.ref.split(' · ').filter((part) => /^[A-Z][A-Z0-9.-]*$/.test(part.trim())).length,
+  0,
+);
 
 const FOOTNOTE =
-  'Prepared from docs/03-STATUS.md, which remains the authoritative list. Nothing in this ' +
+  'Prepared from docs/04-DECISION-REGISTER.md, which remains the authoritative list and ' +
+  'carries every identifier used here. Nothing in this ' +
   'document is a proposed answer. Where the system must do something while a question is ' +
   'open it refuses, or records the fact and leaves it visible — because on a system that ' +
   'moves real money, a guess does not announce itself.';
@@ -310,7 +342,7 @@ function main() {
     info: {
       Title: 'MFI Manager — open business and regulatory questions',
       Author: 'MFI Manager',
-      Subject: 'Decisions required before the blocked modules can be built',
+      Subject: 'Decisions still required, and what each one holds back',
     },
     autoFirstPage: false,
   });
@@ -361,7 +393,7 @@ function main() {
     .font(FONT)
     .fontSize(12)
     .fillColor(ACCENT)
-    .text('MFI Manager — decisions required before the blocked modules can be built', {
+    .text('MFI Manager — decisions still required, and what each one holds back', {
       width: CONTENT_WIDTH,
     });
 
@@ -379,8 +411,9 @@ function main() {
     .fontSize(9.5)
     .fillColor(INK)
     .text(
-      'Twelve questions, carrying thirty-one entries in the decision register. Each blocks ' +
-        'a module that moves real money, and none can be answered from the supplied ' +
+      `${String(QUESTION_COUNT)} questions, carrying ${String(ENTRY_COUNT)} entries in the ` +
+        'decision register. Each one holds back a figure, a posting or an operation on a ' +
+        'system that moves real money, and none can be answered from the supplied ' +
         'documentation. Until an answer arrives the system refuses rather than guesses — ' +
         'every “current behaviour” below is the conservative option, chosen so that no ' +
         'borrower’s balance moves for a reason nobody decided.',

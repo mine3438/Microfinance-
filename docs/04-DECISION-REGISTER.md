@@ -22,6 +22,7 @@ index.
 | --- | --- |
 | **DECIDED + IMPLEMENTED** | Decision received, and the behaviour is built and tested. |
 | **DECIDED + IMPLEMENTATION PENDING** | Decision received and recorded here; the code does not yet do it. The old safe behaviour still stands in the meantime. |
+| **DECIDED (policy recorded)** | Decision received and recorded here, and deliberately not built — because another entry blocks it. Not the same as pending: there is nothing waiting to be written, only a question waiting to be answered. |
 | **NOT APPLICABLE** | The institution does not do this. Nothing is built, and nothing needs to be. |
 | **BLOCKED BY BOT** | Waiting on a Bank of Tanzania interpretation. No code guesses at it. |
 | **BLOCKED BY ACCOUNTING POLICY** | The business rule is decided; the journal/ledger mapping is not. The domain record exists and carries enough to post correctly once the mapping is approved. |
@@ -75,7 +76,7 @@ with what it was.
 | BOT-11.5 | Housing loans 0–90 days overdue | BLOCKED BY BOT | Unclassified and surfaced; never Current | BOT ruling |
 | BOT-11.8 | Calendar year or the institution fiscal year | BLOCKED BY BOT | Required parameter, echoed as `yearToDateFrom` | BOT ruling |
 | BOT-11.8B | Whether a fiscal year must begin on a quarter boundary | BLOCKED BY BOT | Any month 1–12 accepted; a non-aligned year can produce a window over twelve months, reported as it stands | BOT or business |
-| RESTRUCT-06 | Whether MSP2-09 counts a restructured facility as a disbursement | BLOCKED BY BOT | The successor carries the restructuring date, so MSP2-09 counts it; no cash moves, so this may overstate lending | BOT ruling |
+| RESTRUCT-06 | Whether MSP2-09 counts a restructured facility as a disbursement | BLOCKED BY BOT | The successor carries the restructuring date, so MSP2-09 would count it; no cash moves, so this may overstate lending. The operation is therefore withheld: `RESTRUCTURING_ENABLED` defaults to `false` and the routes are not mounted | BOT ruling |
 | AUDIT-01 | Audit retention period | BLOCKED BY BOT | Nothing is ever deleted | BOT requirement |
 | IDENTITY-01 | May one person hold accounts at two institutions | BLOCKED BY BUSINESS | Refused; email addresses globally unique | Business decision |
 | AUDIT-02 | Audit branch filtering | DEFERRED | No branch on an audit event; no filter offered | Only if an authoritative branch relationship appears |
@@ -139,9 +140,19 @@ fault this project records as R8 and has already had to repair twice.
 - Members stay associated for membership, identification, audit and operational
   management, and membership history must remain interpretable after it changes.
 
-**Status.** DECIDED + IMPLEMENTATION PENDING. No group tables exist yet, so the
-current behaviour is unchanged: a loan to a member of a group is an ordinary
-loan to that borrower. Nothing has been half-built.
+**Status.** DECIDED (policy recorded). The membership half is built (GROUP-06);
+lending to a group is not, and waits on GROUP-05 below.
+
+`groups` and `group_members` exist (migrations 0029 and 0030), with membership
+held as intervals rather than a roster, and are reachable from the interface: a
+group list, a group with its roster read as at any date, add and depart, and the
+reverse view of one borrower’s groups. Nothing there touches money.
+
+`loans` is still untouched — no `group_id`, no group borrower, no group
+disbursement and no group repayment. A loan to a member of a group remains an
+ordinary loan to that borrower, exactly as before. The joint-liability
+arithmetic above is decided and recorded but deliberately not built, because
+GROUP-05 decides how its result would be reported.
 
 **Extensibility already confirmed.** `loans.client_id` is `NOT NULL` with a
 composite key into `clients`. The joint-liability model needs a `groups` table, a
@@ -225,7 +236,13 @@ If the application is **approved** the institution retains it. If **rejected**
 it is refunded, and the collection record is kept — a refund is a second event,
 never a deletion of the first.
 
-**Status.** DECIDED + IMPLEMENTATION PENDING.
+**Status.** DECIDED + IMPLEMENTED, except for the ledger posting (FEE-04).
+
+`loan_application_fees` (migration 0028) records the collection, and a refund is
+recorded against it as a second event. The state — `collected`, `retained`,
+`refund_due`, `refunded` — is derived by the server from the application and the
+refund stamp; it is never stored, and never read off the loan’s current status.
+Both collection and refund are reachable from the loan screen.
 
 **What stays true meanwhile, and after.** The allocator's fee bucket keeps its
 fixed position and continues to allocate **nil**. The TZS 5,000 never travels
@@ -314,11 +331,20 @@ are fully recorded and traceable; no journal entry is posted.
 - The TZS 5,000 application fee is **not** part of a settlement quote; it was
   handled at application.
 
-**Status.** DECIDED + IMPLEMENTATION PENDING. Ordinary repayments continue to
-work exactly as before, and there is still no settlement endpoint — which is the
-safe interim, because an oversized ordinary repayment would allocate against the
-*whole* remaining scheduled interest rather than interest through the settlement
-month. That is precisely why settlement has to be its own operation.
+**Status.** DECIDED + IMPLEMENTED.
+
+Settlement is its own operation, which is the whole point of it: an oversized
+ordinary repayment would allocate against the *whole* remaining scheduled
+interest rather than interest through the settlement month, so it could never
+have produced this figure. Ordinary repayments are unchanged.
+
+A quote endpoint returns the four amounts and the interest not charged; taking
+the settlement records an ordinary payment row carrying the split and closes the
+loan. No migration was needed, because a settlement *is* a payment. The quote is
+recomputed on every request and again before anything closes, and the amount
+submitted must equal it — so a screen left open produces a refusal rather than a
+wrong settlement. The interface quotes, shows the breakdown and confirms; it
+computes none of it.
 
 ### Restructuring
 
@@ -339,7 +365,20 @@ month. That is precisely why settlement has to be its own operation.
   ordinary repayments, and records the link to its successor.
 - The new loan starts **Current** and does not inherit the old classification.
 
-**Status.** DECIDED + IMPLEMENTATION PENDING.
+**Status.** DECIDED + IMPLEMENTED, and deliberately **not exposed** — see
+RESTRUCT-06.
+
+`loan_restructurings` (migration 0031) records the link and the decomposed
+amounts carried across, and `restructured` is a loan status of its own so a
+restructured loan never reads as a repaid one. The operation is built and
+covered by tests.
+
+It is not reachable in production. `RESTRUCTURING_ENABLED` defaults to `false`
+and the routes are not registered when it is off, so they answer 404 rather than
+403 — absent, not forbidden, because a permission or role change could otherwise
+undo the decision without anyone revisiting RESTRUCT-06. There is no
+restructuring screen, route or client binding either. The test suite sets the
+flag, so the implementation stays proven for the day the ruling arrives.
 
 **Regulatory caveat on RESTRUCT-05.** Starting a restructured loan at Current is
 the institution's approved operational policy and is recorded as such. No
